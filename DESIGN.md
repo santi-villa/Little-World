@@ -1,4 +1,4 @@
-# DESIGN.md — Acuario (nombre provisional)
+# DESIGN.md — Little World
 
 > Documento de diseño del juego. Es la fuente de verdad para cualquier sesión de desarrollo (incluida Claude Code).
 > Antes de programar algo nuevo, leer la sección correspondiente. Si una decisión cambia, se actualiza este archivo en el mismo commit.
@@ -94,29 +94,40 @@ Posible migración futura a Godot 4 si se quiere publicar en Play Store con noti
 
 ```
 /src
+  main.ts           arranque: Pixi, carga de la partida, bucle principal
+  game.ts           une la simulación con el reloj real (el único que lo conoce)
   /sim          ← simulación pura (SIN imports de Pixi ni del DOM)
-    clock.ts        tiempo real y catch-up offline
-    water.ts        química del agua
+    index.ts        API pública: step, applyAction, createNewTank, derive
+    step.ts         step(state, deltaMinutes) -> { state, events }
+    actions.ts      acciones del jugador: applyAction(state, action)
+    state.ts        creación de una pecera nueva
+    types.ts        forma del estado, eventos y acciones
+    config.ts       carga tipada de los JSON de /data
+    chemistry.ts    fórmulas puras (NH3 libre, saturación de O2, pH)
+    derive.ts       valores derivados del estado (NH3 libre, oxígeno 0–1, caudal)
+    clock.ts        tiempo: hora del día y pasos fijos (el catch-up offline llega en la Fase 3)
+    water.ts        química del agua: residuos, gases, cloro, evaporación, pH/KH
     bacteria.ts     ciclo del nitrógeno
     thermal.ts      temperatura de la habitación y la pecera
-    fish.ts         necesidades, estrés, salud, edad
-    behavior.ts     decisiones de comportamiento (qué quiere hacer cada animal)
-    compat.ts       compatibilidad entre especies
     algae.ts
-    plants.ts
-    cat.ts          necesidades del gato
-    economy.ts
-    events.ts       generación de entradas del diario
+    events.ts       alertas (y, más adelante, entradas del diario)
     rng.ts          RNG con semilla (determinista)
+    fish.ts         (futuro) necesidades, estrés, salud, edad
+    behavior.ts     (futuro) decisiones de comportamiento
+    compat.ts       (futuro) compatibilidad entre especies
+    plants.ts       (futuro)
+    cat.ts          (futuro) necesidades del gato
+    economy.ts      (futuro)
   /render       ← todo lo visual
+    viewport.ts     escalado entero pixel perfect
     scene/          habitaciones y capas
     tank/           agua, vidrio, algas, peces, plantas
-    fx/             partículas, shaders, iluminación
-    ui/
-  /world        ← clima real y geolocalización
-  /audio
-  /data         ← JSON: species, plants, tanks, rooms, items, decor
-  /save
+    fx/             (futuro) partículas, shaders, iluminación
+    ui/             HUD, fuente de píxeles, textos, panel de debug
+  /world        ← (futuro) clima real y geolocalización
+  /audio        ← (futuro)
+  /data         ← JSON: sim-config, tanks, texts.es (y después species, plants, rooms, items, decor)
+  /save         ← formato con versión + IndexedDB
 /docs
   /referencias
 /tests
@@ -138,6 +149,8 @@ Esto permite:
 ### Tiempo real 1:1
 
 - El juego usa la **hora real del dispositivo**. Un día en el juego es un día real.
+- El reloj de la simulación (`timeMinutes`) arranca en la hora local del dispositivo al crear la pecera.
+- El panel de debug permite acelerar el tiempo (1 min, 1 hora o 1 día por segundo) y saltar 1 hora, 1 día o 1 semana. Es solo para probar: la velocidad normal es 1:1.
 - El ciclo día/noche usa la **salida y puesta del sol reales** de tu ubicación.
 
 ### Catch-up offline
@@ -151,6 +164,8 @@ Esto permite:
 4. Para la temperatura exterior durante la ausencia se usa el **histórico horario de Open-Meteo** (`past_days`), así el invierno o el calor que hubo realmente afecta la pecera.
 5. El RNG tiene semilla: la misma ausencia da siempre el mismo resultado (no se puede "rerollear" cerrando y abriendo).
 6. Al volver se muestra un **resumen de bienvenida** con lo que pasó: crías nacidas, parámetros que cambiaron, algas, el gato hizo algo, etc.
+
+Estado: la regla de los pasos fijos ya está en `sim/clock.ts` (`planSteps`) y `step()` la usa. El catch-up en sí (simular lo que pasó con el juego cerrado) llega en la Fase 3: por ahora, al volver, la pecera sigue desde donde quedó.
 
 ### Realismo de la ausencia
 
@@ -195,7 +210,10 @@ Los colores del cielo cambian al amanecer y al atardecer reales.
 - **Temperatura de la habitación**: sigue a la exterior con inercia (la casa amortigua).
   - `T_hab` tiende a `T_confort (20–22 °C) + k * (T_ext - T_confort)`, con `k ≈ 0.3` y ventana cerrada.
   - Con la ventana abierta, `k ≈ 0.7`.
+  - La inercia es de unas 4 horas con la ventana cerrada y 1 hora con la ventana abierta.
+  - Hasta que llegue el clima real (Fase 3), la temperatura exterior es **sintética**: una media ajustable + ciclo diario + un desvío aleatorio lento que sale del RNG con semilla.
 - **Temperatura del agua**: tiende a `T_hab`. El calefactor la empuja hacia su setpoint según potencia/litros.
+  - Modelo: el agua pierde calor por los vidrios, la superficie y la evaporación (pérdidas proporcionales a la superficie) y tiene la inercia de su volumen. Por eso los mismos watts sostienen más grados en una pecera chica que en una grande.
 - **Luz solar directa** sobre la pecera (según ubicación, hora, nubes y cortina) → más algas y más temperatura.
 
 ---
@@ -207,20 +225,28 @@ Todas las constantes van en `src/data/sim-config.json` para poder ajustarlas. Un
 ### Variables por pecera
 
 ```
-volume_L, waterLevel (0–1)
-temp_C
-ammonia_total (NH3 + NH4+)
-nitrite (NO2)
-nitrate (NO3)
-pH, KH, GH
-oxygen (0–1 relativo a saturación)
+volume_L, waterLevel (0–1)        tank.waterLiters / tank.fullLiters
+temp_C                            water.temperatureC
+ammonia_total (NH3 + NH4+)        water.ammonia   ppm, como NH3
+nitrite (NO2)                     water.nitrite   ppm
+nitrate (NO3)                     water.nitrate   ppm
+pH, KH, GH                        water.ph, water.kh (dKH), water.gh (dGH)
+co2                               water.co2       mg/L (junto con el KH determina el pH)
+oxygen                            water.oxygen    mg/L; derive().oxygenRelative lo da de 0 a 1
 chlorine (0 si se usó acondicionador)
-organicWaste (comida sin comer + restos)
+organicWaste                      organics.foodG (comida sin comer) + organics.detritusG (restos)
 phosphate (simplificado, para algas)
-tannins (color ámbar, por madera u hojas)
-bacteria_AOB, bacteria_NOB (población, 0–capacidad)
-algae_glass, algae_decor (0–1)
+tannins (color ámbar, por madera u hojas)   0–1; por ahora solo se diluye, todavía no hay fuentes
+bacteria_AOB, bacteria_NOB        bacteria.filter y bacteria.surfaces, en mg de N por día
+algae_glass, algae_decor (0–1)    algae.glass, algae.decor
 ```
+
+Notas sobre las unidades:
+
+- Las concentraciones se guardan en **ppm como las lee un test**: amoníaco total como NH3, nitrito como NO2⁻, nitrato como NO3⁻. Para las cuentas del ciclo se pasan a nitrógeno (1 mg de N de amoníaco → 1 mg de N de nitrito → 1 mg de N de nitrato).
+- El **oxígeno** se guarda en mg/L (es lo que se conserva al mezclar agua y lo que cambia con la temperatura). El valor de 0 a 1 de la tabla de umbrales es relativo a la saturación del agua a 20 °C (≈9,1 mg/L): así el agua caliente, aunque esté saturada, queda por debajo de 1.
+- La **población de bacterias** se mide por su capacidad máxima de oxidación (mg de N por día). Vive en dos lugares: el material filtrante (la mayor parte) y las superficies (sustrato, vidrios, decoración).
+- La **carga biológica** (peces, en fases futuras) entra como mg de N de amoníaco por día. Hasta que haya peces se ajusta a mano desde el panel de debug.
 
 ### Ciclo del nitrógeno
 
@@ -241,6 +267,16 @@ NOB (bacterias): nitrito → nitrato
 Nitrato:
   se acumula; solo baja con cambios de agua y plantas
 ```
+
+Cómo está modelado:
+
+- La conversión sigue una curva de saturación (Monod): con poco sustrato es proporcional a lo que hay, con mucho se topa con la capacidad de la colonia. Depende también de la temperatura, del pH (en agua ácida se frena) y del oxígeno.
+- Una colonia **crece solo si le sobra comida** (saturación por encima de un nivel de mantenimiento) y, en equilibrio, puede procesar alrededor de 1,7 veces la carga habitual. Por eso un aumento chico de carga no se nota y uno grande provoca un pico.
+- Si pasa hambre muere despacio (≈5% por día como máximo), y siempre queda un rastro del que puede volver a crecer.
+- El NH3 libre frena a las NOB: es otra razón por la que el nitrito llega después.
+- Nitrificar consume oxígeno y **KH** (≈0,4 dKH por cada mg/L de N). Sin KH la nitrificación se frena.
+- El cloro mata bacterias en proporción a su concentración; con el filtro apagado, las del filtro se mueren en pocos días.
+- La pecera se considera **ciclada** cuando lleva 48 h con amoníaco y nitrito por debajo de 0,2 ppm y con colonias suficientes; se pierde si el amoníaco pasa de 0,5 ppm o el nitrito de 1 ppm.
 
 **Ciclado de una pecera nueva**: con fuente de amoníaco tarda de 3 a 6 semanas reales en estabilizarse. Si usás **material de filtro colonizado** (regalo del tutorial o de otra pecera tuya) arranca con bacterias.
 
@@ -264,17 +300,22 @@ Por eso el mismo amoníaco es más peligroso en agua alcalina y caliente. El dia
 
 La temperatura y el pH dependen de cada especie (ver catálogo).
 
+La simulación emite un evento cuando se cruza cada umbral (y otro cuando se normaliza), con un margen del 10% para que no parpadee. Además avisa de: crash de pH (pH < 6), KH bajo (< 1 dKH), falta de agua (nivel < 0,85), filtro tapado y muchas algas en el vidrio.
+
 ### Otros procesos
 
 - **pH**: baja lentamente con la acumulación de residuos orgánicos y nitrato. El KH lo amortigua (con KH bajo el pH puede caer de golpe, el "crash de pH"). La madera y las hojas de almendro lo bajan. La roca caliza lo sube.
+  - Modelo: el pH no es una variable independiente; sale del KH y del CO2 disuelto (`pH = 7 + log10(3 · KH / CO2)`). Lo que acumula nitrato (la nitrificación) consume KH, y los residuos al pudrirse sueltan CO2. De día las algas consumen CO2 y el pH sube un poco.
 - **Oxígeno**: baja con la temperatura (el agua caliente tiene menos oxígeno), con más peces y de noche con muchas plantas. Sube con aireador, filtro de cascada y movimiento en la superficie.
-- **Evaporación**: el nivel baja (más rápido con calor y sin tapa). Los minerales se concentran. Se rellena con agua acondicionada.
+- **Evaporación**: el nivel baja (más rápido con calor y sin tapa). Los minerales se concentran. Se rellena con agua acondicionada. Si falta mucha agua el filtro pierde caudal. Evaporar también enfría el agua.
+- **Residuos orgánicos**: la comida sin comer se pudre en pocos días (más rápido con calor); una parte pasa a detrito, que se descompone despacio. Pudrirse libera amoníaco, fosfato y CO2 y consume oxígeno.
 - **Agua de la canilla**: tiene cloro o cloramina. Configurable por región: pH ~7.4, KH y GH moderados por defecto.
+  - Por defecto (`tapWater` en `sim-config.json`): 18 °C, KH 4, GH 6, 1 ppm de cloro libre, sin nitrato. Por ahora se modela cloro libre (se va solo en horas), no cloramina.
 
 ### Cambio de agua
 
 - Elegís el % (lo recomendable es 20–30% semanal).
-- Diluye amoníaco, nitrito, nitrato, residuos y taninos en ese %.
+- Diluye amoníaco, nitrito, nitrato, residuos y taninos en ese %. Sifonear el fondo saca el doble de residuos.
 - Si el agua nueva tiene **otra temperatura** (más de 2 °C de diferencia), los peces se estresan.
 - **Sin acondicionador** entra cloro: daña bacterias y estresa peces.
 - Cambios muy grandes (más del 50%) de golpe → shock por cambio brusco de parámetros.
@@ -285,12 +326,14 @@ La temperatura y el pH dependen de cada especie (ver catálogo).
 - Se ensucia con el tiempo y el caudal baja.
 - Limpieza correcta: **enjuagar en agua de la pecera** (la que sacaste en el cambio) → mantiene las bacterias.
 - Limpieza incorrecta: **agua de la canilla** → mata del 70 al 90% de las bacterias → mini re-ciclado (pico de amoníaco).
-- Cambiar todo el material de golpe: mismo efecto.
+- Cambiar todo el material de golpe: mismo efecto (se va la colonia entera del filtro).
+- El porcentaje exacto que muere al lavarlo mal sale del RNG con semilla.
 
 ### Algas
 
 - Crecen con: horas de luz (más de 8–10 h/día), luz solar directa, nitrato y fosfato altos, y pocas plantas.
 - Bajan con: plantas que compiten por nutrientes, animales comealgas y limpieza manual.
+- Modelo actual: crecen con las horas de luz, el nitrógeno (prefieren el amoníaco) y el fosfato; de día producen oxígeno y consumen CO2; las que mueren vuelven como detrito. El vidrio recibe más luz y se cubre antes que la decoración. Faltan el sol directo, las plantas que compiten y los comealgas.
 - Tipos visuales (fase futura): película verde en el vidrio, puntos verdes, algas filamentosas y agua verde (si hay mucho sol).
 
 ---
@@ -533,6 +576,8 @@ Todo lo que ves se puede tocar. Cada objeto tiene un estado y una animación.
 | Rectangular mediana | 60×30×36 | ~65 L | Comunidad: guppys, platys, cardumen, corys |
 | Rectangular grande | 100×40×45 | ~180 L | Escalares, cardúmenes grandes, goldfish (pecera de agua fría), ancistrus |
 
+Los modelos están en `src/data/tanks.json` con sus medidas, el nivel de llenado y el equipo de base (watts del calefactor, caudal y capacidad del filtro). La redonda está aproximada como una caja de volumen equivalente.
+
 Cada pecera tiene: volumen, superficie de intercambio de gases, altura (importa para los escalares), equipo instalado, sustrato, decoración y plantas.
 
 ### Lugares (habitaciones)
@@ -703,9 +748,10 @@ Volúmenes separados: música, ambiente y efectos.
 ## 16. Guardado
 
 - Se guarda en IndexedDB: estado de la simulación, `lastTimestamp`, ubicación, ajustes y semilla del RNG.
-- Autoguardado cada 1 minuto y al pasar a segundo plano.
-- Exportar e importar la partida como archivo JSON (backup).
-- Versión del formato del save con migraciones.
+- Autoguardado cada 1 minuto, al pasar a segundo plano y enseguida después de cada acción del jugador.
+- Exportar e importar la partida como archivo JSON (backup). *(Pendiente.)*
+- Versión del formato del save con migraciones (`formatVersion` en `src/save/save-format.ts`). Un guardado ilegible o de una versión más nueva no se pisa: queda una copia de respaldo.
+- La "semilla del RNG" que se guarda es el estado actual del generador, que vive dentro del estado de la simulación.
 
 ---
 
@@ -714,16 +760,16 @@ Volúmenes separados: música, ambiente y efectos.
 Cada fase termina con algo jugable y publicado en GitHub Pages.
 
 ### Fase 0: Base
-- [ ] Proyecto Vite + TypeScript + PixiJS + PWA + deploy automático
-- [ ] Escena vacía 640×360 escalada, orientación horizontal
-- [ ] Guardado básico
+- [x] Proyecto Vite + TypeScript + PixiJS + PWA + deploy automático
+- [x] Escena vacía 640×360 escalada, orientación horizontal
+- [x] Guardado básico
 
 ### Fase 1: Química del agua (sin gráficos)
-- [ ] `sim/` con agua, bacterias y temperatura
-- [ ] Tests: una pecera nueva cicla en 3 a 6 semanas simuladas
-- [ ] Tests: lavar el filtro con agua de la canilla provoca un pico de amoníaco
-- [ ] Tests: sobrealimentar sube el amoníaco
-- [ ] Panel de debug para ver los parámetros
+- [x] `sim/` con agua, bacterias y temperatura
+- [x] Tests: una pecera nueva cicla en 3 a 6 semanas simuladas
+- [x] Tests: lavar el filtro con agua de la canilla provoca un pico de amoníaco
+- [x] Tests: sobrealimentar sube el amoníaco
+- [x] Panel de debug para ver los parámetros
 
 ### Fase 2: Una pecera viva
 - [ ] Cubo de 20 L dibujado con agua, burbujas, rayos de luz y planta ondulando
@@ -778,15 +824,16 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - La simulación es **determinista**: mismo estado + misma semilla + mismo delta = mismo resultado.
 - Toda mecánica nueva de la simulación va con al menos un test en Vitest.
 - Mobile first: probar en el celular, apuntar a 60 fps y no pasarse con las partículas.
-- Pixel perfect: posiciones enteras, escalado entero, sin suavizado de texturas.
+- Pixel perfect: posiciones enteras, escalado entero, sin suavizado de texturas. El múltiplo entero se calcula en píxeles físicos de la pantalla (píxeles CSS × devicePixelRatio).
 - Commits chicos y descriptivos, una funcionalidad por vez.
-- Textos del juego en español (rioplatense neutro), centralizados en un archivo de textos para traducir después.
+- Textos del juego en español (rioplatense neutro), centralizados en un archivo de textos para traducir después (`src/data/texts.es.json`).
+- `npm run typecheck` compila `src/sim` aparte sin las librerías del DOM: si la simulación toca el navegador, falla.
 
 ---
 
 ## 19. Preguntas abiertas
 
-- [ ] Nombre del juego
+- [x] Nombre del juego: **Little World**
 - [ ] Nombre de la moneda
 - [ ] Nombre y aspecto del gato (¿se elige al empezar?)
 - [ ] ¿Modo suave activado por defecto o desactivado?
