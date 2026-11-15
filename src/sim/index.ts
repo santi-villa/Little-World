@@ -15,7 +15,68 @@ export {
   type SimConfig,
   type TankModel,
 } from './config';
-export { MINUTES_PER_DAY, MINUTES_PER_HOUR, dayIndex, hourOfDay, planSteps } from './clock';
+export {
+  MINUTES_PER_DAY,
+  MINUTES_PER_HOUR,
+  dayIndex,
+  hourOfDay,
+  planCatchUp,
+  planSteps,
+  type CatchUpPlan,
+  type StepPlan,
+} from './clock';
+export { catchUp, type CatchUpResult } from './catchup';
+export {
+  buildWelcomeSummary,
+  formatDuration,
+  type SummaryLine,
+  type SummaryTone,
+  type WelcomeSummary,
+} from './summary';
+export {
+  NO_ENVIRONMENT,
+  constantOutdoor,
+  outdoorAt,
+  type OutdoorSeries,
+  type SimEnvironment,
+} from './environment';
+export {
+  SPECIES,
+  findSpecies,
+  getSpecies,
+  groupStyle,
+  hasTrait,
+  type ActivityRhythm,
+  type Species,
+  type SpeciesCategory,
+  type Temperament,
+  type Zone,
+} from './species';
+export {
+  buildContext,
+  canEatSpecies,
+  createAnimal,
+  isAdult,
+  metabolism,
+  moodOf,
+  sizeFactor,
+  type TankContext,
+} from './fish';
+export { foodInReach, fullMealG, layerAccess } from './feeding';
+export { decideIntents, isActivePeriod, isDaytime } from './behavior';
+export { createCat, petTolerance } from './cat';
+export {
+  checkAddition,
+  checkCompatibility,
+  defaultMales,
+  stockFromAnimals,
+  type CompatCode,
+  type CompatSeverity,
+  type CompatTank,
+  type CompatWarning,
+  type StockEntry,
+} from './compat';
+export { fill } from './text';
 export {
   derive,
   effectiveFlowLph,

@@ -17,6 +17,7 @@ import { saturationVaporPressure } from './chemistry';
 import { MINUTES_PER_HOUR, hourOfDay } from './clock';
 import type { SimConfig } from './config';
 import { surfaceAreaM2 } from './derive';
+import { outdoorAt, type OutdoorSeries } from './environment';
 import type { Rng } from './rng';
 import type { SimState } from './types';
 
@@ -36,9 +37,13 @@ export function syntheticOutdoorC(state: SimState, config: SimConfig): number {
 }
 
 /**
- * Avanza el exterior y la habitación. El clima es un proceso AR(1) que se
- * actualiza una vez por hora (en el cruce de hora), así el resultado no
- * depende de cómo se parta el tiempo en pasos.
+ * Avanza el exterior y la habitación.
+ *
+ * Si llega una serie horaria de temperatura exterior (el clima real, o el
+ * valor fijo que usa el juego mientras tanto) se usa esa. Si no, el exterior
+ * es sintético: el clima es un proceso AR(1) que se actualiza una vez por
+ * hora (en el cruce de hora), así el resultado no depende de cómo se parta
+ * el tiempo en pasos.
  */
 export function stepRoom(
   state: SimState,
@@ -46,20 +51,26 @@ export function stepRoom(
   dtMinutes: number,
   rng: Rng,
   config: SimConfig,
+  outdoor?: OutdoorSeries,
 ): void {
   const o = config.outdoor;
   const room = state.room;
-  const hoursCrossed =
-    Math.floor(state.timeMinutes / MINUTES_PER_HOUR) -
-    Math.floor(previousTimeMinutes / MINUTES_PER_HOUR);
-  if (hoursCrossed > 0 && o.weatherSigmaC > 0) {
-    const keep = Math.exp(-1 / o.weatherTauHours);
-    const kick = o.weatherSigmaC * Math.sqrt(1 - keep * keep);
-    for (let i = 0; i < hoursCrossed; i++) {
-      room.weatherOffsetC = room.weatherOffsetC * keep + kick * rng.gaussian();
+  if (outdoor && outdoor.hourlyC.length > 0) {
+    // Se toma el valor del medio del paso.
+    room.outdoorC = outdoorAt(outdoor, state.timeMinutes - dtMinutes / 2);
+  } else {
+    const hoursCrossed =
+      Math.floor(state.timeMinutes / MINUTES_PER_HOUR) -
+      Math.floor(previousTimeMinutes / MINUTES_PER_HOUR);
+    if (hoursCrossed > 0 && o.weatherSigmaC > 0) {
+      const keep = Math.exp(-1 / o.weatherTauHours);
+      const kick = o.weatherSigmaC * Math.sqrt(1 - keep * keep);
+      for (let i = 0; i < hoursCrossed; i++) {
+        room.weatherOffsetC = room.weatherOffsetC * keep + kick * rng.gaussian();
+      }
     }
+    room.outdoorC = syntheticOutdoorC(state, config);
   }
-  room.outdoorC = syntheticOutdoorC(state, config);
 
   const r = config.room;
   const target = roomTargetC(room.outdoorC, room.windowOpen, config);

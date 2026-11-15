@@ -4,9 +4,15 @@
  */
 
 import { seedCapacity } from './bacteria';
+import { decideIntents } from './behavior';
+import { fillCatBowl, petCat } from './cat';
 import { NITROGEN_FRACTION, clamp } from './chemistry';
 import { defaultConfig, type SimConfig } from './config';
+import { NO_ENVIRONMENT } from './environment';
 import { updateAlerts } from './events';
+import { buildContext, createAnimal, scareAnimals } from './fish';
+import { defaultMales } from './compat';
+import { getSpecies } from './species';
 import { Rng } from './rng';
 import { cloneState } from './state';
 import type { SimAction, SimEvent, SimState, StepResult } from './types';
@@ -52,6 +58,14 @@ function killFilterBacteria(state: SimState, fraction: number, config: SimConfig
   filter.nob = Math.max(floor, filter.nob * (1 - fraction));
 }
 
+/** Todos vuelven a decidir qué hacer ya mismo (acaba de pasar algo). */
+function redecide(state: SimState, config: SimConfig): void {
+  const rng = new Rng(state.rngState);
+  // Se asume al jugador presente: una acción la hace alguien que está mirando.
+  decideIntents(state, buildContext(state, config), rng, config, { ...NO_ENVIRONMENT, playerPresent: true }, true);
+  state.rngState = rng.state;
+}
+
 export function applyAction(
   state: SimState,
   action: SimAction,
@@ -63,9 +77,22 @@ export function applyAction(
 
   switch (action.type) {
     case 'feed': {
+      // La comida cae a la superficie; feeding.ts la hunde y reparte.
       const grams = Math.max(0, action.grams);
-      next.organics.foodG += grams;
+      next.food.surfaceG += grams;
       events.push({ type: 'fed', timeMinutes, grams });
+      if (grams > 0 && next.animals.length > 0) {
+        // Aprenden que el jugador trae comida, y van enseguida a buscarla.
+        for (const animal of next.animals) {
+          if (!animal.alive) continue;
+          animal.feedingTrust = Math.min(
+            1,
+            animal.feedingTrust +
+              config.fish.feedingTrustPerFeeding * (0.5 + 0.5 * animal.personality.boldness),
+          );
+        }
+        redecide(next, config);
+      }
       break;
     }
 
@@ -74,14 +101,27 @@ export function applyAction(
       // residuos) y se repone el mismo volumen con agua de la canilla.
       const fraction = clamp(action.fraction, 0, 1);
       const liters = next.tank.waterLiters * fraction;
+      const temperatureBefore = next.water.temperatureC;
       next.tank.waterLiters -= liters;
       addTapWater(next, liters, action.conditioned, config, action.temperatureC);
+      // Cambios bruscos: otra temperatura, o demasiada agua de golpe, estresan.
+      const s = config.stress;
+      const shift = Math.abs(next.water.temperatureC - temperatureBefore);
+      const shock =
+        Math.max(0, shift - s.waterChangeTempToleranceC) * s.waterChangeTempPerC +
+        (fraction > s.bigWaterChangeFraction ? s.bigWaterChange : 0);
+      if (shock > 0) {
+        for (const animal of next.animals) {
+          if (animal.alive) animal.stress = Math.min(100, animal.stress + shock);
+        }
+      }
       // Sifonear el fondo saca bastante más suciedad que solo sacar agua.
       const removed = action.vacuum
         ? Math.min(1, fraction * config.organics.vacuumEfficiency)
         : fraction;
       next.organics.detritusG *= 1 - removed;
       next.organics.foodG *= 1 - removed;
+      next.food.sinkingG *= 1 - fraction;
       events.push({
         type: 'water_changed',
         timeMinutes,
@@ -205,6 +245,64 @@ export function applyAction(
       }
       break;
     }
+
+    case 'addAnimals': {
+      const species = getSpecies(action.speciesId);
+      const count = Math.max(0, Math.floor(action.count));
+      const males = clamp(action.males ?? defaultMales(species, count), 0, count);
+      const rng = new Rng(next.rngState);
+      for (let i = 0; i < count; i++) {
+        const animal = createAnimal(
+          next,
+          species.id,
+          i < males ? 'male' : 'female',
+          rng,
+          config,
+          action.ageDays,
+        );
+        next.animals.push(animal);
+        events.push({ type: 'animal_added', timeMinutes, id: animal.id, speciesId: species.id });
+      }
+      next.rngState = rng.state;
+      break;
+    }
+
+    case 'removeAnimal': {
+      const animal = next.animals.find((a) => a.id === action.id);
+      if (!animal) break;
+      next.animals = next.animals.filter((a) => a !== animal);
+      events.push({ type: 'animal_removed', timeMinutes, id: animal.id, speciesId: animal.speciesId });
+      break;
+    }
+
+    case 'removeDead': {
+      for (const animal of next.animals) {
+        if (animal.alive) continue;
+        events.push({ type: 'animal_removed', timeMinutes, id: animal.id, speciesId: animal.speciesId });
+      }
+      next.animals = next.animals.filter((animal) => animal.alive);
+      break;
+    }
+
+    case 'nameAnimal': {
+      const animal = next.animals.find((a) => a.id === action.id);
+      if (animal) animal.name = action.name.trim().slice(0, 24) || null;
+      break;
+    }
+
+    case 'tapGlass':
+      // Golpear el vidrio asusta a todos y les sube el estrés: no hay que hacerlo.
+      scareAnimals(next, config.stress.tapGlass, false, config);
+      events.push({ type: 'glass_tapped', timeMinutes, by: 'player' });
+      break;
+
+    case 'petCat':
+      petCat(next, config, events);
+      break;
+
+    case 'fillCatBowl':
+      fillCatBowl(next, events);
+      break;
   }
 
   updatePh(next, config);

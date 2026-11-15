@@ -6,14 +6,26 @@
  * la versión anterior en la nueva. Así las partidas viejas siguen cargando.
  */
 
-import type { SimState } from '../sim';
+import { createCat, defaultConfig, type SimState, type Weather } from '../sim';
 
-export const SAVE_FORMAT_VERSION = 1;
+export const SAVE_FORMAT_VERSION = 2;
 
 export interface GameSettings {
   /** Minutos simulados por segundo real (0 = pausa). */
   speed: number;
+  /** Temperatura exterior fija, hasta que se conecte el clima real. */
+  outdoorC: number;
+  /** Clima fijo, hasta que se conecte el clima real. */
+  weather: Weather;
 }
+
+export const DEFAULT_SETTINGS: GameSettings = {
+  speed: 1 / 60,
+  outdoorC: defaultConfig.outdoor.fixedC,
+  weather: 'clear',
+};
+
+const WEATHERS: readonly Weather[] = ['clear', 'cloudy', 'rain', 'storm'];
 
 export interface SaveFile {
   formatVersion: number;
@@ -29,8 +41,21 @@ export type Migration = (save: Record<string, unknown>) => Record<string, unknow
 
 /** MIGRATIONS[N] convierte de la versión N a la N+1. */
 export const MIGRATIONS: Record<number, Migration> = {
-  // Ejemplo para el día que haga falta:
-  // 1: (save) => ({ ...save, sim: { ...(save.sim as object), peces: [] } }),
+  // v1 -> v2: llegan los animales, la comida en el agua y el gato.
+  1: (save) => {
+    const sim = isRecord(save.sim) ? save.sim : {};
+    const time = typeof sim.timeMinutes === 'number' ? sim.timeMinutes : 0;
+    return {
+      ...save,
+      sim: {
+        ...sim,
+        animals: [],
+        nextAnimalId: 1,
+        food: { surfaceG: 0, sinkingG: 0 },
+        cat: createCat(time),
+      },
+    };
+  },
 };
 
 export type ParseResult =
@@ -70,7 +95,14 @@ export function parseSave(
     formatVersion: targetVersion,
     lastTimestamp: typeof current.lastTimestamp === 'number' ? current.lastTimestamp : 0,
     sim: current.sim as unknown as SimState,
-    settings: { speed: typeof settings.speed === 'number' ? settings.speed : 1 / 60 },
+    settings: {
+      speed: typeof settings.speed === 'number' ? settings.speed : DEFAULT_SETTINGS.speed,
+      outdoorC:
+        typeof settings.outdoorC === 'number' ? settings.outdoorC : DEFAULT_SETTINGS.outdoorC,
+      weather: WEATHERS.includes(settings.weather as Weather)
+        ? (settings.weather as Weather)
+        : DEFAULT_SETTINGS.weather,
+    },
   };
   return { status: 'ok', save, migratedFrom: version === targetVersion ? null : version };
 }

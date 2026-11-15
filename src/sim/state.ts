@@ -1,11 +1,12 @@
 /** Creación y copia del estado. */
 
 import { seedCapacity } from './bacteria';
+import { createCat } from './cat';
 import { oxygenSaturation, phFromKhCo2 } from './chemistry';
 import { DEFAULT_TANK_ID, defaultConfig, getTankModel, type SimConfig } from './config';
 import { seedToState } from './rng';
 import { roomTargetC, syntheticOutdoorC } from './thermal';
-import type { SimState } from './types';
+import type { AnimalState, SimState } from './types';
 
 export interface NewTankOptions {
   seed?: number | string;
@@ -89,6 +90,10 @@ export function createNewTank(
     algae: { glass: config.algae.seedCoverage, decor: config.algae.seedCoverage },
     bioload: { ammoniaMgNPerDay: options.ammoniaMgNPerDay ?? 0, wasteGPerDay: 0 },
     cycle: { established: false, stableMinutes: 0 },
+    animals: [],
+    nextAnimalId: 1,
+    food: { surfaceG: 0, sinkingG: 0 },
+    cat: createCat(options.startMinuteOfDay ?? d.startHour * 60),
     alerts: [],
   };
 
@@ -105,6 +110,10 @@ export function createNewTank(
   state.bacteria.filter = { aob: seed.filter + colonized, nob: seed.filter + colonized };
   state.bacteria.surfaces = { aob: seed.surfaces, nob: seed.surfaces };
   return state;
+}
+
+function cloneAnimal(animal: AnimalState): AnimalState {
+  return { ...animal, personality: { ...animal.personality } };
 }
 
 /** Copia profunda del estado (más rápida y tipada que pasar por JSON). */
@@ -126,6 +135,10 @@ export function cloneState(state: SimState): SimState {
     algae: { ...state.algae },
     bioload: { ...state.bioload },
     cycle: { ...state.cycle },
+    animals: state.animals.map(cloneAnimal),
+    nextAnimalId: state.nextAnimalId,
+    food: { ...state.food },
+    cat: { ...state.cat, needs: { ...state.cat.needs } },
     alerts: [...state.alerts],
   };
 }

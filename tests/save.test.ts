@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  DEFAULT_SETTINGS,
   SAVE_FORMAT_VERSION,
   createSave,
   parseSave,
@@ -12,20 +13,21 @@ import { DAY } from './helpers';
 
 const sampleState = () => {
   let state = createNewTank({ seed: 'guardado', ammoniaMgNPerDay: 10 });
+  state = applyAction(state, { type: 'addAnimals', speciesId: 'endler', count: 6 }).state;
   state = applyAction(state, { type: 'feed', grams: 1 }).state;
   return step(state, 3 * DAY).state;
 };
 
 describe('formato de guardado', () => {
   it('lleva versión de formato, lastTimestamp y la semilla del RNG', () => {
-    const save = createSave(sampleState(), { speed: 60 }, 1234);
+    const save = createSave(sampleState(), { ...DEFAULT_SETTINGS, speed: 60 }, 1234);
     expect(save.formatVersion).toBe(SAVE_FORMAT_VERSION);
     expect(save.lastTimestamp).toBe(1234);
     expect(save.sim.rngState).toBeTypeOf('number');
   });
 
   it('un guardado actual se lee tal cual', () => {
-    const save = createSave(sampleState(), { speed: 60 }, 1234);
+    const save = createSave(sampleState(), { ...DEFAULT_SETTINGS, speed: 60 }, 1234);
     const result = parseSave(JSON.parse(JSON.stringify(save)));
     expect(result).toEqual({ status: 'ok', save, migratedFrom: null });
   });
@@ -44,6 +46,21 @@ describe('formato de guardado', () => {
     expect(result.save.settings.speed).toBe(5);
     expect(result.save.lastTimestamp).toBe(99);
     expect(result.save.sim).toEqual(sim);
+  });
+
+  it('migra una partida v1 (sin animales ni gato) a la versión actual', () => {
+    const { animals, nextAnimalId, food, cat, ...old } = createNewTank({ seed: 'vieja' });
+    void animals, nextAnimalId, food, cat;
+    const result = parseSave({ formatVersion: 1, lastTimestamp: 7, sim: old, settings: { speed: 1 } });
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.migratedFrom).toBe(1);
+    expect(result.save.sim.animals).toEqual([]);
+    expect(result.save.sim.food).toEqual({ surfaceG: 0, sinkingG: 0 });
+    expect(result.save.sim.cat.behavior).toBeTypeOf('string');
+    expect(result.save.settings.outdoorC).toBe(DEFAULT_SETTINGS.outdoorC);
+    // Y la simulación corre sin problemas desde la partida migrada.
+    expect(step(result.save.sim, DAY).state.timeMinutes).toBe(old.timeMinutes + DAY);
   });
 
   it('rechaza un guardado de una versión más nueva sin romperlo', () => {
@@ -71,7 +88,7 @@ describe('guardado en IndexedDB', () => {
 
   it('guarda y vuelve a cargar exactamente el mismo estado', async () => {
     const sim = sampleState();
-    await writeSave(createSave(sim, { speed: 1440 }, 5000));
+    await writeSave(createSave(sim, { ...DEFAULT_SETTINGS, speed: 1440 }, 5000));
     const result = await readSave();
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
@@ -86,8 +103,8 @@ describe('guardado en IndexedDB', () => {
   it('el último guardado pisa al anterior', async () => {
     const first = sampleState();
     const second = step(first, DAY).state;
-    await writeSave(createSave(first, { speed: 1 }, 1));
-    await writeSave(createSave(second, { speed: 1 }, 2));
+    await writeSave(createSave(first, { ...DEFAULT_SETTINGS, speed: 1 }, 1));
+    await writeSave(createSave(second, { ...DEFAULT_SETTINGS, speed: 1 }, 2));
     const result = await readSave();
     expect(result.status === 'ok' && result.save.sim.timeMinutes).toBe(second.timeMinutes);
   });

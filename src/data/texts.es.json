@@ -40,7 +40,19 @@
     "conditionerAdded": "Acondicionador agregado",
     "glassCleaned": "Vidrio limpiado",
     "seededMediaAdded": "Material de filtro colonizado agregado",
-    "ammoniaDosed": "Dosis de amoníaco: +{ppm} ppm"
+    "ammoniaDosed": "Dosis de amoníaco: +{ppm} ppm",
+    "animalAdded": "Llegó a la pecera: {species}",
+    "animalDied": "✗ Murió {name} ({cause})",
+    "animalEaten": "✗ {predator} se comió a {name}",
+    "animalRemoved": "Retirado: {species}",
+    "animalMood": "{name}: ahora está {mood}",
+    "finNipped": "{nipper} le mordió las aletas a {name}",
+    "glassTappedPlayer": "Golpe en el vidrio: los peces se asustaron",
+    "glassTappedCat": "El gato tocó el vidrio con la pata",
+    "catBehavior": "Gato: {behavior} ({spot})",
+    "catPetted": "El gato ronronea",
+    "catAnnoyed": "El gato se molestó y se fue",
+    "catBowlFilled": "Plato del gato lleno"
   },
   "save": {
     "unavailable": "Guardado no disponible en este navegador",
@@ -73,7 +85,11 @@
       "waste": "Residuos y algas",
       "equipment": "Equipo y habitación",
       "events": "Últimos eventos",
-      "game": "Partida"
+      "game": "Partida",
+      "animals": "Animales",
+      "shop": "Tienda de prueba (compatibilidad)",
+      "cat": "Gato",
+      "welcome": "Resumen de bienvenida"
     },
     "speeds": {
       "pause": "Pausa",
@@ -106,7 +122,20 @@
       "filter": "Filtro sí/no",
       "heater": "Calefactor sí/no",
       "lid": "Tapa sí/no",
-      "reset": "Pecera nueva (borra la partida)"
+      "reset": "Pecera nueva (borra la partida)",
+      "pinch": "Pizca de comida (0,02 g)",
+      "tapGlass": "Golpear el vidrio",
+      "removeDead": "Retirar muertos",
+      "addOne": "Agregar 1",
+      "addGroup": "Agregar grupo mínimo",
+      "removeAll": "Vaciar la pecera",
+      "petCat": "Acariciar al gato",
+      "petCatMany": "Acariciar ×10",
+      "fillBowl": "Llenar el plato del gato",
+      "away3h": "Simular ausencia: 3 horas",
+      "away3d": "Simular ausencia: 3 días",
+      "away7d": "Simular ausencia: 7 días",
+      "away40d": "Simular ausencia: 40 días"
     },
     "rows": {
       "temperature": "Temperatura",
@@ -141,7 +170,15 @@
       "clog": "Suciedad del filtro",
       "light": "Luz",
       "lid": "Tapa",
-      "rng": "Estado del RNG"
+      "rng": "Estado del RNG",
+      "foodColumn": "Comida flotando / hundiéndose",
+      "catBehavior": "Qué hace",
+      "catNeeds": "Sueño / hambre / curiosidad",
+      "catNeeds2": "Cariño / energía",
+      "catPetting": "Caricias / aguante",
+      "catBowl": "Plato",
+      "weather": "Clima",
+      "catchUp": "Último catch-up"
     },
     "values": {
       "cycledNo": "no ({hours} h estable)",
@@ -156,7 +193,141 @@
       "filterNone": "no tiene",
       "lightOn": "prendida",
       "lightOff": "apagada",
-      "outdoorMean": "media {value}"
-    }
+      "outdoorMean": "media {value}",
+      "noAnimals": "No hay animales",
+      "noWarnings": "Sin advertencias: compatible",
+      "dead": "muerto",
+      "catchUpNone": "todavía ninguno",
+      "catchUp": "{minutes} min en {ms} ms ({steps} pasos)",
+      "animalRow": "{name} · {mood} · {intent}",
+      "animalNeeds": "hambre {hunger} · estrés {stress} · salud {health}"
+    },
+    "speciesLabel": "Especie",
+    "weatherLabel": "Clima"
+  },
+  "compat": {
+    "minTank": "{a} necesita una pecera de al menos {min} L y esta tiene {liters} L: va a vivir estresado.",
+    "minTankMessy": "{a} ensucia muchísimo y crece mucho: necesita al menos {min} L y esta pecera tiene {liters} L.",
+    "tankHeight": "{a} es un pez alto: necesita una pecera de al menos {min} cm de altura (esta tiene {height} cm).",
+    "minGroup": "{a} vive en grupo: necesita al menos {min} y tendrías {count}. En grupos chicos se estresa y se esconde.",
+    "minGroupNipper": "{a} necesita un grupo de al menos {min} y tendrías {count}. En grupos chicos se estresa y muerde más las aletas de los demás.",
+    "territorialOne": "{a}: los machos son territoriales y se pelean hasta lastimarse. Un solo macho por pecera (tendrías {males}).",
+    "territorial": "{a}: los machos son territoriales. No más de {max} por pecera (tendrías {males}).",
+    "temperatureNone": "{a} ({aRange} °C) y {b} ({bRange} °C) no comparten ningún rango de temperatura: uno de los dos siempre va a estar mal.",
+    "temperatureTight": "{a} y {b} solo coinciden entre {lo} y {hi} °C: vas a tener que mantener la temperatura muy justa.",
+    "phNone": "{a} (pH {aRange}) y {b} (pH {bRange}) necesitan aguas distintas: no hay un pH que les sirva a los dos.",
+    "phTight": "{a} y {b} solo coinciden en un pH de {lo} a {hi}: queda poco margen.",
+    "predation": "{a} de adulto ({aSize} cm) se come a {b} ({bSize} cm): le entra en la boca.",
+    "finNipping": "{a} muerde aletas y {b} tiene aletas largas: se las va a deshilachar.",
+    "attacksLongFins": "{a} puede atacar a peces de aletas largas y vistosas como {b}: los confunde con un rival."
+  },
+  "duration": {
+    "minutes": "{n} minutos",
+    "minute": "1 minuto",
+    "hours": "{n} horas",
+    "hour": "1 hora",
+    "days": "{n} días",
+    "day": "1 día",
+    "and": "{a} y {b}"
+  },
+  "welcome": {
+    "title": "¡Hola de nuevo!",
+    "away": "Estuviste afuera {duration}.",
+    "capped": "Pasaron más de {days} días: la pecera siguió su vida solo hasta el día {days}.",
+    "quiet": "Todo siguió tranquilo.",
+    "diedOldAge": "{name} murió de viejo, tranquilo, después de una vida larga.",
+    "diedStarvation": "{name} murió de hambre: pasó demasiado tiempo sin comer.",
+    "diedWater": "{name} murió por la mala calidad del agua.",
+    "diedStress": "{name} murió por estrés prolongado.",
+    "eaten": "Falta un {prey}: {predator} se lo comió.",
+    "corpses": "Hay {count} animales muertos sin retirar: pudren el agua.",
+    "hungry": "Tus animales no comen desde hace {duration}: tienen hambre.",
+    "veryHungry": "Tus animales llevan {duration} sin comer y están muy hambrientos. Dales de comer de a poco.",
+    "stressed": "{count} animales están estresados.",
+    "sick": "{count} animales están enfermos o débiles.",
+    "allHappy": "Tus animales están bien.",
+    "finNipped": "{victim} tiene las aletas mordidas por {nipper}.",
+    "alertNew": "Atención: {alert}.",
+    "alertCleared": "Se normalizó solo: {alert}.",
+    "cycleEstablished": "¡La pecera terminó de ciclar!",
+    "cycleLost": "Se perdió el ciclado de la pecera.",
+    "temperature": "El agua pasó de {before} a {after} °C.",
+    "evaporated": "Se evaporaron {liters} L de agua.",
+    "algae": "Crecieron algas en el vidrio.",
+    "catHungry": "El gato tiene hambre: su plato está vacío.",
+    "catWatched": "El gato se sentó a mirar los peces {count} veces.",
+    "catTapped": "El gato tocó el vidrio con la pata {count} veces: los peces se asustaron.",
+    "catLid": "El gato durmió una siesta sobre la tapa tibia de la pecera.",
+    "catSlept": "El gato durmió casi todo el tiempo.",
+    "close": "Seguir",
+    "catWatchedOnce": "El gato se sentó un rato a mirar los peces.",
+    "catTappedOnce": "El gato tocó el vidrio con la pata: los peces se asustaron.",
+    "diedMany": "Murieron {count} animales ({cause}).",
+    "corpseOne": "Hay un animal muerto sin retirar: pudre el agua.",
+    "stressedOne": "Un animal está estresado.",
+    "sickOne": "Un animal está enfermo o débil."
+  },
+  "deathCauses": {
+    "old_age": "vejez",
+    "starvation": "hambre",
+    "water": "calidad del agua",
+    "stress": "estrés",
+    "eaten": "depredación"
+  },
+  "moods": {
+    "happy": "feliz",
+    "normal": "normal",
+    "stressed": "estresado",
+    "sick": "enfermo"
+  },
+  "intents": {
+    "explore": "explora",
+    "school": "en cardumen",
+    "eat": "come",
+    "rest": "descansa",
+    "hide": "se esconde",
+    "chase": "persigue",
+    "flee": "huye",
+    "court": "corteja",
+    "beg": "pide comida",
+    "gasp": "boquea"
+  },
+  "catBehaviors": {
+    "sleep": "duerme",
+    "watch_fish": "mira los peces",
+    "tap_glass": "toca el vidrio",
+    "look_window": "mira por la ventana",
+    "beg_food": "pide comida",
+    "eat": "come",
+    "groom": "se lava",
+    "wander": "pasea",
+    "play": "juega",
+    "purr": "ronronea",
+    "sulk": "molesto"
+  },
+  "catSpots": {
+    "bed": "cama",
+    "sunbeam": "rayo de sol",
+    "tank_lid": "tapa de la pecera",
+    "tank_front": "frente a la pecera",
+    "bowl": "plato",
+    "floor": "piso",
+    "away": "se fue",
+    "windowsill": "ventana"
+  },
+  "weather": {
+    "clear": "Despejado",
+    "cloudy": "Nublado",
+    "rain": "Lluvia",
+    "storm": "Tormenta"
+  },
+  "sex": {
+    "male": "macho",
+    "female": "hembra"
+  },
+  "cat": {
+    "purr": "prrr",
+    "annoyed": "!",
+    "hungry": "miau"
   }
 }

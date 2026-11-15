@@ -126,6 +126,129 @@ export interface CycleState {
   stableMinutes: number;
 }
 
+export type Sex = 'male' | 'female';
+
+/** Lo que el animal quiere hacer ahora. El render decide cómo se ve. */
+export const INTENTS = [
+  'explore',
+  'school',
+  'eat',
+  'rest',
+  'hide',
+  'chase',
+  'flee',
+  'court',
+  'beg',
+  'gasp',
+] as const;
+export type Intent = (typeof INTENTS)[number];
+
+export type Mood = 'happy' | 'normal' | 'stressed' | 'sick';
+
+/** Personalidad fija de cada individuo, valores de 0 a 1. */
+export interface Personality {
+  boldness: number;
+  activity: number;
+  curiosity: number;
+}
+
+export type DeathCause = 'old_age' | 'starvation' | 'water' | 'stress' | 'eaten';
+
+/** Un animal de la pecera (pez, gamba o caracol). */
+export interface AnimalState {
+  id: number;
+  speciesId: string;
+  name: string | null;
+  sex: Sex;
+  /** Edad real en días. */
+  ageDays: number;
+  /** Edad a la que muere de viejo (se sortea al nacer, dentro del rango de la especie). */
+  lifespanDays: number;
+  /** Minuto en que entró a esta pecera. */
+  addedAtMinutes: number;
+  /** 0 (recién comido) a 1 (famélico, tras ~una semana sin comer). */
+  hunger: number;
+  /** 0 a 100. */
+  stress: number;
+  /** 0 a 100. */
+  health: number;
+  personality: Personality;
+  intent: Intent;
+  /** Hasta qué minuto mantiene la decisión actual. */
+  intentUntil: number;
+  /** A quién persigue, corteja o de quién huye. */
+  targetId: number | null;
+  /** Susto reciente, 0 a 1 (se pasa en pocos minutos). */
+  fright: number;
+  /** Acostumbramiento al gato, 0 a 1. */
+  catHabituation: number;
+  /** Cuánto aprendió que el jugador trae comida, 0 a 1. */
+  feedingTrust: number;
+  /** Aletas mordidas, 0 a 1. */
+  finDamage: number;
+  mood: Mood;
+  alive: boolean;
+  /** Si murió y nadie lo retiró: gramos que todavía se están pudriendo. */
+  corpseG: number;
+}
+
+/** Comida en el agua. Lo que llega al fondo pasa a organics.foodG. */
+export interface FoodState {
+  /** Flotando en la superficie, gramos. */
+  surfaceG: number;
+  /** Hundiéndose a media agua, gramos. */
+  sinkingG: number;
+}
+
+export const CAT_BEHAVIORS = [
+  'sleep',
+  'watch_fish',
+  'tap_glass',
+  'look_window',
+  'beg_food',
+  'eat',
+  'groom',
+  'wander',
+  'play',
+  'purr',
+  'sulk',
+] as const;
+export type CatBehavior = (typeof CAT_BEHAVIORS)[number];
+
+/** Dónde está el gato (el render lo traduce a un lugar de la escena). */
+export type CatSpot = 'bed' | 'sunbeam' | 'tank_lid' | 'tank_front' | 'windowsill' | 'bowl' | 'floor' | 'away';
+
+export interface CatNeeds {
+  /** Sueño acumulado, 0 a 1. */
+  sleep: number;
+  /** 0 a 1. */
+  hunger: number;
+  /** Ganas de curiosear, 0 a 1. */
+  curiosity: number;
+  /** Ganas de mimos, 0 a 1. */
+  affection: number;
+  /** Energía disponible, 0 a 1. */
+  energy: number;
+}
+
+export interface CatState {
+  needs: CatNeeds;
+  behavior: CatBehavior;
+  spot: CatSpot;
+  behaviorSince: number;
+  behaviorUntil: number;
+  /** Caricias recientes (se van solas con los minutos). */
+  petting: number;
+  /** Hasta qué minuto sigue molesto. */
+  annoyedUntil: number;
+  /** Comida en el plato, 0 a 1. */
+  bowl: number;
+  /** Minutos seguidos mirando la pecera. */
+  watchingMinutes: number;
+}
+
+export type Weather = 'clear' | 'cloudy' | 'rain' | 'storm';
+
 export const ALERT_IDS = [
   'ammonia_stress',
   'ammonia_danger',
@@ -160,6 +283,10 @@ export interface SimState {
   algae: AlgaeState;
   bioload: BioloadState;
   cycle: CycleState;
+  animals: AnimalState[];
+  nextAnimalId: number;
+  food: FoodState;
+  cat: CatState;
   /** Alertas activas en este momento. */
   alerts: AlertId[];
 }
@@ -191,7 +318,33 @@ export type SimEvent =
   | { type: 'conditioner_added'; timeMinutes: number }
   | { type: 'glass_cleaned'; timeMinutes: number; coverageRemoved: number }
   | { type: 'seeded_media_added'; timeMinutes: number }
-  | { type: 'ammonia_dosed'; timeMinutes: number; ppm: number };
+  | { type: 'ammonia_dosed'; timeMinutes: number; ppm: number }
+  | { type: 'animal_added'; timeMinutes: number; id: number; speciesId: string }
+  | {
+      type: 'animal_died';
+      timeMinutes: number;
+      id: number;
+      speciesId: string;
+      name: string | null;
+      cause: DeathCause;
+      /** Solo si se lo comieron. */
+      bySpeciesId?: string;
+    }
+  | { type: 'animal_removed'; timeMinutes: number; id: number; speciesId: string }
+  | {
+      type: 'animal_mood';
+      timeMinutes: number;
+      id: number;
+      speciesId: string;
+      mood: Mood;
+      previous: Mood;
+    }
+  | { type: 'fin_nipped'; timeMinutes: number; id: number; speciesId: string; bySpeciesId: string }
+  | { type: 'glass_tapped'; timeMinutes: number; by: 'player' | 'cat' }
+  | { type: 'cat_behavior'; timeMinutes: number; behavior: CatBehavior; spot: CatSpot }
+  | { type: 'cat_petted'; timeMinutes: number }
+  | { type: 'cat_annoyed'; timeMinutes: number }
+  | { type: 'cat_bowl_filled'; timeMinutes: number };
 
 export interface StepResult {
   state: SimState;
@@ -222,4 +375,18 @@ export type SimAction =
   | { type: 'setLight'; startHour?: number; durationHours?: number }
   | { type: 'setWindow'; open: boolean }
   | { type: 'setOutdoorBase'; baseC: number }
-  | { type: 'setBioload'; ammoniaMgNPerDay?: number; wasteGPerDay?: number };
+  | { type: 'setBioload'; ammoniaMgNPerDay?: number; wasteGPerDay?: number }
+  | {
+      type: 'addAnimals';
+      speciesId: string;
+      count: number;
+      /** Cuántos son machos. Por defecto, la mitad (o todos si la especie se vende como macho). */
+      males?: number;
+      ageDays?: number;
+    }
+  | { type: 'removeAnimal'; id: number }
+  | { type: 'removeDead' }
+  | { type: 'nameAnimal'; id: number; name: string }
+  | { type: 'tapGlass' }
+  | { type: 'petCat' }
+  | { type: 'fillCatBowl' };
