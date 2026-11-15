@@ -4,122 +4,136 @@
  * y se puede ocultar con el botón DEBUG.
  */
 
-import { DEFAULT_SPEED, SPEEDS, type Game } from '../game/game';
-import { PPM_PER_MG_N, derive, type DerivedValues, type SimAction, type SimState } from '../sim';
-import { ALERT_LABELS, describeEvent, formatClock } from './labels';
+import { DEFAULT_SPEED, SPEEDS, type Game, type SpeedId } from '../../game';
+import {
+  DEFAULT_TANK_ID,
+  TANK_MODELS,
+  derive,
+  type DerivedValues,
+  type SimAction,
+  type SimState,
+} from '../../sim';
+import { describeEvent, fill, formatClock, texts } from './texts';
 
 const OPEN_KEY = 'little-world:debug-open';
 const REFRESH_MS = 200;
 
+const T = texts.debug;
+type RowId = keyof typeof T.rows;
+type ButtonId = keyof typeof T.buttons;
+type SectionId = keyof typeof T.sections;
 type Getter = (state: SimState, derived: DerivedValues) => string;
 
-interface Row {
-  label: string;
-  get: Getter;
-}
-
-interface Section {
-  title: string;
-  rows: Row[];
-}
-
 const n = (value: number, digits = 2): string => value.toFixed(digits);
-const yesNo = (value: boolean): string => (value ? 'sí' : 'no');
+const pct = (fraction: number, digits = 0): string => `${(fraction * 100).toFixed(digits)}%`;
+const yesNo = (value: boolean): string => (value ? T.yes : T.no);
 
-const SECTIONS: Section[] = [
+const ROWS: { section: SectionId; rows: [RowId, Getter][] }[] = [
   {
-    title: 'Agua',
+    section: 'water',
     rows: [
-      { label: 'Temperatura', get: (s) => `${n(s.water.temperatureC)} °C` },
-      {
-        label: 'Amoníaco total',
-        get: (s, d) => `${n(d.ammoniaPpm, 3)} ppm (${n(s.water.ammonia, 3)} N)`,
-      },
-      {
-        label: 'NH3 libre (tóxico)',
-        get: (_s, d) => `${n(d.nh3 * PPM_PER_MG_N.ammonia, 4)} ppm (${n(d.nh3Fraction * 100)}%)`,
-      },
-      { label: 'Toxicidad NH3', get: (_s, d) => `${n(d.ammoniaToxicity * 100, 0)}%` },
-      { label: 'Nitrito', get: (s, d) => `${n(d.nitritePpm, 3)} ppm (${n(s.water.nitrite, 3)} N)` },
-      { label: 'Nitrato', get: (s, d) => `${n(d.nitratePpm)} ppm (${n(s.water.nitrate)} N)` },
-      { label: 'pH', get: (s) => n(s.water.ph) },
-      { label: 'KH', get: (s) => `${n(s.water.kh)} dKH` },
-      { label: 'CO2', get: (s) => `${n(s.water.co2)} mg/L` },
-      {
-        label: 'Oxígeno',
-        get: (s, d) => `${n(s.water.oxygen)} mg/L (${n(d.oxygenPercent, 0)}%)`,
-      },
-      { label: 'Cloro', get: (s) => `${n(s.water.chlorine, 3)} mg/L` },
-      {
-        label: 'Volumen',
-        get: (s, d) => `${n(s.tank.waterLiters, 1)} L (${n(d.levelFraction * 100, 0)}%)`,
-      },
+      ['temperature', (s) => `${n(s.water.temperatureC)} °C`],
+      ['ammonia', (s) => `${n(s.water.ammonia, 3)} ppm`],
+      ['nh3', (_s, d) => `${n(d.nh3, 4)} ppm (${pct(d.nh3Fraction, 2)})`],
+      ['toxicity', (_s, d) => pct(d.ammoniaToxicity)],
+      ['nitrite', (s) => `${n(s.water.nitrite, 3)} ppm`],
+      ['nitrate', (s) => `${n(s.water.nitrate)} ppm`],
+      ['phosphate', (s) => `${n(s.water.phosphate)} ppm`],
+      ['ph', (s) => n(s.water.ph)],
+      ['kh', (s) => `${n(s.water.kh)} dKH`],
+      ['gh', (s) => `${n(s.water.gh)} dGH`],
+      ['co2', (s) => `${n(s.water.co2)} mg/L`],
+      ['oxygen', (s, d) => `${n(d.oxygenRelative)} (${n(s.water.oxygen)} mg/L)`],
+      ['chlorine', (s) => `${n(s.water.chlorine, 3)} ppm`],
+      ['tannins', (s) => n(s.water.tannins)],
+      ['volume', (s, d) => `${n(s.tank.waterLiters, 1)} L (${n(d.waterLevel)})`],
     ],
   },
   {
-    title: 'Bacterias y ciclo (mg N/día)',
+    section: 'bacteria',
     rows: [
-      {
-        label: 'AOB filtro / superficies',
-        get: (s) => `${n(s.bacteria.filter.aob)} / ${n(s.bacteria.surfaces.aob)}`,
-      },
-      {
-        label: 'NOB filtro / superficies',
-        get: (s) => `${n(s.bacteria.filter.nob)} / ${n(s.bacteria.surfaces.nob)}`,
-      },
-      { label: 'Carga de amoníaco', get: (s) => n(s.bioload.ammoniaMgNPerDay, 1) },
-      {
-        label: 'Ciclada',
-        get: (s) =>
-          s.cycle.established ? 'sí' : `no (${n(s.cycle.stableMinutes / 60, 0)} h estable)`,
-      },
+      ['aob', (s) => `${n(s.bacteria.filter.aob)} / ${n(s.bacteria.surfaces.aob)}`],
+      ['nob', (s) => `${n(s.bacteria.filter.nob)} / ${n(s.bacteria.surfaces.nob)}`],
+      ['bioload', (s) => n(s.bioload.ammoniaMgNPerDay, 1)],
+      [
+        'cycled',
+        (s) =>
+          s.cycle.established
+            ? T.yes
+            : fill(T.values.cycledNo, { hours: n(s.cycle.stableMinutes / 60, 0) }),
+      ],
     ],
   },
   {
-    title: 'Residuos y algas',
+    section: 'waste',
     rows: [
-      { label: 'Comida sin comer', get: (s) => `${n(s.organics.foodG)} g` },
-      { label: 'Detrito', get: (s) => `${n(s.organics.detritusG)} g` },
-      {
-        label: 'Algas',
-        get: (s, d) => `${n(s.algae.biomassG, 3)} g (${n(d.algaeFraction * 100, 1)}%)`,
-      },
+      ['food', (s) => `${n(s.organics.foodG)} g`],
+      ['detritus', (s) => `${n(s.organics.detritusG)} g`],
+      ['algaeGlass', (s) => n(s.algae.glass, 3)],
+      ['algaeDecor', (s) => n(s.algae.decor, 3)],
     ],
   },
   {
-    title: 'Equipo y habitación',
+    section: 'equipment',
     rows: [
-      { label: 'Habitación', get: (s) => `${n(s.room.temperatureC)} °C (media ${n(s.room.baseC, 0)})` },
-      {
-        label: 'Calefactor',
-        get: (s, d) =>
-          `${!s.heater.enabled ? 'apagado' : s.heater.on ? 'CALENTANDO' : 'en espera'} · ${
-            s.heater.watts
-          } W (${n(d.heaterWattsPerLiter)} W/L) → ${n(s.heater.setpointC, 0)} °C`,
-      },
-      {
-        label: 'Filtro',
-        get: (s, d) =>
-          `${s.filter.running ? 'andando' : 'APAGADO'} · ${n(d.effectiveFlowLph, 0)} de ${
-            s.filter.flowLph
-          } L/h`,
-      },
-      { label: 'Suciedad del filtro', get: (s) => `${n(s.filter.clog * 100, 0)}%` },
-      {
-        label: 'Luz',
-        get: (s, d) =>
-          `${d.lightOn ? 'prendida' : 'apagada'} (${s.light.startHour} a ${
+      [
+        'tank',
+        (s) =>
+          `${TANK_MODELS.find((m) => m.id === s.tank.modelId)?.name ?? s.tank.modelId} · ${
+            s.tank.lengthCm
+          }×${s.tank.widthCm}×${s.tank.heightCm}`,
+      ],
+      [
+        'outdoor',
+        (s) =>
+          `${n(s.room.outdoorC, 1)} °C (${fill(T.values.outdoorMean, {
+            value: n(s.room.outdoorBaseC, 0),
+          })})`,
+      ],
+      ['room', (s) => `${n(s.room.temperatureC)} °C`],
+      ['window', (s) => (s.room.windowOpen ? T.values.windowOpen : T.values.windowClosed)],
+      [
+        'heater',
+        (s, d) =>
+          s.heater.watts <= 0
+            ? T.values.heaterNone
+            : `${
+                !s.heater.enabled
+                  ? T.values.heaterOff
+                  : s.heater.on
+                    ? T.values.heaterHeating
+                    : T.values.heaterIdle
+              } · ${s.heater.watts} W (${n(d.heaterWattsPerLiter)} W/L) → ${n(
+                s.heater.setpointC,
+                0,
+              )} °C`,
+      ],
+      [
+        'filter',
+        (s, d) =>
+          s.filter.flowLph <= 0
+            ? T.values.filterNone
+            : `${s.filter.running ? T.values.filterRunning : T.values.filterStopped} · ${n(
+                d.effectiveFlowLph,
+                0,
+              )} / ${s.filter.flowLph} L/h`,
+      ],
+      ['clog', (s) => pct(s.filter.clog)],
+      [
+        'light',
+        (s, d) =>
+          `${d.lightOn ? T.values.lightOn : T.values.lightOff} (${s.light.startHour}–${
             (s.light.startHour + s.light.durationHours) % 24
           } h)`,
-      },
-      { label: 'Tapa', get: (s) => yesNo(s.tank.hasLid) },
-      { label: 'Estado del RNG', get: (s) => String(s.rngState) },
+      ],
+      ['lid', (s) => yesNo(s.tank.hasLid)],
+      ['rng', (s) => String(s.rngState)],
     ],
   },
 ];
 
 interface ActionButton {
-  label: string;
+  id: ButtonId;
   /** Marca visual: acción "mal hecha" a propósito. */
   bad?: boolean;
   run: (game: Game) => void;
@@ -131,76 +145,73 @@ const act =
     game.act(action);
 
 const TIME_BUTTONS: ActionButton[] = [
-  { label: '+1 hora', run: (game) => game.advance(60) },
-  { label: '+1 día', run: (game) => game.advance(1440) },
-  { label: '+1 semana', run: (game) => game.advance(10080) },
+  { id: 'plusHour', run: (game) => game.skip(60) },
+  { id: 'plusDay', run: (game) => game.skip(1440) },
+  { id: 'plusWeek', run: (game) => game.skip(10080) },
 ];
+
+/** Cambio de agua bien hecho: sifonear, acondicionar e igualar la temperatura. */
+const waterChange =
+  (conditioned: boolean) =>
+  (game: Game): void =>
+    game.act({
+      type: 'waterChange',
+      fraction: 0.3,
+      conditioned,
+      vacuum: true,
+      temperatureC: game.state.water.temperatureC,
+    });
 
 const ACTION_BUTTONS: ActionButton[] = [
-  { label: 'Alimentar (0,5 g)', run: act({ type: 'feed', grams: 0.5 }) },
-  { label: 'Sobrealimentar (5 g)', bad: true, run: act({ type: 'feed', grams: 5 }) },
+  { id: 'feed', run: act({ type: 'feed', grams: 0.1 }) },
+  { id: 'overfeed', bad: true, run: act({ type: 'feed', grams: 2 }) },
+  { id: 'waterChange', run: waterChange(true) },
+  { id: 'waterChangeRaw', bad: true, run: waterChange(false) },
+  { id: 'cleanFilterGood', run: act({ type: 'cleanFilter', method: 'tankWater' }) },
+  { id: 'cleanFilterBad', bad: true, run: act({ type: 'cleanFilter', method: 'tapWater' }) },
+  { id: 'replaceMedia', bad: true, run: act({ type: 'replaceFilterMedia' }) },
   {
-    label: 'Cambio de agua 30%',
-    run: act({ type: 'waterChange', fraction: 0.3, conditioned: true, vacuum: true }),
+    id: 'topOff',
+    run: (game) =>
+      game.act({ type: 'topOff', conditioned: true, temperatureC: game.state.water.temperatureC }),
   },
-  {
-    label: 'Cambio 30% sin acondicionador',
-    bad: true,
-    run: act({ type: 'waterChange', fraction: 0.3, conditioned: false, vacuum: true }),
-  },
-  { label: 'Lavar filtro bien (agua de pecera)', run: act({ type: 'cleanFilter', method: 'tankWater' }) },
-  {
-    label: 'Lavar filtro mal (canilla)',
-    bad: true,
-    run: act({ type: 'cleanFilter', method: 'tapWater' }),
-  },
-  { label: 'Rellenar lo evaporado', run: act({ type: 'topOff', conditioned: true }) },
-  { label: 'Acondicionador', run: act({ type: 'addConditioner' }) },
-  { label: 'Limpiar algas', run: act({ type: 'scrubAlgae' }) },
-  { label: 'Material colonizado', run: act({ type: 'addSeededMedia' }) },
-  {
-    label: 'Amoníaco +2 ppm',
-    run: act({ type: 'doseAmmonia', mgPerLiter: 2 / PPM_PER_MG_N.ammonia }),
-  },
+  { id: 'conditioner', run: act({ type: 'addConditioner' }) },
+  { id: 'cleanGlass', run: act({ type: 'cleanGlass' }) },
+  { id: 'seededMedia', run: act({ type: 'addSeededMedia' }) },
+  { id: 'doseAmmonia', run: act({ type: 'doseAmmonia', ppm: 2 }) },
 ];
 
+const bioload =
+  (delta: number) =>
+  (game: Game): void =>
+    game.act({
+      type: 'setBioload',
+      ammoniaMgNPerDay: game.state.bioload.ammoniaMgNPerDay + delta,
+    });
+
+const outdoor =
+  (delta: number) =>
+  (game: Game): void =>
+    game.act({ type: 'setOutdoorBase', baseC: game.state.room.outdoorBaseC + delta });
+
 const SETTING_BUTTONS: ActionButton[] = [
+  { id: 'loadDown', run: bioload(-2) },
+  { id: 'loadUp', run: bioload(2) },
+  { id: 'outdoorDown', run: outdoor(-5) },
+  { id: 'outdoorUp', run: outdoor(5) },
   {
-    label: 'Carga −5',
-    run: (game) =>
-      game.act({
-        type: 'setBioload',
-        ammoniaMgNPerDay: game.state.bioload.ammoniaMgNPerDay - 5,
-      }),
+    id: 'window',
+    run: (game) => game.act({ type: 'setWindow', open: !game.state.room.windowOpen }),
   },
   {
-    label: 'Carga +5',
-    run: (game) =>
-      game.act({
-        type: 'setBioload',
-        ammoniaMgNPerDay: game.state.bioload.ammoniaMgNPerDay + 5,
-      }),
-  },
-  {
-    label: 'Habitación −2°',
-    run: (game) => game.act({ type: 'setRoomBase', baseC: game.state.room.baseC - 2 }),
-  },
-  {
-    label: 'Habitación +2°',
-    run: (game) => game.act({ type: 'setRoomBase', baseC: game.state.room.baseC + 2 }),
-  },
-  {
-    label: 'Filtro sí/no',
+    id: 'filter',
     run: (game) => game.act({ type: 'setFilterRunning', running: !game.state.filter.running }),
   },
   {
-    label: 'Calefactor sí/no',
+    id: 'heater',
     run: (game) => game.act({ type: 'setHeater', enabled: !game.state.heater.enabled }),
   },
-  {
-    label: 'Tapa sí/no',
-    run: (game) => game.act({ type: 'setLid', hasLid: !game.state.tank.hasLid }),
-  },
+  { id: 'lid', run: (game) => game.act({ type: 'setLid', hasLid: !game.state.tank.hasLid }) },
 ];
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -233,7 +244,8 @@ function writeOpen(open: boolean): void {
 export interface DebugPanelOptions {
   /** Texto del estado del guardado (lo arma main.ts). */
   saveStatus: () => string;
-  onReset: () => void;
+  /** Empezar una pecera nueva del modelo elegido. */
+  onReset: (tankId: string) => void;
 }
 
 export class DebugPanel {
@@ -261,69 +273,78 @@ export class DebugPanel {
     this.toggle.addEventListener('click', () => this.setOpen(!this.open));
 
     this.root = el('aside', 'debug-panel');
-    this.root.setAttribute('aria-label', 'Panel de debug');
+    this.root.setAttribute('aria-label', T.panelLabel);
     this.body = el('div', 'debug-body');
     this.root.append(this.body);
 
     // --- Tiempo ---
-    const time = this.section('Tiempo');
+    const time = this.section('time');
     this.clock = el('div', 'debug-clock');
-    time.append(this.clock);
     this.speed = el('select', 'debug-speed');
-    this.speed.setAttribute('aria-label', 'Velocidad');
-    for (const option of SPEEDS) {
-      const node = el('option', undefined, option.label);
-      node.value = String(option.value);
+    this.speed.setAttribute('aria-label', T.speedLabel);
+    for (const id of Object.keys(SPEEDS) as SpeedId[]) {
+      const node = el('option', undefined, T.speeds[id]);
+      node.value = String(SPEEDS[id]);
       this.speed.append(node);
     }
     this.speed.addEventListener('change', () => this.game.setSpeed(Number(this.speed.value)));
-    time.append(this.speed, this.buttons(TIME_BUTTONS));
+    time.append(this.clock, this.speed, this.buttons(TIME_BUTTONS));
 
-    // --- Acciones ---
-    this.section('Acciones de prueba').append(this.buttons(ACTION_BUTTONS));
-    this.section('Ajustes').append(this.buttons(SETTING_BUTTONS));
+    // --- Acciones y ajustes ---
+    this.section('actions').append(this.buttons(ACTION_BUTTONS));
+    this.section('settings').append(this.buttons(SETTING_BUTTONS));
 
     // --- Alertas ---
     this.alerts = el('div', 'debug-alerts');
-    this.section('Alertas activas').append(this.alerts);
+    this.section('alerts').append(this.alerts);
 
     // --- Parámetros ---
-    for (const section of SECTIONS) {
+    for (const group of ROWS) {
       const table = el('table', 'debug-table');
-      for (const row of section.rows) {
+      for (const [id, get] of group.rows) {
         const tr = el('tr');
         const value = el('td', 'debug-value');
-        tr.append(el('th', undefined, row.label), value);
+        tr.append(el('th', undefined, T.rows[id]), value);
         table.append(tr);
-        this.cells.push({ get: row.get, node: value });
+        this.cells.push({ get, node: value });
       }
-      this.section(section.title).append(table);
+      this.section(group.section).append(table);
     }
 
     // --- Eventos ---
     this.events = el('ol', 'debug-events');
-    this.section('Últimos eventos').append(this.events);
+    this.section('events').append(this.events);
 
     // --- Partida ---
-    const saveSection = this.section('Partida');
+    const game_ = this.section('game');
     this.save = el('div', 'debug-save');
-    const reset = el('button', 'debug-button bad', 'Pecera nueva (borra la partida)');
+    const model = el('select', 'debug-speed');
+    model.setAttribute('aria-label', T.rows.tank);
+    for (const tank of TANK_MODELS) {
+      const node = el('option', undefined, `${tank.name} (${tank.id})`);
+      node.value = tank.id;
+      model.append(node);
+    }
+    model.value = TANK_MODELS.some((m) => m.id === game.state.tank.modelId)
+      ? game.state.tank.modelId
+      : DEFAULT_TANK_ID;
+    const reset = el('button', 'debug-button bad', T.buttons.reset);
     reset.type = 'button';
     reset.addEventListener('click', () => {
-      if (window.confirm('¿Empezar una pecera nueva? Se pierde la partida actual.')) {
-        this.options.onReset();
-        this.refresh(true);
+      if (window.confirm(T.resetConfirm)) {
+        this.options.onReset(model.value);
+        this.refresh();
       }
     });
-    saveSection.append(this.save, reset);
+    game_.append(this.save, model, reset);
 
     parent.append(this.root, this.toggle);
     this.setOpen(this.open);
   }
 
-  private section(title: string): HTMLElement {
+  private section(id: SectionId): HTMLElement {
     const section = el('section', 'debug-section');
-    section.append(el('h2', undefined, title));
+    section.append(el('h2', undefined, T.sections[id]));
     this.body.append(section);
     return section;
   }
@@ -331,11 +352,15 @@ export class DebugPanel {
   private buttons(list: ActionButton[]): HTMLElement {
     const group = el('div', 'debug-buttons');
     for (const item of list) {
-      const button = el('button', item.bad ? 'debug-button bad' : 'debug-button', item.label);
+      const button = el(
+        'button',
+        item.bad ? 'debug-button bad' : 'debug-button',
+        T.buttons[item.id],
+      );
       button.type = 'button';
       button.addEventListener('click', () => {
         item.run(this.game);
-        this.refresh(true);
+        this.refresh();
       });
       group.append(button);
     }
@@ -347,28 +372,28 @@ export class DebugPanel {
     this.root.hidden = !open;
     // Con el panel abierto la escena se corre a la izquierda para no quedar tapada.
     document.body.classList.toggle('debug-open', open);
-    this.toggle.textContent = open ? 'DEBUG ✕' : 'DEBUG';
+    this.toggle.textContent = open ? T.toggleClose : T.toggle;
     this.toggle.setAttribute('aria-expanded', String(open));
     writeOpen(open);
-    if (open) this.refresh(true);
+    if (open) this.refresh();
   }
 
   /** Se llama en cada cuadro; solo redibuja unas pocas veces por segundo. */
   update(nowMs: number): void {
     if (!this.open || nowMs - this.lastRefresh < REFRESH_MS) return;
     this.lastRefresh = nowMs;
-    this.refresh(false);
+    this.refresh();
   }
 
-  private refresh(force: boolean): void {
-    if (!this.open && !force) return;
+  private refresh(): void {
+    if (!this.open) return;
     const state = this.game.state;
     const derived = derive(state);
 
     this.clock.textContent = formatClock(state.timeMinutes);
     if (document.activeElement !== this.speed) {
-      const current = SPEEDS.find((s) => s.value === this.game.speed)?.value ?? DEFAULT_SPEED;
-      this.speed.value = String(current);
+      const known = Object.values(SPEEDS).includes(this.game.speed as never);
+      this.speed.value = String(known ? this.game.speed : DEFAULT_SPEED);
     }
 
     for (const cell of this.cells) {
@@ -377,7 +402,7 @@ export class DebugPanel {
     }
 
     const alertsText =
-      state.alerts.length === 0 ? 'Ninguna' : state.alerts.map((id) => ALERT_LABELS[id]).join(' · ');
+      state.alerts.length === 0 ? T.none : state.alerts.map((id) => texts.alerts[id]).join(' · ');
     if (this.alerts.textContent !== alertsText) {
       this.alerts.textContent = alertsText;
       this.alerts.classList.toggle('active', state.alerts.length > 0);
@@ -393,7 +418,7 @@ export class DebugPanel {
           el('li', undefined, `${formatClock(event.timeMinutes)} — ${describeEvent(event)}`),
         ),
       );
-      if (recent.length === 0) this.events.append(el('li', 'empty', 'Todavía no pasó nada'));
+      if (recent.length === 0) this.events.append(el('li', 'empty', T.noEvents));
     }
 
     const saveText = this.options.saveStatus();

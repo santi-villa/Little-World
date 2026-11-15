@@ -1,32 +1,29 @@
-/** Textos en castellano para alertas y eventos de la simulación. */
+/**
+ * Textos del juego. Están todos en src/data/texts.es.json para poder
+ * traducirlos después; acá solo se arman con sus valores.
+ */
 
-import type { AlertId, SimEvent } from '../sim';
+import texts from '../../data/texts.es.json';
+import type { SimEvent } from '../../sim';
 
-export const ALERT_LABELS: Record<AlertId, string> = {
-  ammonia_warning: 'Amoníaco tóxico (NH3)',
-  ammonia_danger: 'Amoníaco peligroso (NH3)',
-  nitrite_warning: 'Nitrito alto',
-  nitrite_danger: 'Nitrito peligroso',
-  nitrate_high: 'Nitrato alto',
-  ph_low: 'pH muy bajo',
-  ph_high: 'pH muy alto',
-  kh_low: 'KH bajo',
-  oxygen_low: 'Poco oxígeno',
-  oxygen_critical: 'Oxígeno crítico',
-  chlorine_present: 'Cloro en el agua',
-  temperature_low: 'Agua fría',
-  temperature_high: 'Agua caliente',
-  water_low: 'Falta agua',
-  filter_clogged: 'Filtro tapado',
-  algae_bloom: 'Muchas algas',
-};
+export { texts };
 
-export function formatClock(timeMinutes: number): string {
+/** Reemplaza {clave} por su valor. */
+export function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
+}
+
+export function clockParts(timeMinutes: number): { day: number; time: string } {
   const total = Math.floor(timeMinutes);
-  const day = Math.floor(total / 1440) + 1;
   const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
   const mm = String(total % 60).padStart(2, '0');
-  return `Día ${day} ${hh}:${mm}`;
+  return { day: Math.floor(total / 1440) + 1, time: `${hh}:${mm}` };
+}
+
+export function formatClock(timeMinutes: number): string {
+  return fill(texts.clock, clockParts(timeMinutes));
 }
 
 function percent(fraction: number): string {
@@ -34,34 +31,44 @@ function percent(fraction: number): string {
 }
 
 export function describeEvent(event: SimEvent): string {
+  const e = texts.events;
+  const conditioner = (conditioned: boolean): string =>
+    conditioned ? e.withConditioner : e.withoutConditioner;
   switch (event.type) {
     case 'alert_raised':
-      return `⚠ ${ALERT_LABELS[event.alert]}`;
+      return fill(e.alertRaised, { alert: texts.alerts[event.alert] });
     case 'alert_cleared':
-      return `✓ Se normalizó: ${ALERT_LABELS[event.alert]}`;
+      return fill(e.alertCleared, { alert: texts.alerts[event.alert] });
     case 'cycle_established':
-      return '★ La pecera está ciclada';
+      return e.cycleEstablished;
     case 'cycle_lost':
-      return '✗ Se perdió el ciclado';
+      return e.cycleLost;
     case 'fed':
-      return `Comida: ${event.grams} g`;
+      return fill(e.fed, { grams: event.grams });
     case 'water_changed':
-      return `Cambio de agua ${percent(event.fraction)} (${event.liters.toFixed(1)} L) ${
-        event.conditioned ? 'con' : 'SIN'
-      } acondicionador`;
+      return fill(e.waterChanged, {
+        percent: percent(event.fraction),
+        liters: event.liters.toFixed(1),
+        conditioner: conditioner(event.conditioned),
+      });
     case 'topped_off':
-      return `Relleno: ${event.liters.toFixed(1)} L ${event.conditioned ? 'con' : 'SIN'} acondicionador`;
+      return fill(e.toppedOff, {
+        liters: event.liters.toFixed(1),
+        conditioner: conditioner(event.conditioned),
+      });
     case 'filter_cleaned':
-      return event.method === 'tankWater'
-        ? `Filtro enjuagado en agua de la pecera (−${percent(event.bacteriaLostFraction)} bacterias)`
-        : `Filtro lavado con agua de canilla (−${percent(event.bacteriaLostFraction)} bacterias)`;
+      return fill(event.method === 'tankWater' ? e.filterRinsed : e.filterWashedTap, {
+        percent: percent(event.bacteriaLostFraction),
+      });
+    case 'filter_media_replaced':
+      return e.filterMediaReplaced;
     case 'conditioner_added':
-      return 'Acondicionador agregado';
-    case 'algae_scrubbed':
-      return `Algas limpiadas (${event.gramsRemoved.toFixed(2)} g)`;
+      return e.conditionerAdded;
+    case 'glass_cleaned':
+      return e.glassCleaned;
     case 'seeded_media_added':
-      return 'Material de filtro colonizado agregado';
+      return e.seededMediaAdded;
     case 'ammonia_dosed':
-      return `Dosis de amoníaco: +${event.mgPerLiter.toFixed(2)} mg/L N`;
+      return fill(e.ammoniaDosed, { ppm: event.ppm.toFixed(2) });
   }
 }

@@ -1,6 +1,9 @@
 /**
  * Pegamento entre la simulación pura y el resto (render, UI, guardado).
  * Es el único lugar que conoce el reloj real.
+ *
+ * El juego corre en tiempo real 1:1. Las velocidades más rápidas existen solo
+ * para probar desde el panel de debug.
  */
 
 import {
@@ -10,26 +13,28 @@ import {
   type SimAction,
   type SimEvent,
   type SimState,
-} from '../sim';
+} from './sim';
 
-export interface SpeedOption {
-  label: string;
-  /** Minutos simulados por segundo real. */
-  value: number;
-}
+/** Minutos simulados por segundo real. */
+export const SPEEDS = {
+  pause: 0,
+  realtime: 1 / 60,
+  minute: 1,
+  hour: 60,
+  day: 1440,
+} as const;
 
-export const SPEEDS: SpeedOption[] = [
-  { label: 'Pausa', value: 0 },
-  { label: 'Tiempo real', value: 1 / 60 },
-  { label: '1 min por seg', value: 1 },
-  { label: '1 hora por seg', value: 60 },
-  { label: '1 día por seg', value: 1440 },
-];
+export type SpeedId = keyof typeof SPEEDS;
 
-export const DEFAULT_SPEED = 1;
+export const DEFAULT_SPEED: number = SPEEDS.realtime;
 const MAX_LOG = 40;
 /** Si un cuadro tarda más que esto (pestaña en segundo plano), no se recupera el tiempo. */
 const MAX_FRAME_SECONDS = 0.25;
+
+/** Minuto del día según el reloj del dispositivo. */
+function localMinuteOfDay(now: Date): number {
+  return now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+}
 
 export class Game {
   state: SimState;
@@ -38,6 +43,8 @@ export class Game {
   readonly log: SimEvent[] = [];
   /** Hay cambios sin guardar. */
   dirty = false;
+  /** El jugador hizo algo: conviene guardar enseguida, sin esperar al autoguardado. */
+  saveSoon = false;
   private pendingMinutes = 0;
 
   constructor(state: SimState, speed: number = DEFAULT_SPEED) {
@@ -45,8 +52,14 @@ export class Game {
     this.speed = speed;
   }
 
-  static newTank(seed: number | string): Game {
-    return new Game(createNewTank({ seed }));
+  /** Pecera nueva, con el reloj de la simulación en la hora real. */
+  static newTank(seed: number | string, tankId?: string, now: Date = new Date()): Game {
+    const game = new Game(
+      createNewTank({ seed, tankId, startMinuteOfDay: localMinuteOfDay(now) }),
+    );
+    game.dirty = true;
+    game.saveSoon = true;
+    return game;
   }
 
   /** Avanza según el reloj real y la velocidad elegida. */
@@ -67,24 +80,34 @@ export class Game {
     this.dirty = true;
   }
 
+  /** Salto de tiempo pedido a mano (botones del panel de debug). */
+  skip(minutes: number): void {
+    this.advance(minutes);
+    this.saveSoon = true;
+  }
+
   act(action: SimAction): void {
     const result = applyAction(this.state, action);
     this.state = result.state;
     this.record(result.events);
     this.dirty = true;
+    this.saveSoon = true;
   }
 
   setSpeed(speed: number): void {
     this.speed = speed;
     this.pendingMinutes = 0;
     this.dirty = true;
+    this.saveSoon = true;
   }
 
-  reset(seed: number | string): void {
-    this.state = createNewTank({ seed });
+  reset(seed: number | string, tankId?: string, now: Date = new Date()): void {
+    this.state = createNewTank({ seed, tankId, startMinuteOfDay: localMinuteOfDay(now) });
+    this.speed = DEFAULT_SPEED;
     this.log.length = 0;
     this.pendingMinutes = 0;
     this.dirty = true;
+    this.saveSoon = true;
   }
 
   private record(events: SimEvent[]): void {

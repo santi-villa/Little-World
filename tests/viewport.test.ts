@@ -67,3 +67,18 @@ describe('escalado pixel perfect', () => {
     expect(layout.cssHeight).toBeLessThanOrEqual(270);
   });
 });
+
+describe('la pecera en pantalla', () => {
+  it('entra en la escena y queda en posiciones enteras para todos los modelos', async () => {
+    const { tankRect, TANK_BASE_Y } = await import('../src/render/tank/tank-layout');
+    const { TANK_MODELS } = await import('../src/sim');
+    for (const model of TANK_MODELS) {
+      const rect = tankRect(model.lengthCm, model.heightCm);
+      for (const value of Object.values(rect)) expect(Number.isInteger(value), model.id).toBe(true);
+      expect(rect.x, model.id).toBeGreaterThan(60);
+      expect(rect.x + rect.width, model.id).toBeLessThan(GAME_WIDTH - 60);
+      expect(rect.y, model.id).toBeGreaterThan(50);
+      expect(rect.y + rect.height).toBe(TANK_BASE_Y);
+    }
+  });
+});
