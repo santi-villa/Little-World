@@ -1,8 +1,17 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Rng, applyAction, createNewTank, rngNext, seedToState, step } from '../src/sim';
-import { DAY, HOUR, WEEK } from './helpers';
+import {
+  Rng,
+  applyAction,
+  createNewTank,
+  defaultConfig,
+  planSteps,
+  rngNext,
+  seedToState,
+  step,
+} from '../src/sim';
+import { DAY, HOUR, WEEK, matureTank } from './helpers';
 
 describe('RNG con semilla', () => {
   it('la misma semilla da la misma secuencia', () => {
@@ -97,22 +106,49 @@ describe('determinismo de step()', () => {
     expect(resumed.events).toEqual(direct.events);
   });
 
-  it('otra semilla cambia el clima de la habitación, no la química de base', () => {
+  it('otra semilla cambia el clima, no la química de base', () => {
     const a = step(createNewTank({ seed: 1 }), WEEK).state;
     const b = step(createNewTank({ seed: 2 }), WEEK).state;
-    expect(a.room.temperatureC).not.toBe(b.room.temperatureC);
+    expect(a.room.outdoorC).not.toBe(b.room.outdoorC);
     expect(a.rngState).not.toBe(b.rngState);
   });
 
-  it('avanzar de a horas o de a días da prácticamente lo mismo', () => {
+  it('lavar mal el filtro también es determinista (usa el RNG del estado)', () => {
+    const mature = matureTank();
+    const a = applyAction(mature, { type: 'cleanFilter', method: 'tapWater' });
+    const b = applyAction(mature, { type: 'cleanFilter', method: 'tapWater' });
+    expect(a).toEqual(b);
+    expect(a.state.rngState).not.toBe(mature.rngState);
+    // Con otra semilla sale otro porcentaje.
+    const c = applyAction({ ...mature, rngState: 12345 }, { type: 'cleanFilter', method: 'tapWater' });
+    expect(c.state.bacteria.filter.aob).not.toBe(a.state.bacteria.filter.aob);
+  });
+
+  it('avanzar de a horas o de a días da lo mismo (pasos fijos de 1 minuto)', () => {
     let hourly = start();
     for (let h = 0; h < 24 * 7; h++) hourly = step(hourly, HOUR).state;
     let daily = start();
     for (let d = 0; d < 7; d++) daily = step(daily, DAY).state;
     expect(hourly.timeMinutes).toBe(daily.timeMinutes);
     expect(hourly.rngState).toBe(daily.rngState);
-    expect(hourly.water.ammonia).toBeCloseTo(daily.water.ammonia, 6);
-    expect(hourly.water.temperatureC).toBeCloseTo(daily.water.temperatureC, 6);
+    expect(hourly.water.ammonia).toBeCloseTo(daily.water.ammonia, 9);
+    expect(hourly.water.temperatureC).toBeCloseTo(daily.water.temperatureC, 9);
+  });
+
+  it('el paso base es de 1 minuto, y de 10 para ausencias de más de 7 días', () => {
+    expect(planSteps(1, defaultConfig)).toEqual({ count: 1, minutes: 1 });
+    expect(planSteps(HOUR, defaultConfig)).toEqual({ count: 60, minutes: 1 });
+    expect(planSteps(WEEK, defaultConfig)).toEqual({ count: WEEK, minutes: 1 });
+    expect(planSteps(3 * WEEK, defaultConfig)).toEqual({ count: (3 * WEEK) / 10, minutes: 10 });
+    expect(planSteps(0.5, defaultConfig)).toEqual({ count: 1, minutes: 0.5 });
+
+    // Simular tres semanas de un saque (pasos de 10 min) da casi lo mismo que de a un día.
+    const coarse = step(start(), 3 * WEEK).state;
+    let fine = start();
+    for (let d = 0; d < 21; d++) fine = step(fine, DAY).state;
+    expect(coarse.timeMinutes).toBe(fine.timeMinutes);
+    expect(coarse.water.nitrate / fine.water.nitrate).toBeCloseTo(1, 1);
+    expect(coarse.water.temperatureC).toBeCloseTo(fine.water.temperatureC, 0);
   });
 
   it('delta cero o negativo no hace nada', () => {
@@ -134,7 +170,9 @@ describe('pureza de src/sim', () => {
         // Solo se permite importar de la propia carpeta o de src/data.
         expect(target, `${file} importa ${target}`).toMatch(/^\.\/|^\.\.\/data\//);
       }
-      expect(source, file).not.toMatch(/\b(document|window|navigator|localStorage|indexedDB)\b/);
+      expect(source, file).not.toMatch(
+        /\b(document|window|navigator|localStorage|indexedDB|fetch|performance)\b/,
+      );
       expect(source, file).not.toMatch(/Math\.random|Date\.now|new Date/);
     }
   });

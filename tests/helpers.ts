@@ -1,9 +1,27 @@
-import { applyAction, step, type SimEvent, type SimState } from '../src/sim';
-import { createNewTank } from '../src/sim';
+import {
+  applyAction,
+  createNewTank,
+  defaultConfig,
+  step,
+  type NewTankOptions,
+  type SimEvent,
+  type SimState,
+} from '../src/sim';
 
 export const HOUR = 60;
 export const DAY = 1440;
 export const WEEK = 7 * DAY;
+
+/** Pecera de los tests: la rectangular mediana (60 L de agua). */
+export function newTank(options: NewTankOptions = {}): SimState {
+  return createNewTank({ tankId: 'rect_65', ...options });
+}
+
+/** Temperatura exterior media que deja la habitación (ventana cerrada) en `roomC`. */
+export function outdoorForRoom(roomC: number): number {
+  const { comfortC, outdoorCouplingWindowClosed } = defaultConfig.room;
+  return comfortC + (roomC - comfortC) / outdoorCouplingWindowClosed;
+}
 
 export interface RunSummary {
   state: SimState;
@@ -14,7 +32,7 @@ export interface RunSummary {
   peakNitriteDay: number;
 }
 
-/** Avanza la simulación de a una hora y registra los picos de amoníaco y nitrito. */
+/** Avanza la simulación de a una hora y registra los picos de amoníaco y nitrito (ppm). */
 export function run(start: SimState, minutes: number): RunSummary {
   let state = start;
   const events: SimEvent[] = [];
@@ -39,18 +57,30 @@ export function run(start: SimState, minutes: number): RunSummary {
   return { state, events, peakAmmonia, peakAmmoniaDay, peakNitrite, peakNitriteDay };
 }
 
+const matureCache = new Map<string, SimState>();
+
 /**
  * Pecera madura: arrancó con material colonizado, lleva dos meses con una
  * carga moderada y cambios de agua semanales bien hechos.
  */
 export function matureTank(seed: number | string = 7, ammoniaMgNPerDay = 20): SimState {
-  let state = createNewTank({ seed, seededMedia: true, ammoniaMgNPerDay });
+  const key = `${seed}:${ammoniaMgNPerDay}`;
+  const cached = matureCache.get(key);
+  if (cached) return cached;
+  let state = newTank({ seed, seededMedia: true, ammoniaMgNPerDay });
   for (let week = 0; week < 8; week++) {
     state = step(state, WEEK).state;
-    state = applyAction(state, { type: 'waterChange', fraction: 0.3, conditioned: true }).state;
+    state = applyAction(state, {
+      type: 'waterChange',
+      fraction: 0.3,
+      conditioned: true,
+      temperatureC: state.water.temperatureC,
+    }).state;
     state = applyAction(state, { type: 'topOff', conditioned: true }).state;
   }
-  return step(state, DAY).state;
+  state = step(state, DAY).state;
+  matureCache.set(key, state);
+  return state;
 }
 
 export function totalAob(state: SimState): number {
