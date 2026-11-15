@@ -2,6 +2,18 @@
 
 import type { SimConfig } from './config';
 
+/**
+ * Fracción en masa de nitrógeno de cada compuesto. El estado guarda ppm del
+ * compuesto (como un test), pero la cuenta del ciclo se hace en nitrógeno:
+ * 1 mg de N de amoníaco se convierte en 1 mg de N de nitrito y después en
+ * 1 mg de N de nitrato.
+ */
+export const NITROGEN_FRACTION = {
+  ammonia: 14.007 / 17.031, // NH3
+  nitrite: 14.007 / 46.005, // NO2-
+  nitrate: 14.007 / 62.004, // NO3-
+} as const;
+
 export function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
 }
@@ -10,6 +22,11 @@ export function clamp(value: number, min: number, max: number): number {
 export function monod(concentration: number, halfSaturation: number): number {
   if (concentration <= 0) return 0;
   return concentration / (halfSaturation + concentration);
+}
+
+/** Fracción que reacciona en dt con una cinética de primer orden (siempre estable). */
+export function firstOrderFraction(ratePerDay: number, dtDays: number): number {
+  return 1 - Math.exp(-ratePerDay * dtDays);
 }
 
 /**
@@ -31,7 +48,7 @@ export function oxygenSaturation(temperatureC: number): number {
 /**
  * pH a partir del KH y el CO2 disuelto (equilibrio de carbonatos):
  * CO2 = 3 * KH * 10^(7 - pH)  =>  pH = 7 + log10(3 * KH / CO2).
- * Sin KH no hay tampón y el pH se desploma.
+ * Sin KH no hay tampón y el pH se desploma ("crash de pH").
  */
 export function phFromKhCo2(kh: number, co2: number, config: SimConfig): number {
   const effectiveKh = Math.max(kh, config.ph.khFloor);
@@ -46,10 +63,10 @@ export function saturationVaporPressure(temperatureC: number): number {
 }
 
 /**
- * Factor de actividad de las bacterias nitrificantes según la temperatura:
- * 1 a la temperatura de referencia, crece hasta el óptimo y cae a 0 en el máximo.
+ * Factor de actividad biológica según la temperatura: 1 a la temperatura de
+ * referencia, crece hasta el óptimo y cae a 0 en el máximo.
  */
-export function nitrifierTemperatureFactor(temperatureC: number, config: SimConfig): number {
+export function temperatureFactor(temperatureC: number, config: SimConfig): number {
   const t = config.nitrogen.temperature;
   if (temperatureC <= 0 || temperatureC >= t.maxC) return 0;
   const base = Math.pow(t.theta, Math.min(temperatureC, t.optimumC) - t.referenceC);
@@ -64,7 +81,7 @@ export function nitrifierPhFactor(ph: number, config: SimConfig): number {
 }
 
 /** Índice 0..1 de toxicidad por NH3 libre (0 = seguro, 1 = letal). */
-export function ammoniaToxicity(nh3: number, config: SimConfig): number {
-  const { nh3SafeMgL, nh3LethalMgL } = config.toxicity;
-  return clamp((nh3 - nh3SafeMgL) / (nh3LethalMgL - nh3SafeMgL), 0, 1);
+export function ammoniaToxicity(nh3Ppm: number, config: SimConfig): number {
+  const { nh3SafePpm, nh3LethalPpm } = config.toxicity;
+  return clamp((nh3Ppm - nh3SafePpm) / (nh3LethalPpm - nh3SafePpm), 0, 1);
 }

@@ -3,15 +3,17 @@
  *   applyAction(state, action) -> { state, events }
  */
 
-import { updateAlerts } from './alerts';
-import { clamp } from './chemistry';
+import { seedCapacity } from './bacteria';
+import { NITROGEN_FRACTION, clamp } from './chemistry';
 import { defaultConfig, type SimConfig } from './config';
+import { updateAlerts } from './events';
+import { Rng } from './rng';
 import { cloneState } from './state';
 import type { SimAction, SimEvent, SimState, StepResult } from './types';
 import { updatePh } from './water';
 
 /**
- * Mezcla `liters` de agua de canilla con el agua que queda en la pecera.
+ * Mezcla `liters` de agua de la canilla con el agua que queda en la pecera.
  * Sin acondicionador, el agua nueva trae cloro.
  */
 function addTapWater(
@@ -32,11 +34,22 @@ function addTapWater(
   w.ammonia = w.ammonia * keep + tap.ammonia * add;
   w.nitrite = w.nitrite * keep + tap.nitrite * add;
   w.nitrate = w.nitrate * keep + tap.nitrate * add;
+  w.phosphate = w.phosphate * keep + tap.phosphate * add;
   w.kh = w.kh * keep + tap.kh * add;
+  w.gh = w.gh * keep + tap.gh * add;
   w.co2 = w.co2 * keep + tap.co2 * add;
   w.oxygen = w.oxygen * keep + tap.oxygen * add;
   w.chlorine = w.chlorine * keep + (conditioned ? 0 : tap.chlorine) * add;
+  w.tannins = w.tannins * keep;
   state.tank.waterLiters = after;
+}
+
+/** Mata una fracción de las bacterias del filtro (siempre queda un rastro). */
+function killFilterBacteria(state: SimState, fraction: number, config: SimConfig): void {
+  const floor = seedCapacity(state, config).filter;
+  const filter = state.bacteria.filter;
+  filter.aob = Math.max(floor, filter.aob * (1 - fraction));
+  filter.nob = Math.max(floor, filter.nob * (1 - fraction));
 }
 
 export function applyAction(
@@ -57,16 +70,18 @@ export function applyAction(
     }
 
     case 'waterChange': {
-      // Se saca una fracción del agua (con todo lo disuelto) y se repone el mismo volumen.
+      // Se saca una fracción del agua con todo lo disuelto (y parte de los
+      // residuos) y se repone el mismo volumen con agua de la canilla.
       const fraction = clamp(action.fraction, 0, 1);
       const liters = next.tank.waterLiters * fraction;
       next.tank.waterLiters -= liters;
       addTapWater(next, liters, action.conditioned, config, action.temperatureC);
-      if (action.vacuum) {
-        const removed = Math.min(1, fraction * config.organics.vacuumEfficiency);
-        next.organics.detritusG *= 1 - removed;
-        next.organics.foodG *= 1 - removed;
-      }
+      // Sifonear el fondo saca bastante más suciedad que solo sacar agua.
+      const removed = action.vacuum
+        ? Math.min(1, fraction * config.organics.vacuumEfficiency)
+        : fraction;
+      next.organics.detritusG *= 1 - removed;
+      next.organics.foodG *= 1 - removed;
       events.push({
         type: 'water_changed',
         timeMinutes,
@@ -85,16 +100,16 @@ export function applyAction(
     }
 
     case 'cleanFilter': {
-      // Bien: enjuagar en agua de la pecera (se pierde poca colonia).
-      // Mal: lavar bajo la canilla (el cloro arrasa con las bacterias del filtro).
+      if (next.filter.mediaCapacity <= 0) break;
       const f = config.filter;
-      const loss =
-        action.method === 'tapWater' && config.tapWater.chlorine > 0
-          ? f.badCleanBacteriaLoss
-          : f.goodCleanBacteriaLoss;
-      const floor = config.nitrogen.seedCapacityMgNPerDay * config.nitrogen.filterSeedShare;
-      next.bacteria.filter.aob = Math.max(floor, next.bacteria.filter.aob * (1 - loss));
-      next.bacteria.filter.nob = Math.max(floor, next.bacteria.filter.nob * (1 - loss));
+      let loss = f.goodCleanBacteriaLoss;
+      if (action.method === 'tapWater' && config.tapWater.chlorine > 0) {
+        // Mal: bajo la canilla, el cloro mata entre el 70 y el 90% de la colonia.
+        const rng = new Rng(next.rngState);
+        loss = rng.range(f.badCleanBacteriaLossMin, f.badCleanBacteriaLossMax);
+        next.rngState = rng.state;
+      }
+      killFilterBacteria(next, loss, config);
       next.filter.clog = Math.min(next.filter.clog, f.cleanResidualClog);
       next.organics.detritusG *= 1 - f.cleanDetritusRemoval;
       events.push({
@@ -106,21 +121,33 @@ export function applyAction(
       break;
     }
 
+    case 'replaceFilterMedia': {
+      // Cambiar todo el material de golpe: se va la colonia entera del filtro.
+      if (next.filter.mediaCapacity <= 0) break;
+      killFilterBacteria(next, 1, config);
+      next.filter.clog = 0;
+      next.organics.detritusG *= 1 - config.filter.cleanDetritusRemoval;
+      events.push({ type: 'filter_media_replaced', timeMinutes });
+      break;
+    }
+
     case 'addConditioner': {
       next.water.chlorine = 0;
       events.push({ type: 'conditioner_added', timeMinutes });
       break;
     }
 
-    case 'scrubAlgae': {
-      const removed = next.algae.biomassG * config.algae.scrubRemovalFraction;
-      next.algae.biomassG = Math.max(config.algae.seedGrams, next.algae.biomassG - removed);
-      events.push({ type: 'algae_scrubbed', timeMinutes, gramsRemoved: removed });
+    case 'cleanGlass': {
+      const removed = next.algae.glass * config.algae.scrubRemovalFraction;
+      next.algae.glass = Math.max(config.algae.seedCoverage, next.algae.glass - removed);
+      events.push({ type: 'glass_cleaned', timeMinutes, coverageRemoved: removed });
       break;
     }
 
     case 'addSeededMedia': {
-      const amount = config.nitrogen.seededMediaCapacityMgNPerDay;
+      if (next.filter.mediaCapacity <= 0) break;
+      const amount =
+        config.nitrogen.seededMediaCapacityMgNPerDayPerLiter * next.tank.fullLiters;
       const max = next.filter.mediaCapacity;
       next.bacteria.filter.aob = Math.min(max, next.bacteria.filter.aob + amount);
       next.bacteria.filter.nob = Math.min(max, next.bacteria.filter.nob + amount);
@@ -129,9 +156,11 @@ export function applyAction(
     }
 
     case 'doseAmmonia': {
-      const mgPerLiter = Math.max(0, action.mgPerLiter);
-      next.water.ammonia += mgPerLiter;
-      events.push({ type: 'ammonia_dosed', timeMinutes, mgPerLiter });
+      const ppm = Math.max(0, action.ppm);
+      next.water.ammonia += ppm;
+      next.water.kh +=
+        ppm * NITROGEN_FRACTION.ammonia * config.nitrogen.khReleasedPerMgNAmmonified;
+      events.push({ type: 'ammonia_dosed', timeMinutes, ppm });
       break;
     }
 
@@ -144,7 +173,7 @@ export function applyAction(
     }
 
     case 'setFilterRunning':
-      next.filter.running = action.running;
+      next.filter.running = action.running && next.filter.flowLph > 0;
       break;
 
     case 'setLid':
@@ -159,8 +188,12 @@ export function applyAction(
       break;
     }
 
-    case 'setRoomBase':
-      next.room.baseC = action.baseC;
+    case 'setWindow':
+      next.room.windowOpen = action.open;
+      break;
+
+    case 'setOutdoorBase':
+      next.room.outdoorBaseC = action.baseC;
       break;
 
     case 'setBioload': {

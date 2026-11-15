@@ -7,31 +7,30 @@
  * (que incluye la semilla del RNG) y el mismo delta devuelve siempre lo mismo.
  */
 
-import { updateAlerts } from './alerts';
+import { stepAlgae } from './algae';
+import { stepCycle, stepNitrogen } from './bacteria';
+import { MINUTES_PER_DAY, planSteps } from './clock';
 import { defaultConfig, type SimConfig } from './config';
+import { updateAlerts } from './events';
 import { Rng } from './rng';
 import { cloneState } from './state';
 import { evaporationLitersPerDay, stepRoom, stepWaterTemperature } from './thermal';
 import type { SimEvent, SimState, StepResult } from './types';
-import {
-  MINUTES_PER_DAY,
-  applyEvaporation,
-  stepAlgae,
-  stepCycle,
-  stepFilterClog,
-  stepGases,
-  stepNitrogen,
-  stepOrganics,
-  updatePh,
-} from './water';
+import { applyEvaporation, stepFilterClog, stepGases, stepOrganics, updatePh } from './water';
 
-function substep(state: SimState, dtMinutes: number, rng: Rng, config: SimConfig): SimEvent[] {
+function singleStep(
+  state: SimState,
+  dtMinutes: number,
+  rng: Rng,
+  config: SimConfig,
+  events: SimEvent[],
+): void {
   const dtDays = dtMinutes / MINUTES_PER_DAY;
   const previousTime = state.timeMinutes;
   state.timeMinutes += dtMinutes;
 
-  // Habitación y temperatura del agua.
-  stepRoom(state, previousTime, rng, config);
+  // Exterior, habitación y temperatura del agua.
+  stepRoom(state, previousTime, dtMinutes, rng, config);
   const evaporated = applyEvaporation(
     state,
     evaporationLitersPerDay(state, config) * dtDays,
@@ -48,15 +47,13 @@ function substep(state: SimState, dtMinutes: number, rng: Rng, config: SimConfig
   stepFilterClog(state, dtDays, newDetritusG, config);
 
   // Estado del ciclado y alertas.
-  const events: SimEvent[] = [];
   const cycleChange = stepCycle(state, dtMinutes, config);
   if (cycleChange === 'established') {
     events.push({ type: 'cycle_established', timeMinutes: state.timeMinutes });
   } else if (cycleChange === 'lost') {
     events.push({ type: 'cycle_lost', timeMinutes: state.timeMinutes });
   }
-  events.push(...updateAlerts(state, config));
-  return events;
+  for (const event of updateAlerts(state, config)) events.push(event);
 }
 
 export function step(
@@ -69,13 +66,11 @@ export function step(
   if (!(deltaMinutes > 0)) return { state: next, events };
 
   const rng = new Rng(next.rngState);
-  const count = Math.ceil(deltaMinutes / config.integration.maxSubstepMinutes - 1e-9);
-  const dt = deltaMinutes / count;
-  const endTime = state.timeMinutes + deltaMinutes;
-  for (let i = 0; i < count; i++) {
-    events.push(...substep(next, dt, rng, config));
+  const plan = planSteps(deltaMinutes, config);
+  for (let i = 0; i < plan.count; i++) {
+    singleStep(next, plan.minutes, rng, config, events);
   }
-  next.timeMinutes = endTime; // evita arrastrar error de redondeo
+  next.timeMinutes = state.timeMinutes + deltaMinutes; // evita arrastrar error de redondeo
   next.rngState = rng.state;
   return { state: next, events };
 }

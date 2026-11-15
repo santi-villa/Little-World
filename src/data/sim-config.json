@@ -1,37 +1,42 @@
 {
-  "integration": {
-    "maxSubstepMinutes": 5
+  "clock": {
+    "baseStepMinutes": 1,
+    "coarseStepMinutes": 10,
+    "fineStepMaxDays": 7,
+    "maxCatchUpDays": 30
   },
   "newTank": {
-    "lengthCm": 60,
-    "widthCm": 30,
-    "heightCm": 36,
-    "fillFraction": 0.926,
-    "hasLid": true,
-    "heaterWatts": 50,
     "heaterSetpointC": 25,
-    "filterFlowLph": 300,
-    "filterMediaCapacityMgNPerDay": 600,
     "lightStartHour": 10,
     "lightDurationHours": 8,
-    "roomBaseC": 21,
     "startHour": 8
   },
   "tapWater": {
     "temperatureC": 18,
-    "kh": 5,
-    "co2": 4,
+    "kh": 4,
+    "gh": 6,
+    "co2": 5,
     "oxygen": 8,
     "chlorine": 1.0,
     "ammonia": 0,
     "nitrite": 0,
-    "nitrate": 0
+    "nitrate": 0,
+    "phosphate": 0.1
+  },
+  "outdoor": {
+    "defaultBaseC": 18,
+    "dailyAmplitudeC": 5,
+    "peakHour": 15,
+    "weatherSigmaC": 2.5,
+    "weatherTauHours": 48
   },
   "room": {
-    "dailyAmplitudeC": 1.5,
-    "peakHour": 16,
-    "weatherSigmaC": 1.2,
-    "weatherTauHours": 48
+    "comfortC": 21,
+    "outdoorCouplingWindowClosed": 0.3,
+    "outdoorCouplingWindowOpen": 0.7,
+    "inertiaHoursWindowClosed": 4,
+    "inertiaHoursWindowOpen": 1,
+    "relativeHumidity": 0.55
   },
   "thermal": {
     "waterHeatCapacityJPerLiterK": 4186,
@@ -43,7 +48,6 @@
   },
   "evaporation": {
     "litersPerDayPerM2PerKPa": 1.2,
-    "roomRelativeHumidity": 0.55,
     "lidFactor": 0.25,
     "minWaterFraction": 0.05
   },
@@ -52,7 +56,10 @@
     "flowKlaPerHour": 0.6,
     "turnoverHalfPerHour": 1.0,
     "co2KlaRatio": 0.9,
-    "co2EquilibriumMgL": 1.5
+    "co2EquilibriumMgL": 2.5
+  },
+  "oxygen": {
+    "referenceTemperatureC": 20
   },
   "ph": {
     "khFloor": 0.02,
@@ -61,20 +68,20 @@
   },
   "nitrogen": {
     "aob": {
-      "halfSaturationMgL": 0.03,
+      "halfSaturationPpm": 0.036,
       "maxNetGrowthPerDay": 0.6,
       "oxygenHalfSaturationMgL": 0.5
     },
     "nob": {
-      "halfSaturationMgL": 0.03,
+      "halfSaturationPpm": 0.066,
       "maxNetGrowthPerDay": 0.55,
       "oxygenHalfSaturationMgL": 1.0,
-      "freeAmmoniaInhibitionMgL": 0.3
+      "freeAmmoniaInhibitionPpm": 0.36
     },
-    "maintenanceSaturation": 0.5,
+    "maintenanceSaturation": 0.6,
     "starvationDecayPerDay": 0.05,
-    "seedCapacityMgNPerDay": 0.05,
-    "filterSeedShare": 0.85,
+    "seedCapacityMgNPerDayPerLiter": 0.001,
+    "filterShare": 0.9,
     "surfaceColonizationPerDay": 0.03,
     "surfaceCapacityMgNPerDayPerLiter": 0.5,
     "filterTurnoverHalfPerHour": 0.5,
@@ -93,7 +100,7 @@
     "oxygenPerMgNAob": 3.43,
     "oxygenPerMgNNob": 1.14,
     "filterStoppedDeathPerDay": 1.0,
-    "seededMediaCapacityMgNPerDay": 40
+    "seededMediaCapacityMgNPerDayPerLiter": 0.7
   },
   "chlorine": {
     "halfLifeHours": 8,
@@ -102,22 +109,29 @@
   "organics": {
     "foodDecayPerDay": 0.4,
     "foodNitrogenMgPerGram": 64,
+    "foodPhosphateMgPerGram": 15,
     "foodToDetritusFraction": 0.3,
     "detritusDecayPerDay": 0.03,
     "detritusNitrogenMgPerGram": 40,
+    "detritusPhosphateMgPerGram": 8,
+    "bioloadPhosphateMgPerMgN": 0.15,
     "oxygenMgPerMgMineralized": 1.0,
     "co2MgPerMgMineralized": 1.4,
     "oxygenHalfSaturationMgL": 0.5,
     "vacuumEfficiency": 2.0
   },
   "algae": {
-    "seedGrams": 0.001,
+    "seedCoverage": 0.001,
     "maxGrowthPerDay": 0.6,
     "lossPerDay": 0.05,
     "capacityGramsPerLiter": 0.03,
+    "glassCapacityShare": 0.6,
+    "decorLightFactor": 0.7,
     "nitrogenHalfSaturationMgL": 0.5,
+    "phosphateHalfSaturationPpm": 0.05,
     "co2HalfSaturationMgL": 0.3,
     "nitrogenMgPerGram": 70,
+    "phosphateMgPerGram": 30,
     "ammoniaPreference": 5,
     "oxygenMgPerMgGrown": 1.3,
     "co2MgPerMgGrown": 1.6,
@@ -130,38 +144,38 @@
     "minLevelFraction": 0.7,
     "fullFlowLevelFraction": 0.85,
     "goodCleanBacteriaLoss": 0.1,
-    "badCleanBacteriaLoss": 0.95,
+    "badCleanBacteriaLossMin": 0.7,
+    "badCleanBacteriaLossMax": 0.9,
     "cleanResidualClog": 0.05,
     "cleanDetritusRemoval": 0.4
   },
   "cycle": {
-    "maxAmmoniaMgL": 0.1,
-    "maxNitriteMgL": 0.1,
+    "maxAmmoniaPpm": 0.2,
+    "maxNitritePpm": 0.2,
     "minCapacityMgNPerDayPerLiter": 0.1,
     "stableHours": 48,
-    "lostAboveMgL": 0.5
+    "lostAboveAmmoniaPpm": 0.5,
+    "lostAboveNitritePpm": 1.0
   },
   "toxicity": {
-    "nh3SafeMgL": 0.02,
-    "nh3LethalMgL": 0.5
+    "nh3SafePpm": 0.02,
+    "nh3LethalPpm": 0.5
   },
-  "alerts": {
+  "thresholds": {
     "hysteresis": 0.1,
-    "nh3WarningMgL": 0.02,
-    "nh3DangerMgL": 0.1,
-    "nitriteWarningMgL": 0.15,
-    "nitriteDangerMgL": 0.6,
-    "nitrateHighMgL": 9,
-    "phLow": 6.2,
-    "phHigh": 8.8,
+    "nh3StressPpm": 0.02,
+    "nh3DangerPpm": 0.05,
+    "nitriteStressPpm": 0.25,
+    "nitriteDangerPpm": 1,
+    "nitrateStressPpm": 40,
+    "nitrateDangerPpm": 80,
+    "oxygenStress": 0.6,
+    "oxygenDanger": 0.4,
+    "chlorinePpm": 0.02,
+    "phCrash": 6.0,
     "khLow": 1,
-    "oxygenLowMgL": 5,
-    "oxygenCriticalMgL": 3,
-    "chlorineMgL": 0.02,
-    "temperatureLowC": 20,
-    "temperatureHighC": 30,
     "waterLowFraction": 0.85,
     "filterClogged": 0.7,
-    "algaeBloomFraction": 0.5
+    "algaeBloom": 0.5
   }
 }

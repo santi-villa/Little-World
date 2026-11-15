@@ -1,0 +1,70 @@
+{
+  "defaultTankId": "cube_20",
+  "tanks": [
+    {
+      "id": "bowl_8",
+      "name": "Redonda chica",
+      "shape": "round",
+      "lengthCm": 25,
+      "widthCm": 25,
+      "heightCm": 20,
+      "fillFraction": 0.64,
+      "hasLid": false,
+      "heaterWatts": 0,
+      "filterFlowLph": 0,
+      "filterMediaCapacityMgNPerDay": 0
+    },
+    {
+      "id": "cube_20",
+      "name": "Cubo chico",
+      "shape": "box",
+      "lengthCm": 30,
+      "widthCm": 30,
+      "heightCm": 30,
+      "fillFraction": 0.85,
+      "hasLid": true,
+      "heaterWatts": 25,
+      "filterFlowLph": 150,
+      "filterMediaCapacityMgNPerDay": 200
+    },
+    {
+      "id": "cube_40",
+      "name": "Cubo mediano",
+      "shape": "box",
+      "lengthCm": 35,
+      "widthCm": 35,
+      "heightCm": 35,
+      "fillFraction": 0.93,
+      "hasLid": true,
+      "heaterWatts": 50,
+      "filterFlowLph": 250,
+      "filterMediaCapacityMgNPerDay": 400
+    },
+    {
+      "id": "rect_65",
+      "name": "Rectangular mediana",
+      "shape": "box",
+      "lengthCm": 60,
+      "widthCm": 30,
+      "heightCm": 36,
+      "fillFraction": 0.926,
+      "hasLid": true,
+      "heaterWatts": 50,
+      "filterFlowLph": 300,
+      "filterMediaCapacityMgNPerDay": 600
+    },
+    {
+      "id": "rect_180",
+      "name": "Rectangular grande",
+      "shape": "box",
+      "lengthCm": 100,
+      "widthCm": 40,
+      "heightCm": 45,
+      "fillFraction": 0.93,
+      "hasLid": true,
+      "heaterWatts": 200,
+      "filterFlowLph": 900,
+      "filterMediaCapacityMgNPerDay": 1800
+    }
+  ]
+}

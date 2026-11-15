@@ -1,20 +1,23 @@
 /** Creación y copia del estado. */
 
+import { seedCapacity } from './bacteria';
 import { oxygenSaturation, phFromKhCo2 } from './chemistry';
-import { defaultConfig, type SimConfig } from './config';
+import { DEFAULT_TANK_ID, defaultConfig, getTankModel, type SimConfig } from './config';
 import { seedToState } from './rng';
+import { roomTargetC, syntheticOutdoorC } from './thermal';
 import type { SimState } from './types';
 
 export interface NewTankOptions {
   seed?: number | string;
-  lengthCm?: number;
-  widthCm?: number;
-  heightCm?: number;
+  /** Modelo del catálogo (data/tanks.json). Por defecto, el cubo del tutorial. */
+  tankId?: string;
   hasLid?: boolean;
   heaterWatts?: number;
   heaterSetpointC?: number;
-  filterFlowLph?: number;
-  roomBaseC?: number;
+  /** Temperatura exterior media (el exterior es sintético hasta la Fase 3). */
+  outdoorBaseC?: number;
+  /** Minuto del día en que arranca el reloj (para que coincida con la hora real). */
+  startMinuteOfDay?: number;
   /** Arrancar con material de filtro colonizado de otra pecera. */
   seededMedia?: boolean;
   /** Fuente constante de amoníaco, mg N/día (carga biológica). */
@@ -22,7 +25,7 @@ export interface NewTankOptions {
 }
 
 /**
- * Pecera nueva: recién llenada con agua de canilla acondicionada, ya a la
+ * Pecera nueva: recién llenada con agua de la canilla acondicionada, ya a la
  * temperatura del calefactor, con apenas un rastro de bacterias.
  */
 export function createNewTank(
@@ -31,71 +34,77 @@ export function createNewTank(
 ): SimState {
   const d = config.newTank;
   const tap = config.tapWater;
-  const n = config.nitrogen;
+  const model = getTankModel(options.tankId ?? DEFAULT_TANK_ID);
 
-  const lengthCm = options.lengthCm ?? d.lengthCm;
-  const widthCm = options.widthCm ?? d.widthCm;
-  const heightCm = options.heightCm ?? d.heightCm;
-  const fullLiters = ((lengthCm * widthCm * heightCm) / 1000) * d.fillFraction;
+  const fullLiters =
+    ((model.lengthCm * model.widthCm * model.heightCm) / 1000) * model.fillFraction;
+  const heaterWatts = options.heaterWatts ?? model.heaterWatts;
   const setpointC = options.heaterSetpointC ?? d.heaterSetpointC;
-  const roomBaseC = options.roomBaseC ?? d.roomBaseC;
+  const hasFilter = model.filterFlowLph > 0;
   const co2 = config.gasExchange.co2EquilibriumMgL;
 
-  const seed = n.seedCapacityMgNPerDay;
-  const colonized = options.seededMedia ? n.seededMediaCapacityMgNPerDay : 0;
-
-  return {
-    timeMinutes: d.startHour * 60,
+  const state: SimState = {
+    timeMinutes: options.startMinuteOfDay ?? d.startHour * 60,
     rngState: seedToState(options.seed ?? 1),
     tank: {
-      lengthCm,
-      widthCm,
-      heightCm,
+      modelId: model.id,
+      lengthCm: model.lengthCm,
+      widthCm: model.widthCm,
+      heightCm: model.heightCm,
       waterLiters: fullLiters,
       fullLiters,
-      hasLid: options.hasLid ?? d.hasLid,
+      hasLid: options.hasLid ?? model.hasLid,
     },
     water: {
       temperatureC: setpointC,
       ammonia: tap.ammonia,
       nitrite: tap.nitrite,
       nitrate: tap.nitrate,
-      kh: tap.kh,
-      co2,
+      phosphate: tap.phosphate,
       ph: phFromKhCo2(tap.kh, co2, config),
+      kh: tap.kh,
+      gh: tap.gh,
+      co2,
       oxygen: oxygenSaturation(setpointC),
       chlorine: 0,
+      tannins: 0,
     },
     organics: { foodG: 0, detritusG: 0 },
-    bacteria: {
-      filter: {
-        aob: seed * n.filterSeedShare + colonized,
-        nob: seed * n.filterSeedShare + colonized,
-      },
-      surfaces: {
-        aob: seed * (1 - n.filterSeedShare),
-        nob: seed * (1 - n.filterSeedShare),
-      },
-    },
+    bacteria: { filter: { aob: 0, nob: 0 }, surfaces: { aob: 0, nob: 0 } },
     filter: {
-      running: true,
-      flowLph: options.filterFlowLph ?? d.filterFlowLph,
-      mediaCapacity: d.filterMediaCapacityMgNPerDay,
+      running: hasFilter,
+      flowLph: model.filterFlowLph,
+      mediaCapacity: model.filterMediaCapacityMgNPerDay,
       clog: 0,
     },
-    heater: {
-      enabled: true,
-      watts: options.heaterWatts ?? d.heaterWatts,
-      setpointC,
-      on: false,
-    },
+    heater: { enabled: heaterWatts > 0, watts: heaterWatts, setpointC, on: false },
     light: { startHour: d.lightStartHour, durationHours: d.lightDurationHours },
-    room: { baseC: roomBaseC, weatherOffsetC: 0, temperatureC: roomBaseC },
-    algae: { biomassG: config.algae.seedGrams },
+    room: {
+      outdoorBaseC: options.outdoorBaseC ?? config.outdoor.defaultBaseC,
+      weatherOffsetC: 0,
+      outdoorC: 0,
+      windowOpen: false,
+      temperatureC: 0,
+    },
+    algae: { glass: config.algae.seedCoverage, decor: config.algae.seedCoverage },
     bioload: { ammoniaMgNPerDay: options.ammoniaMgNPerDay ?? 0, wasteGPerDay: 0 },
     cycle: { established: false, stableMinutes: 0 },
     alerts: [],
   };
+
+  // La habitación arranca en equilibrio con el exterior.
+  state.room.outdoorC = syntheticOutdoorC(state, config);
+  state.room.temperatureC = roomTargetC(state.room.outdoorC, false, config);
+  if (!state.heater.enabled) state.water.temperatureC = state.room.temperatureC;
+
+  const seed = seedCapacity(state, config);
+  const colonized =
+    options.seededMedia && hasFilter
+      ? config.nitrogen.seededMediaCapacityMgNPerDayPerLiter * fullLiters
+      : 0;
+  state.bacteria.filter = { aob: seed.filter + colonized, nob: seed.filter + colonized };
+  state.bacteria.surfaces = { aob: seed.surfaces, nob: seed.surfaces };
+  return state;
 }
 
 /** Copia profunda del estado (más rápida y tipada que pasar por JSON). */
