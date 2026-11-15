@@ -6,7 +6,7 @@ import {
   parseSave,
   type Migration,
 } from '../src/save/save-format';
-import { deleteSave, readBackup, readSave, writeSave } from '../src/save/storage';
+import { deleteSave, readBackup, readSave, writeRaw, writeSave } from '../src/save/storage';
 import { applyAction, createNewTank, step } from '../src/sim';
 import { DAY } from './helpers';
 
@@ -16,30 +16,12 @@ const sampleState = () => {
   return step(state, 3 * DAY).state;
 };
 
-/** Escribe un valor crudo en la base, como lo dejaría otra versión del juego. */
-function putRaw(value: unknown): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open('little-world', 1);
-    open.onupgradeneeded = () => open.result.createObjectStore('saves');
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const db = open.result;
-      const tx = db.transaction('saves', 'readwrite');
-      tx.objectStore('saves').put(value, 'main');
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      tx.onerror = () => reject(tx.error);
-    };
-  });
-}
-
 describe('formato de guardado', () => {
-  it('lleva versión de formato', () => {
+  it('lleva versión de formato, lastTimestamp y la semilla del RNG', () => {
     const save = createSave(sampleState(), { speed: 60 }, 1234);
     expect(save.formatVersion).toBe(SAVE_FORMAT_VERSION);
-    expect(save.savedAt).toBe(1234);
+    expect(save.lastTimestamp).toBe(1234);
+    expect(save.sim.rngState).toBeTypeOf('number');
   });
 
   it('un guardado actual se lee tal cual', () => {
@@ -52,15 +34,15 @@ describe('formato de guardado', () => {
     const sim = sampleState();
     const migrations: Record<number, Migration> = {
       1: (save) => ({ ...save, settings: { speed: 5 } }),
-      2: (save) => ({ ...save, savedAt: 99 }),
+      2: (save) => ({ ...save, lastTimestamp: 99 }),
     };
-    const result = parseSave({ formatVersion: 1, savedAt: 1, sim }, migrations, 3);
+    const result = parseSave({ formatVersion: 1, lastTimestamp: 1, sim }, migrations, 3);
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
     expect(result.migratedFrom).toBe(1);
     expect(result.save.formatVersion).toBe(3);
     expect(result.save.settings.speed).toBe(5);
-    expect(result.save.savedAt).toBe(99);
+    expect(result.save.lastTimestamp).toBe(99);
     expect(result.save.sim).toEqual(sim);
   });
 
@@ -112,7 +94,7 @@ describe('guardado en IndexedDB', () => {
 
   it('una partida ilegible queda respaldada en vez de perderse', async () => {
     const future = { formatVersion: SAVE_FORMAT_VERSION + 5, sim: { algo: 'del futuro' } };
-    await putRaw(future);
+    await writeRaw(future);
     const result = await readSave();
     expect(result.status).toBe('too_new');
     expect(await readBackup()).toEqual(future);

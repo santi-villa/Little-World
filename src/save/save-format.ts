@@ -17,8 +17,9 @@ export interface GameSettings {
 
 export interface SaveFile {
   formatVersion: number;
-  /** Momento real del guardado (ms desde 1970). */
-  savedAt: number;
+  /** Momento real del guardado (ms desde 1970). Base del catch-up offline. */
+  lastTimestamp: number;
+  /** Estado de la simulación (incluye el estado del RNG). */
   sim: SimState;
   settings: GameSettings;
 }
@@ -26,7 +27,7 @@ export interface SaveFile {
 /** Una migración recibe el guardado en la versión N y lo devuelve en la N+1. */
 export type Migration = (save: Record<string, unknown>) => Record<string, unknown>;
 
-/** migrations[N] convierte de la versión N a la N+1. */
+/** MIGRATIONS[N] convierte de la versión N a la N+1. */
 export const MIGRATIONS: Record<number, Migration> = {
   // Ejemplo para el día que haga falta:
   // 1: (save) => ({ ...save, sim: { ...(save.sim as object), peces: [] } }),
@@ -67,13 +68,13 @@ export function parseSave(
   const settings = isRecord(current.settings) ? current.settings : {};
   const save: SaveFile = {
     formatVersion: targetVersion,
-    savedAt: typeof current.savedAt === 'number' ? current.savedAt : 0,
+    lastTimestamp: typeof current.lastTimestamp === 'number' ? current.lastTimestamp : 0,
     sim: current.sim as unknown as SimState,
-    settings: { speed: typeof settings.speed === 'number' ? settings.speed : 1 },
+    settings: { speed: typeof settings.speed === 'number' ? settings.speed : 1 / 60 },
   };
   return { status: 'ok', save, migratedFrom: version === targetVersion ? null : version };
 }
 
-export function createSave(sim: SimState, settings: GameSettings, savedAt: number): SaveFile {
-  return { formatVersion: SAVE_FORMAT_VERSION, savedAt, sim, settings };
+export function createSave(sim: SimState, settings: GameSettings, lastTimestamp: number): SaveFile {
+  return { formatVersion: SAVE_FORMAT_VERSION, lastTimestamp, sim, settings };
 }
