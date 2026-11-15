@@ -1,0 +1,274 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1020;
+  --panel: rgba(12, 16, 30, 0.93);
+  --line: #2a3352;
+  --text: #dfe6f7;
+  --muted: #8f9bbd;
+  --accent: #f4e9c8;
+  --bad: #ff6b5e;
+  --debug-width: min(340px, 48vw);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* El escenario ocupa toda la pantalla; el canvas se centra adentro (viewport.ts). */
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+body.debug-open #stage {
+  right: var(--debug-width);
+}
+
+#stage canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------- Panel de debug ---------- */
+
+.debug-toggle {
+  position: fixed;
+  top: max(6px, env(safe-area-inset-top));
+  right: max(6px, env(safe-area-inset-right));
+  z-index: 20;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.debug-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: var(--debug-width);
+  /* Lugar para el botón DEBUG, que queda fijo arriba. */
+  padding-top: calc(max(6px, env(safe-area-inset-top)) + 38px);
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.debug-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.debug-panel[hidden] {
+  display: none;
+}
+
+.debug-section {
+  margin-bottom: 12px;
+}
+
+.debug-section h2 {
+  margin: 0 0 5px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.debug-clock {
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.debug-speed {
+  width: 100%;
+  min-height: 32px;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #141a2e;
+  color: var(--text);
+  font: inherit;
+}
+
+.debug-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 5px;
+}
+
+.debug-button {
+  min-height: 34px;
+  padding: 5px 6px;
+  border: 1px solid #3a4670;
+  border-radius: 4px;
+  background: #1b2340;
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.debug-button:active {
+  background: #2c3966;
+}
+
+.debug-button.bad {
+  border-color: #6d3a3a;
+  background: #3a1d22;
+  color: #ffc9c2;
+}
+
+.debug-button.bad:active {
+  background: #5a2a30;
+}
+
+.debug-button:focus-visible,
+.debug-toggle:focus-visible,
+.debug-speed:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.debug-table th {
+  padding: 2px 6px 2px 0;
+  color: var(--muted);
+  font-weight: 400;
+  text-align: left;
+  vertical-align: top;
+}
+
+.debug-table td {
+  padding: 2px 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.debug-alerts {
+  color: var(--muted);
+}
+
+.debug-alerts.active {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.debug-events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.debug-events li {
+  padding: 2px 0;
+  border-bottom: 1px dotted #1f2743;
+  overflow-wrap: anywhere;
+}
+
+.debug-events li.empty {
+  color: var(--muted);
+  border: 0;
+}
+
+.debug-save {
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+/* ---------- Aviso de girar el celular ---------- */
+
+#rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: var(--bg);
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .rotate-icon {
+    width: 44px;
+    height: 76px;
+    border: 4px solid var(--accent);
+    border-radius: 8px;
+    animation: rotate-phone 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rotate-phone {
+  0%,
+  20% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-icon {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
