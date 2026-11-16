@@ -141,3 +141,32 @@ Falta:
     lavarse); el gato "camina por el aire" para subir al escritorio o a la tapa.
 - El pipeline procesa solo todas las imágenes nuevas (peceras, plantas de pecera,
   equipos, íconos, animales...): salen con nombres numerados y todavía no se usan.
+
+## Arreglos: celular, nitidez, helecho, cortinas
+
+- Pecera en celular: el PWA guardaba en caché los PNG pero no `manifest.json`;
+  con un `vidrio.png` viejo (de otro tamaño) y medidas nuevas, el interior
+  quedaba chico y arriba a la izquierda. Ahora el precache incluye los `json`
+  (`vite.config.ts`) y la pecera arma vidrio e interior en un mismo contenedor,
+  en coordenadas de la imagen del vidrio, midiendo la textura que realmente se
+  cargó. Probado en Chromium con DPR 3 (844x390); falta confirmarlo en un iPhone
+  real: si quedara una versión vieja instalada, cerrar y abrir la app una vez
+  para que se actualice el service worker.
+- Regla de nitidez: el juego nunca achica una imagen al dibujarla (achicar con
+  vecino más cercano saltea filas: eso hacía las rayas de las plantas). Las
+  imágenes salen del pipeline a su grilla o a su tamaño final (`kernel:
+  "mitchell"` + `scale` en el config) y se dibujan a escala entera.
+  Pendiente: el sustrato (se dibuja a 0,74) y la decoración de la pecera
+  (maderas y rocas, a 0,5) todavía se achican al dibujar.
+- Gato: los videos se reducen a su grilla nativa (~9,5 px del video por píxel
+  del dibujo), tomando el centro de cada celda; sin promediar ni paleta común.
+  Se dibuja a x2, en posiciones enteras de su grilla. Su píxel mide la mitad
+  que el del fondo (~4): no se puede igualar sin que el gato quede del doble de
+  tamaño que su almohadón.
+- Helecho: a su tamaño real (la etapa grande mide un tercio del agua), a los
+  costados.
+- Cortinas: los paños miden ~150 px de alto (para no tapar los vidrios ni la
+  biblioteca quedan cortos) y sobresalen un poco de las puntas de la barra.
+- Plato del gato: sin dibujo hasta que haya arte del plato.
+- Debug: "Nueva partida" borra el guardado y arranca con la pecera inicial y un
+  solo betta.
