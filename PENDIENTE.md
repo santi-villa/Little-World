@@ -75,11 +75,9 @@ Falta:
 - El canvas queda en 1280x720 y el navegador lo agranda (cambiar la resolución
   del canvas según la pantalla corría y achicaba la escena en celulares). En
   reposo el zoom se ajusta a un número entero si queda a menos de 12% del pedido.
-- **Viento en las plantas colgantes: desactivado** (el shader generaba rayas
-  horizontales y además no compilaba en algunos navegadores). Hacerlo con
-  sprites separados: recortar cada planta colgante como imagen propia (con su
-  maceta y sus tiras) y moverla entera o por tiras dibujadas aparte. El pipeline
-  todavía genera `dormitorio-planta-N.png` (`plantZones`), sin uso.
+- Plantas colgantes: ahora son piezas aparte (`colgantes.jpg`, `enredadera-barra.jpg`)
+  que se hamacan rotando apenas el sprite entero con el pivote arriba (máx. 2°).
+  Ubicación y escala en `scene-layout.ts` (`HANGING`, `CURTAINS`).
 - La lámpara la elige el jugador y no se guarda (al recargar vuelve a prenderse
   sola cuando oscurece).
 - Ventana abierta: cambia la simulación y entra más viento a las plantas, pero no
@@ -110,11 +108,36 @@ Falta:
   rectangular mediana, revisar que entre (el helecho grande llega a la superficie).
 - Las plantas de la pecera ondulan con una malla (`MeshPlane`), de a píxeles
   enteros del dibujo: no usan shader.
-- Gato: sale de `gato-alternativa.jpg`. `gato.jpg` se saltea en el pipeline
-  porque la pata y la lengua de la fila 4 tienen violetas casi iguales al
-  magenta del fondo. Animaciones: dormir, sentado (también mirar peces, pedir
-  comida, ronronear y comer), caminar (espejado a la izquierda), lamerse
-  (lavarse) y tocar el vidrio (dos cuadros de la pata levantada). Falta una
-  animación propia de comer y de jugar.
+- Gato: ahora sale de los videos (ver la sección de abajo); las hojas `gato.jpg` y
+  `gato-alternativa.jpg` se saltean en el pipeline.
 - Revisado con capturas de pantalla (escritorio, 1280x720): vista habitación y
   vista pecera. No se probó en un celular real.
+
+## Dormitorio nuevo, cielo, pájaro y gato con videos
+
+- Fondo: `dormitorio-sin-plantas.jpg` (sale como `dormitorio.png`; el viejo
+  `dormitorio.jpg` se saltea). Lugares en `scene-layout.ts`, zonas y vista
+  inicial en `rooms.json`, pecera en la mitad libre del escritorio
+  (`tank-layout.ts`). Revisado con una captura de día y una de noche, y con una
+  composición estática de la habitación entera.
+- Cortinas: solo los paños (la barra del dibujo no coincide con la del fondo),
+  colgados de la barra del fondo, a una escala que deja libre la lámpara.
+- Cielo de noche: `cielo-noche.png` entre el degradé y el clima; aparece de a
+  poco según la hora y se tapa con nubes y lluvia. Estrellas que titilan suave
+  por código (la luna viene en la imagen).
+- Pájaro: en días despejados, cada 40 a 100 s se posa afuera (vidrio de abajo a
+  la izquierda), se queda 6 a 11 s, se da vuelta y se va. Si el gato está
+  sentado, lo mira. Se achicó mucho la imagen (de 645 a 65 px): queda con
+  píxeles más finos que el fondo.
+- Gato con videos (`scripts/video-frames.mjs`, necesita ffmpeg): 21 clips con
+  cortes definidos en `assets.config.json` (`files["gato/videos/..."].clips`).
+  Del video de comer se usa solo de 2,4 a 6,8 s. Transiciones: despertar,
+  acostarse, pararse (o estirarse + bostezar, a veces), sentarse, echarse,
+  levantarse, rodar, incorporarse, agacharse y erguirse.
+  - Estados: dormir, comer, lavarse, mirar peces/ventana/pájaro (cola), enojado
+    (echado en loaf), caminar/jugar. Acariciar: mimos; ronroneo: panza arriba.
+  - Falta: animación propia de tocar el vidrio y de jugar; los bucles de video no
+    siempre cierran perfecto (puede verse un saltito al reiniciar caminar o
+    lavarse); el gato "camina por el aire" para subir al escritorio o a la tapa.
+- El pipeline procesa solo todas las imágenes nuevas (peceras, plantas de pecera,
+  equipos, íconos, animales...): salen con nombres numerados y todavía no se usan.
