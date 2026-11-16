@@ -259,8 +259,17 @@ describe('algas', () => {
 });
 
 describe('peceras del catálogo', () => {
-  it('la pecera por defecto es el cubo de 20 L del tutorial', () => {
-    const cube = createNewTank({ seed: 1 });
+  it('la pecera por defecto respeta la configuración actual', () => {
+    const tank = createNewTank({ seed: 1 });
+    expect(tank.tank.modelId).toBe('rect_65');
+    expect(tank.tank.fullLiters).toBeGreaterThan(55);
+    expect(tank.tank.fullLiters).toBeLessThan(65);
+    expect(tank.heater.watts).toBe(50);
+    expect(tank.water.chlorine).toBe(0);
+  });
+
+  it('el cubo de 20 L del tutorial sigue disponible por su ID', () => {
+    const cube = createNewTank({ seed: 1, tankId: 'cube_20' });
     expect(cube.tank.modelId).toBe('cube_20');
     expect(cube.tank.fullLiters).toBeGreaterThan(20);
     expect(cube.tank.fullLiters).toBeLessThan(25);
