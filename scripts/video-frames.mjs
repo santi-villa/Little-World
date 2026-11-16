@@ -1,21 +1,25 @@
 // Videos del gato -> animaciones en pixel art, para scripts/build-assets.mjs.
 //
 // Cada video se corta en clips (acciones) definidos en assets.config.json. Para
-// cada cuadro: se quita el magenta, se erosiona 1 px el borde (el halo rosado),
-// se queda solo con la mancha más grande (el gato: afuera platos y motas) y se
-// reduce a la grilla del dibujo promediando los píxeles. Después todos los
-// cuadros de todos los videos pasan por la misma paleta (así los colores no
-// titilan entre cuadros) y cada clip sale como una tira PNG, alineada por los
-// pies: todos los clips de un video comparten el mismo punto de apoyo, y entre
-// videos se igualan con un cuadro de referencia (el gato sentado), así el gato
-// mide siempre lo mismo.
+// cada cuadro: se quita el magenta, se erosiona 1 px el borde (el halo rosado) y
+// se queda solo con la mancha más grande (el gato: afuera platos y motas).
+//
+// Nitidez: el video es pixel art agrandado, así que se mide su grilla (cuántos
+// píxeles del video mide un píxel del dibujo, ~9.5 en 1920x1080) y cada píxel
+// del dibujo se toma del centro de su celda (vecino más cercano, con una
+// mediana de 3x3 contra el ruido del video). No se promedia ni se pasa por una
+// paleta común: los colores quedan como en el video.
+//
+// Cada clip sale como una tira PNG con 1 píxel por píxel del dibujo, alineada
+// por los pies: todos los clips de un video comparten el mismo punto de apoyo
+// (el gato sentado del cuadro de referencia).
 //
 // Necesita ffmpeg instalado.
 
 import { execFileSync } from 'node:child_process';
 
-/** Reducción previa con ffmpeg (para no procesar 1920x1080 completos). */
-const PRE = 4;
+/** Reducción previa con ffmpeg, con vecino más cercano (la grilla queda en ~4.7 px). */
+const PRE = 2;
 
 function probe(path) {
   const out = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', path]);
@@ -28,7 +32,7 @@ function readFrames(path, from, to, fps) {
   const { width, height } = probe(path);
   const raw = execFileSync(
     'ffmpeg',
-    ['-v', 'error', '-ss', String(from), '-to', String(to), '-i', path, '-vf', `fps=${fps},scale=${width}:${height}:flags=area`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],
+    ['-v', 'error', '-ss', String(from), '-to', String(to), '-i', path, '-vf', `fps=${fps},scale=${width}:${height}:flags=neighbor`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],
     { maxBuffer: 1024 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] },
   );
   const size = width * height * 3;
@@ -106,97 +110,85 @@ function bbox(mask, width, height) {
 }
 
 /**
- * Reduce a la grilla del dibujo: cada píxel de salida promedia los píxeles del
- * gato que caen adentro; es opaco si el gato cubre al menos la mitad.
+ * Mide la grilla del pixel art en un cuadro: el tamaño de celda y su desfase,
+ * buscando el período en el que más se alinean los bordes de color del gato.
  */
-function downsample(rgb, mask, width, height, f) {
-  const ow = Math.max(1, Math.round(width * f));
-  const oh = Math.max(1, Math.round(height * f));
-  const out = new Float32Array(ow * oh * 4);
-  const step = 1 / f;
+function measureGrid(rgb, mask, width, height) {
+  const xs = [];
+  const ys = [];
+  const diff = (a, b) => Math.abs(rgb[a] - rgb[b]) + Math.abs(rgb[a + 1] - rgb[b + 1]) + Math.abs(rgb[a + 2] - rgb[b + 2]);
+  for (let y = 1; y < height; y++) {
+    for (let x = 1; x < width; x++) {
+      const p = y * width + x;
+      if (!mask[p] || !mask[p - 1] || !mask[p - width]) continue;
+      if (diff(p * 3, (p - 1) * 3) > 90) xs.push(x);
+      if (diff(p * 3, (p - width) * 3) > 90) ys.push(y);
+    }
+  }
+  const fit = (values, p) => {
+    let c = 0;
+    let s = 0;
+    for (const v of values) {
+      const a = ((v % p) / p) * 2 * Math.PI;
+      c += Math.cos(a);
+      s += Math.sin(a);
+    }
+    const r = Math.hypot(c, s) / Math.max(1, values.length);
+    const phase = (((Math.atan2(s, c) / (2 * Math.PI)) * p) % p + p) % p;
+    return { r, phase };
+  };
+  let best = { score: -1, cell: 4, phaseX: 0, phaseY: 0 };
+  for (let cell = 2.5; cell <= 9; cell += 0.02) {
+    const fx = fit(xs, cell);
+    const fy = fit(ys, cell);
+    const score = fx.r + fy.r;
+    if (score > best.score) best = { score, cell, phaseX: fx.phase, phaseY: fy.phase };
+  }
+  return best;
+}
+
+/**
+ * Reduce a la grilla del dibujo con vecino más cercano: cada píxel de salida es
+ * el centro de su celda (mediana de 3x3 para que el ruido del video no ensucie).
+ */
+function sampleGrid(rgb, mask, width, height, grid) {
+  const { cell, phaseX, phaseY } = grid;
+  const ow = Math.floor((width - phaseX) / cell);
+  const oh = Math.floor((height - phaseY) / cell);
+  const out = new Uint8Array(ow * oh * 4);
+  const r = [];
+  const g = [];
+  const b = [];
+  const median = (list) => list.sort((p, q) => p - q)[list.length >> 1];
   for (let oy = 0; oy < oh; oy++) {
-    const sy0 = Math.floor(oy * step);
-    const sy1 = Math.min(height, Math.max(sy0 + 1, Math.floor((oy + 1) * step)));
+    const cy = Math.floor(phaseY + (oy + 0.5) * cell);
     for (let ox = 0; ox < ow; ox++) {
-      const sx0 = Math.floor(ox * step);
-      const sx1 = Math.min(width, Math.max(sx0 + 1, Math.floor((ox + 1) * step)));
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let covered = 0;
-      let total = 0;
-      for (let y = sy0; y < sy1; y++) {
-        for (let x = sx0; x < sx1; x++) {
-          total++;
+      const cx = Math.floor(phaseX + (ox + 0.5) * cell);
+      r.length = 0;
+      g.length = 0;
+      b.length = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (x < 0 || y < 0 || x >= width || y >= height) continue;
           const p = y * width + x;
           if (!mask[p]) continue;
-          covered++;
-          r += rgb[p * 3];
-          g += rgb[p * 3 + 1];
-          b += rgb[p * 3 + 2];
+          r.push(rgb[p * 3]);
+          g.push(rgb[p * 3 + 1]);
+          b.push(rgb[p * 3 + 2]);
         }
       }
+      // Opaco si el centro de la celda es del gato (y la mayoría alrededor).
+      if (r.length < 5 || !mask[cy * width + cx]) continue;
       const o = (oy * ow + ox) * 4;
-      if (covered * 2 >= total && covered > 0) {
-        out[o] = r / covered;
-        out[o + 1] = g / covered;
-        out[o + 2] = b / covered;
-        out[o + 3] = 1;
-      }
+      out[o] = median(r);
+      out[o + 1] = median(g);
+      out[o + 2] = median(b);
+      out[o + 3] = 255;
     }
   }
   return { data: out, width: ow, height: oh };
-}
-
-/** Paleta común (k-means sobre una muestra de todos los cuadros). */
-function buildPalette(images, colors) {
-  const sample = [];
-  let seen = 0;
-  for (const img of images) {
-    for (let o = 0; o < img.data.length; o += 4) {
-      if (!img.data[o + 3]) continue;
-      seen++;
-      if (seen % 7 === 0) sample.push([img.data[o], img.data[o + 1], img.data[o + 2]]);
-    }
-  }
-  if (sample.length === 0) return [[0, 0, 0]];
-  const lum = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
-  sample.sort((a, b) => lum(a) - lum(b));
-  let centers = Array.from({ length: Math.min(colors, sample.length) }, (_, i) => [...sample[Math.floor(((i + 0.5) * sample.length) / colors)]]);
-  for (let iter = 0; iter < 14; iter++) {
-    const sums = centers.map(() => [0, 0, 0, 0]);
-    for (const c of sample) {
-      let best = 0;
-      let bestD = Infinity;
-      for (let k = 0; k < centers.length; k++) {
-        const d = (c[0] - centers[k][0]) ** 2 + (c[1] - centers[k][1]) ** 2 + (c[2] - centers[k][2]) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          best = k;
-        }
-      }
-      const s = sums[best];
-      s[0] += c[0];
-      s[1] += c[1];
-      s[2] += c[2];
-      s[3]++;
-    }
-    centers = centers.map((c, k) => (sums[k][3] ? [sums[k][0] / sums[k][3], sums[k][1] / sums[k][3], sums[k][2] / sums[k][3]] : c));
-  }
-  return centers.map((c) => c.map((v) => Math.round(v)));
-}
-
-function nearest(palette, r, g, b) {
-  let best = palette[0];
-  let bestD = Infinity;
-  for (const c of palette) {
-    const d = (r - c[0]) ** 2 * 3 + (g - c[1]) ** 2 * 4 + (b - c[2]) ** 2 * 2;
-    if (d < bestD) {
-      bestD = d;
-      best = c;
-    }
-  }
-  return best;
 }
 
 /**
@@ -204,42 +196,39 @@ function nearest(palette, r, g, b) {
  * @param videos [{ path, rel, cfg }]
  * @returns clips listos para guardar: { name, frames: [{data,width,height}], anchor, fps, loop }
  */
-export function processVideos(videos, { colors = 32, refHeight = 41 } = {}) {
+export function processVideos(videos) {
   const clips = [];
-  for (const { path, rel, cfg } of videos) {
-    const fps = cfg.fps ?? 12;
-    // Escala: el gato sentado del cuadro de referencia mide `refHeight` píxeles del dibujo.
+  // Primero se mide la grilla de cada video (en el cuadro de referencia: el gato sentado).
+  const measured = videos.map(({ path, rel, cfg }) => {
     const ref = readFrames(path, cfg.refTime, cfg.refTime + 0.2, 5);
     const refMask = catMask(ref.frames[0], ref.width, ref.height);
     const refBox = bbox(refMask, ref.width, ref.height);
     if (!refBox) throw new Error(`${rel}: no encontré al gato en el cuadro de referencia`);
-    const f = (cfg.refHeight ?? refHeight) / (refBox.y1 - refBox.y0 + 1);
-    // Punto de apoyo del video: el centro del gato sentado y la línea de sus patas.
-    const anchorX = ((refBox.x0 + refBox.x1 + 1) / 2) * f;
-    const groundY = (refBox.y1 + 1) * f;
-    for (const clip of cfg.clips) {
-      const { frames, width, height } = readFrames(path, clip.from, clip.to, fps);
-      const small = frames.map((rgb) => downsample(rgb, catMask(rgb, width, height), width, height, f));
-      clips.push({ name: clip.name, loop: clip.loop ?? false, fps, frames: small, anchorX, groundY, source: rel });
+    const grid = cfg.cell ? { cell: cfg.cell, phaseX: cfg.phaseX ?? 0, phaseY: cfg.phaseY ?? 0 } : measureGrid(ref.frames[0], refMask, ref.width, ref.height);
+    return { refBox, grid, sitting: (refBox.y1 - refBox.y0 + 1) / grid.cell };
+  });
+  // El gato tiene que medir lo mismo en todos: si un video da más de 3% distinto
+  // (la grilla se midió mal o el video está más cerca), su celda se ajusta a la mediana.
+  const heights = measured.map((m) => m.sitting).sort((a, b) => a - b);
+  const target = heights[heights.length >> 1] ?? 70;
+  for (const m of measured) {
+    if (Math.abs(m.sitting / target - 1) > 0.03) {
+      m.grid = { ...m.grid, cell: m.grid.cell * (m.sitting / target) };
+      m.sitting = target;
     }
   }
-  // Paleta estable para todos los cuadros.
-  const palette = buildPalette(clips.flatMap((c) => c.frames), colors);
-  const cache = new Map();
-  for (const clip of clips) {
-    for (const img of clip.frames) {
-      for (let o = 0; o < img.data.length; o += 4) {
-        if (!img.data[o + 3]) continue;
-        const key = (Math.round(img.data[o]) << 16) | (Math.round(img.data[o + 1]) << 8) | Math.round(img.data[o + 2]);
-        let c = cache.get(key);
-        if (!c) {
-          c = nearest(palette, img.data[o], img.data[o + 1], img.data[o + 2]);
-          cache.set(key, c);
-        }
-        img.data[o] = c[0];
-        img.data[o + 1] = c[1];
-        img.data[o + 2] = c[2];
-      }
+  for (const [index, { path, rel, cfg }] of videos.entries()) {
+    const fps = cfg.fps ?? 12;
+    const { refBox, grid } = measured[index];
+    const toGrid = (v, phase) => (v - phase) / grid.cell;
+    const anchorX = toGrid((refBox.x0 + refBox.x1 + 1) / 2, grid.phaseX);
+    const groundY = toGrid(refBox.y1 + 1, grid.phaseY);
+    const sitting = (refBox.y1 - refBox.y0 + 1) / grid.cell;
+    console.log(`  ${rel}: celda de ${(grid.cell * PRE).toFixed(2)} px del video, gato sentado de ${sitting.toFixed(1)} px del dibujo`);
+    for (const clip of cfg.clips) {
+      const { frames, width, height } = readFrames(path, clip.from, clip.to, fps);
+      const small = frames.map((rgb) => sampleGrid(rgb, catMask(rgb, width, height), width, height, grid));
+      clips.push({ name: clip.name, loop: clip.loop ?? false, fps, frames: small, anchorX, groundY, source: rel, sitting });
     }
   }
   // Cada clip: recorte común a todos sus cuadros, con el punto de apoyo adentro.
@@ -288,6 +277,7 @@ export function processVideos(videos, { colors = 32, refHeight = 41 } = {}) {
       strip,
       anchorX: Math.round(clip.anchorX - x0),
       anchorY: Math.round(clip.groundY - y0),
+      sitting: clip.sitting,
     };
   });
 }

@@ -13,7 +13,9 @@
 //   skip       true para no procesar ese archivo (con "why" explicando por qué)
 //   cropTop    píxeles del original que se descartan arriba (para separar piezas pegadas)
 //   kernel     cómo se achica: "nearest" (por defecto) o "mitchell" (promedia; para
-//              achicar mucho un dibujo de píxeles finos, como el pájaro)
+//              llevar un dibujo a su grilla o a su tamaño final, como el pájaro, las
+//              plantas colgantes o el helecho). Así el juego nunca achica al dibujar
+//              (achicar con vecino más cercano saltea filas y hace rayas).
 //   pivot      [x, y] en fracción: de dónde cuelga o se apoya (va al manifest)
 //   sourceArtPx  cuántos píxeles del original mide un píxel del dibujo (por
 //              defecto 4 en las hojas de 1376 px y 5.4 en las de 2576). Con eso
@@ -247,6 +249,8 @@ const manifest = { generated: 'npm run assets', assets: {} };
 
 /** Píxeles del PNG por píxel del dibujo. */
 function artPxOf(cfg, sourceWidth, scale) {
+  // Achicado promediando, cada píxel del PNG ya es un píxel del dibujo.
+  if (cfg.kernel && cfg.kernel !== 'nearest') return 1;
   const source = cfg.sourceArtPx ?? (sourceWidth >= 2000 ? 5.4 : 4);
   return Math.round(source * scale * 100) / 100;
 }
@@ -571,7 +575,7 @@ for (const path of walk(RAW)) {
 }
 if (videos.length > 0) {
   const group = config.video ?? {};
-  for (const clip of processVideos(videos, group)) {
+  for (const clip of processVideos(videos)) {
     const name = `${group.name ?? 'video'}-${clip.name}`;
     const file = join(group.dir ?? 'video', `${name}.png`);
     mkdirSync(dirname(join(OUT, file)), { recursive: true });
@@ -586,6 +590,8 @@ if (videos.length > 0) {
       fps: clip.fps,
       loop: clip.loop,
       anchor: { x: clip.anchorX, y: clip.anchorY },
+      // Alto del gato sentado en píxeles del dibujo (para escalarlo parejo).
+      sitting: Math.round(clip.sitting * 10) / 10,
     });
     total++;
     console.log(`  ${name}: ${clip.frames} cuadros de ${clip.frameWidth}x${clip.frameHeight}`);

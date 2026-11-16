@@ -39,11 +39,11 @@
       "height": 54,
       "source": "animales/pajaro",
       "kind": "sprite",
-      "artPx": 0.4
+      "artPx": 1
     },
     "cielo-noche": {
       "file": "habitacion/cielo/cielo-noche.png",
-      "width": 544,
+      "width": 500,
       "height": 304,
       "source": "habitacion/cielo/noche",
       "kind": "background"
@@ -71,11 +71,11 @@
     },
     "cortina-izquierda": {
       "file": "habitacion/objetos/cortina-izquierda.png",
-      "width": 261,
-      "height": 343,
+      "width": 115,
+      "height": 151,
       "source": "habitacion/objetos/cortinas-largas",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -83,11 +83,11 @@
     },
     "cortina-derecha": {
       "file": "habitacion/objetos/cortina-derecha.png",
-      "width": 261,
-      "height": 343,
+      "width": 115,
+      "height": 151,
       "source": "habitacion/objetos/cortinas-largas",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -103,11 +103,11 @@
     },
     "colgante-macrame": {
       "file": "habitacion/plantas/colgante-macrame.png",
-      "width": 126,
-      "height": 331,
+      "width": 42,
+      "height": 110,
       "source": "habitacion/plantas/colgantes",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -115,11 +115,11 @@
     },
     "colgante-potus": {
       "file": "habitacion/plantas/colgante-potus.png",
-      "width": 132,
-      "height": 354,
+      "width": 44,
+      "height": 118,
       "source": "habitacion/plantas/colgantes",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -127,11 +127,11 @@
     },
     "potus-1": {
       "file": "habitacion/plantas/potus-1.png",
-      "width": 112,
-      "height": 333,
+      "width": 37,
+      "height": 111,
       "source": "habitacion/plantas/colgantes",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -139,11 +139,11 @@
     },
     "potus-2": {
       "file": "habitacion/plantas/potus-2.png",
-      "width": 144,
-      "height": 320,
+      "width": 48,
+      "height": 107,
       "source": "habitacion/plantas/colgantes",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -151,11 +151,11 @@
     },
     "enredadera": {
       "file": "habitacion/plantas/enredadera.png",
-      "width": 97,
-      "height": 161,
+      "width": 32,
+      "height": 54,
       "source": "habitacion/plantas/enredadera-barra",
       "kind": "sprite",
-      "artPx": 2,
+      "artPx": 1,
       "pivot": [
         0.5,
         0
@@ -341,33 +341,33 @@
     },
     "helecho-java-1": {
       "file": "pecera/plantas/helecho-java-1.png",
-      "width": 83,
-      "height": 135,
+      "width": 13,
+      "height": 21,
       "source": "pecera/plantas/helecho-java",
       "kind": "plant",
-      "artPx": 2,
+      "artPx": 1,
       "plant": "helecho-java",
       "stage": 1,
       "stages": 3
     },
     "helecho-java-2": {
       "file": "pecera/plantas/helecho-java-2.png",
-      "width": 167,
-      "height": 243,
+      "width": 26,
+      "height": 38,
       "source": "pecera/plantas/helecho-java",
       "kind": "plant",
-      "artPx": 2,
+      "artPx": 1,
       "plant": "helecho-java",
       "stage": 2,
       "stages": 3
     },
     "helecho-java-3": {
       "file": "pecera/plantas/helecho-java-3.png",
-      "width": 255,
-      "height": 338,
+      "width": 40,
+      "height": 53,
       "source": "pecera/plantas/helecho-java",
       "kind": "plant",
-      "artPx": 2,
+      "artPx": 1,
       "plant": "helecho-java",
       "stage": 3,
       "stages": 3
@@ -662,360 +662,381 @@
     },
     "gato-agacharse": {
       "file": "gato/gato-agacharse.png",
-      "width": 387,
-      "height": 39,
+      "width": 657,
+      "height": 68,
       "source": "gato/videos/comer-relamerse-rascarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 9,
-      "frameWidth": 43,
-      "frameHeight": 39,
+      "frameWidth": 73,
+      "frameHeight": 68,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 19,
-        "y": 36
-      }
+        "x": 32,
+        "y": 63
+      },
+      "sitting": 70.7
     },
     "gato-comer": {
       "file": "gato/gato-comer.png",
-      "width": 1645,
-      "height": 26,
+      "width": 2800,
+      "height": 46,
       "source": "gato/videos/comer-relamerse-rascarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 35,
-      "frameWidth": 47,
-      "frameHeight": 26,
+      "frameWidth": 80,
+      "frameHeight": 46,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 19,
-        "y": 22
-      }
+        "x": 32,
+        "y": 39
+      },
+      "sitting": 70.7
     },
     "gato-erguirse": {
       "file": "gato/gato-erguirse.png",
-      "width": 430,
-      "height": 40,
+      "width": 730,
+      "height": 70,
       "source": "gato/videos/comer-relamerse-rascarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 10,
-      "frameWidth": 43,
-      "frameHeight": 40,
+      "frameWidth": 73,
+      "frameHeight": 70,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 19,
-        "y": 36
-      }
+        "x": 32,
+        "y": 63
+      },
+      "sitting": 70.7
     },
     "gato-mimos": {
       "file": "gato/gato-mimos.png",
-      "width": 1470,
-      "height": 43,
+      "width": 2490,
+      "height": 74,
       "source": "gato/videos/mimos-panza-lavarse-dormir",
       "kind": "anim",
       "artPx": 1,
       "frames": 30,
-      "frameWidth": 49,
-      "frameHeight": 43,
+      "frameWidth": 83,
+      "frameHeight": 74,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 23,
-        "y": 42
-      }
+        "x": 40,
+        "y": 72
+      },
+      "sitting": 70.8
     },
     "gato-rodar": {
       "file": "gato/gato-rodar.png",
-      "width": 826,
-      "height": 41,
+      "width": 1428,
+      "height": 71,
       "source": "gato/videos/mimos-panza-lavarse-dormir",
       "kind": "anim",
       "artPx": 1,
       "frames": 14,
-      "frameWidth": 59,
-      "frameHeight": 41,
+      "frameWidth": 102,
+      "frameHeight": 71,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 23,
-        "y": 41
-      }
+        "x": 41,
+        "y": 71
+      },
+      "sitting": 70.8
     },
     "gato-panza": {
       "file": "gato/gato-panza.png",
-      "width": 3120,
-      "height": 31,
+      "width": 5376,
+      "height": 53,
       "source": "gato/videos/mimos-panza-lavarse-dormir",
       "kind": "anim",
       "artPx": 1,
       "frames": 48,
-      "frameWidth": 65,
-      "frameHeight": 31,
+      "frameWidth": 112,
+      "frameHeight": 53,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 27,
-        "y": 28
-      }
+        "x": 48,
+        "y": 49
+      },
+      "sitting": 70.8
     },
     "gato-incorporarse": {
       "file": "gato/gato-incorporarse.png",
-      "width": 672,
-      "height": 37,
+      "width": 1162,
+      "height": 64,
       "source": "gato/videos/mimos-panza-lavarse-dormir",
       "kind": "anim",
       "artPx": 1,
       "frames": 14,
-      "frameWidth": 48,
-      "frameHeight": 37,
+      "frameWidth": 83,
+      "frameHeight": 64,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 10,
-        "y": 37
-      }
+        "x": 18,
+        "y": 64
+      },
+      "sitting": 70.8
     },
     "gato-sentado": {
       "file": "gato/gato-sentado.png",
-      "width": 806,
-      "height": 42,
+      "width": 1378,
+      "height": 72,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 26,
-      "frameWidth": 31,
-      "frameHeight": 42,
+      "frameWidth": 53,
+      "frameHeight": 72,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 16,
-        "y": 42
-      }
+        "x": 26,
+        "y": 72
+      },
+      "sitting": 70.6
     },
     "gato-estirarse": {
       "file": "gato/gato-estirarse.png",
-      "width": 1980,
-      "height": 45,
+      "width": 3360,
+      "height": 78,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 30,
-      "frameWidth": 66,
-      "frameHeight": 45,
+      "frameWidth": 112,
+      "frameHeight": 78,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 34,
-        "y": 42
-      }
+        "x": 58,
+        "y": 73
+      },
+      "sitting": 70.6
     },
     "gato-bostezar": {
       "file": "gato/gato-bostezar.png",
-      "width": 1464,
-      "height": 38,
+      "width": 2544,
+      "height": 66,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 24,
-      "frameWidth": 61,
-      "frameHeight": 38,
+      "frameWidth": 106,
+      "frameHeight": 66,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 33,
-        "y": 38
-      }
+        "x": 57,
+        "y": 66
+      },
+      "sitting": 70.6
     },
     "gato-echarse": {
       "file": "gato/gato-echarse.png",
-      "width": 1260,
-      "height": 41,
+      "width": 2140,
+      "height": 71,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 20,
-      "frameWidth": 63,
-      "frameHeight": 41,
+      "frameWidth": 107,
+      "frameHeight": 71,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 34,
-        "y": 35
-      }
+        "x": 58,
+        "y": 61
+      },
+      "sitting": 70.6
     },
     "gato-loaf": {
       "file": "gato/gato-loaf.png",
-      "width": 1224,
-      "height": 36,
+      "width": 2136,
+      "height": 62,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 24,
-      "frameWidth": 51,
-      "frameHeight": 36,
+      "frameWidth": 89,
+      "frameHeight": 62,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 28,
-        "y": 30
-      }
+        "x": 48,
+        "y": 52
+      },
+      "sitting": 70.6
     },
     "gato-levantarse": {
       "file": "gato/gato-levantarse.png",
-      "width": 1504,
-      "height": 42,
+      "width": 2624,
+      "height": 72,
       "source": "gato/videos/relax-estirarse-bostezar-echarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 32,
-      "frameWidth": 47,
-      "frameHeight": 42,
+      "frameWidth": 82,
+      "frameHeight": 72,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 21,
-        "y": 41
-      }
+        "x": 36,
+        "y": 71
+      },
+      "sitting": 70.6
     },
     "gato-dormir": {
       "file": "gato/gato-dormir.png",
-      "width": 1128,
-      "height": 31,
+      "width": 1968,
+      "height": 53,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 24,
-      "frameWidth": 47,
-      "frameHeight": 31,
+      "frameWidth": 82,
+      "frameHeight": 53,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 10,
-        "y": 30
-      }
+        "x": 18,
+        "y": 53
+      },
+      "sitting": 70.8
     },
     "gato-despertar": {
       "file": "gato/gato-despertar.png",
-      "width": 1060,
-      "height": 41,
+      "width": 1840,
+      "height": 72,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 20,
-      "frameWidth": 53,
-      "frameHeight": 41,
+      "frameWidth": 92,
+      "frameHeight": 72,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 16,
-        "y": 39
-      }
+        "x": 28,
+        "y": 69
+      },
+      "sitting": 70.8
     },
     "gato-cola": {
       "file": "gato/gato-cola.png",
-      "width": 1176,
-      "height": 43,
+      "width": 2016,
+      "height": 74,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 24,
-      "frameWidth": 49,
-      "frameHeight": 43,
+      "frameWidth": 84,
+      "frameHeight": 74,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 25,
-        "y": 41
-      }
+        "x": 43,
+        "y": 72
+      },
+      "sitting": 70.8
     },
     "gato-pararse": {
       "file": "gato/gato-pararse.png",
-      "width": 480,
-      "height": 41,
+      "width": 824,
+      "height": 71,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 8,
-      "frameWidth": 60,
-      "frameHeight": 41,
+      "frameWidth": 103,
+      "frameHeight": 71,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 25,
-        "y": 40
-      }
+        "x": 43,
+        "y": 71
+      },
+      "sitting": 70.8
     },
     "gato-caminar": {
       "file": "gato/gato-caminar.png",
-      "width": 1416,
-      "height": 39,
+      "width": 2472,
+      "height": 66,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 24,
-      "frameWidth": 59,
-      "frameHeight": 39,
+      "frameWidth": 103,
+      "frameHeight": 66,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 23,
-        "y": 38
-      }
+        "x": 40,
+        "y": 66
+      },
+      "sitting": 70.8
     },
     "gato-sentarse": {
       "file": "gato/gato-sentarse.png",
-      "width": 986,
-      "height": 43,
+      "width": 1700,
+      "height": 75,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 17,
-      "frameWidth": 58,
-      "frameHeight": 43,
+      "frameWidth": 100,
+      "frameHeight": 75,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 22,
-        "y": 38
-      }
+        "x": 37,
+        "y": 68
+      },
+      "sitting": 70.8
     },
     "gato-lavarse": {
       "file": "gato/gato-lavarse.png",
-      "width": 1638,
-      "height": 40,
+      "width": 2847,
+      "height": 68,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 39,
-      "frameWidth": 42,
-      "frameHeight": 40,
+      "frameWidth": 73,
+      "frameHeight": 68,
       "fps": 12,
       "loop": true,
       "anchor": {
-        "x": 8,
-        "y": 39
-      }
+        "x": 13,
+        "y": 68
+      },
+      "sitting": 70.8
     },
     "gato-acostarse": {
       "file": "gato/gato-acostarse.png",
-      "width": 736,
-      "height": 37,
+      "width": 1296,
+      "height": 64,
       "source": "gato/videos/secuencia-dormir-caminar-lavarse",
       "kind": "anim",
       "artPx": 1,
       "frames": 16,
-      "frameWidth": 46,
-      "frameHeight": 37,
+      "frameWidth": 81,
+      "frameHeight": 64,
       "fps": 12,
       "loop": false,
       "anchor": {
-        "x": 10,
-        "y": 36
-      }
+        "x": 18,
+        "y": 64
+      },
+      "sitting": 70.8
     }
   }
 }

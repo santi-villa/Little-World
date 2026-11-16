@@ -39,7 +39,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest}'],
+        // json incluido: manifest.json de los assets tiene que venir de la misma versión que sus PNG.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
         cleanupOutdatedCaches: true,
       },
     }),

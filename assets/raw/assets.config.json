@@ -1,10 +1,4 @@
 {
-  "video": {
-    "name": "gato",
-    "dir": "gato",
-    "colors": 32,
-    "refHeight": 41
-  },
   "files": {
     "habitacion/dormitorio": {
       "skip": true,
@@ -124,14 +118,18 @@
       "pivot": [
         0.5,
         0
-      ]
+      ],
+      "scale": 0.1667,
+      "kernel": "mitchell"
     },
     "habitacion/plantas/enredadera-barra": {
       "name": "enredadera",
       "pivot": [
         0.5,
         0
-      ]
+      ],
+      "scale": 0.1667,
+      "kernel": "mitchell"
     },
     "habitacion/objetos/cortinas-largas": {
       "names": [
@@ -142,13 +140,15 @@
       "pivot": [
         0.5,
         0
-      ]
+      ],
+      "scale": 0.22,
+      "kernel": "mitchell"
     },
     "habitacion/cielo/noche": {
       "mode": "background",
       "name": "cielo-noche",
       "size": [
-        544,
+        500,
         304
       ]
     },
@@ -294,6 +294,15 @@
           "to": 6.8
         }
       ]
+    },
+    "pecera/plantas/helecho-java": {
+      "scale": 0.078,
+      "kernel": "mitchell",
+      "why": "a su tamaño real: la etapa grande mide un tercio del agua de la rectangular mediana"
     }
+  },
+  "video": {
+    "name": "gato",
+    "dir": "gato"
   }
 }
