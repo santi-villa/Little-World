@@ -330,5 +330,50 @@
     "purr": "prrr",
     "annoyed": "!",
     "hungry": "miau"
+  },
+  "scene": {
+    "back": "< VOLVER",
+    "swipeHint": "DESLIZA HACIA ABAJO PARA SALIR",
+    "care": {
+      "feed": "ALIMENTAR",
+      "cleanGlass": "LIMPIAR VIDRIO",
+      "waterChange": "CAMBIO DE AGUA",
+      "topOff": "RELLENAR",
+      "cleanFilter": "LIMPIAR FILTRO",
+      "removeDead": "SACAR MUERTOS"
+    },
+    "done": {
+      "feed": "COMIDA EN EL AGUA",
+      "cleanGlass": "VIDRIO LIMPIO",
+      "waterChange": "CAMBIASTE 25% DEL AGUA",
+      "topOff": "AGUA RELLENADA",
+      "cleanFilter": "FILTRO LIMPIO",
+      "removeDead": "LISTO"
+    },
+    "panels": {
+      "library": {
+        "title": "BIBLIOTECA",
+        "body": [
+          "ACA VA A ESTAR LA ENCICLOPEDIA",
+          "DE PECES, PLANTAS Y CUIDADOS.",
+          "",
+          "PROXIMAMENTE."
+        ]
+      },
+      "notebook": {
+        "title": "CUADERNO",
+        "body": [
+          "ACA VA A ESTAR EL DIARIO",
+          "DE LA PECERA.",
+          "",
+          "PROXIMAMENTE."
+        ]
+      },
+      "close": "TOCA PARA CERRAR"
+    },
+    "windowOpened": "VENTANA ABIERTA",
+    "windowClosed": "VENTANA CERRADA",
+    "lampOn": "LAMPARA PRENDIDA",
+    "lampOff": "LAMPARA APAGADA"
   }
 }

@@ -51,15 +51,43 @@ que tocar:
 
 Falta:
 
-- El vidrio se estira a lo ancho para peceras que no tienen la proporción del
-  dibujo (en el cubo queda angosto; la tapa se deforma). La redonda no tiene arte.
+- El vidrio ya no se estira: se escala parejo y su ancho sale del largo (60 cm =
+  la parte libre del escritorio). Como hay una sola imagen de vidrio, todos los
+  modelos tienen su proporción: el cubo se ve como una rectangular más chica.
+  Falta arte de cubo y de redonda.
 - La decoración todavía es fija (datos por defecto): no sale del estado de la simulación.
 - Calefactor, termómetro, toma del filtro, gato, peces, plato del gato y cielo
   siguen dibujados por código (no hay imágenes de eso todavía).
-- La lámpara se prende sola cuando hay poca luz; no es interactiva.
 - El viento sale del clima elegido (no hay viento en la simulación).
 - "Arranca con un betta" vale para peceras nuevas: una partida guardada conserva sus peces.
 - El selector de hora del debug es solo visual.
 - Los PNG de `public/assets/` no están en el precache de la PWA (sin revisar).
 - De la sección 5 de DESIGN.md: pájaros, cortina, sonido.
 - Gato: poses propias de lavarse y jugar.
+
+## Cámara y zonas tocables
+
+- `render/camera.ts` (zoom y paneo con easing), zonas en `src/data/rooms.json`
+  (`render/scene/room-zones.ts`), botones y paneles en `render/ui/scene-ui.ts`.
+  Los gestos los resuelve `RoomScene` (`pointerDown/Move/Up`).
+- **Sin revisar en pantalla** (solo compilación). Ajustar a ojo: rectángulos de
+  las zonas en `rooms.json`, vista inicial y zoom del gato.
+- Pixel perfect: el canvas se dibuja a la resolución de la pantalla (hasta 3x) y
+  en reposo el zoom se ajusta a un número entero de píxeles físicos si queda a
+  menos de 12% del pedido; si no, queda fraccionario (por ejemplo 1.5x en una
+  pantalla de 1280x720 justa).
+- Plantas colgantes: ahora la capa tiene solo las hojas (las hojas también quedan
+  en el fondo, sin relleno inventado), se corren como máximo 1 píxel del arte y
+  la onda es lenta y larga (toda la planta se hamaca junta). Si igual no queda
+  prolijo, se desactiva sacando `sprite.filters = [filter]` en `room-scene.ts`.
+- La lámpara la elige el jugador y no se guarda (al recargar vuelve a prenderse
+  sola cuando oscurece).
+- Ventana abierta: cambia la simulación y entra más viento a las plantas, pero no
+  hay arte de la ventana abierta.
+- Biblioteca y cuaderno abren paneles provisorios (enciclopedia y diario: falta).
+- Acciones de cuidado de la vista de pecera: alimentar, limpiar vidrio, cambio de
+  agua 25% (acondicionada, a la misma temperatura, sifoneando), rellenar, limpiar
+  filtro y sacar muertos (si hay). Cantidades fijas: falta elegirlas.
+- Los textos de la UI van sin tildes porque la fuente de píxeles no las tiene.
+- La pecera inicial pasó a ser la rectangular mediana (`rect_65`); si algún test
+  esperaba el cubo, hay que actualizarlo (no se corrieron los tests).

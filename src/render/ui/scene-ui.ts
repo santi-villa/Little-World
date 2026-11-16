@@ -1,0 +1,165 @@
+/**
+ * Botones y carteles en pantalla (no se mueven con la cámara): "volver", las
+ * acciones de cuidado de la vista de pecera, los paneles provisorios de la
+ * biblioteca y el cuaderno, y avisos cortos. Dibujado con la fuente de píxeles,
+ * en píxeles gordos de 2x2 (coordenadas de 640x360).
+ */
+
+import { Container, Graphics } from 'pixi.js';
+import type { SimAction, SimState } from '../../sim';
+import type { PanelId } from '../scene/room-zones';
+import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
+import { drawPixelText, textWidth } from './pixel-font';
+import { texts } from './texts';
+
+const U = 2;
+const W = GAME_WIDTH / U;
+const H = GAME_HEIGHT / U;
+const INK = 0xf4e9c8;
+const BOX = 0x0a0d18;
+
+export type CareId = keyof typeof texts.scene.care;
+export type UiMode = 'room' | 'tank' | 'cat';
+
+/** Acciones de cuidado de la vista de pecera. */
+const CARE: { id: CareId; action: (state: SimState) => SimAction; when?: (state: SimState) => boolean }[] = [
+  { id: 'feed', action: () => ({ type: 'feed', grams: 0.1 }) },
+  { id: 'cleanGlass', action: () => ({ type: 'cleanGlass' }) },
+  {
+    id: 'waterChange',
+    action: (state) => ({
+      type: 'waterChange',
+      fraction: 0.25,
+      conditioned: true,
+      vacuum: true,
+      temperatureC: state.water.temperatureC,
+    }),
+  },
+  { id: 'topOff', action: (state) => ({ type: 'topOff', conditioned: true, temperatureC: state.water.temperatureC }) },
+  { id: 'cleanFilter', action: () => ({ type: 'cleanFilter', method: 'tankWater' }) },
+  {
+    id: 'removeDead',
+    action: () => ({ type: 'removeDead' }),
+    when: (state) => state.animals.some((animal) => !animal.alive),
+  },
+];
+
+interface Button {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  hit: UiHit;
+}
+
+export type UiHit = { kind: 'back' } | { kind: 'care'; id: CareId; action: SimAction } | { kind: 'panel' };
+
+export class SceneUi {
+  readonly container = new Container();
+  private readonly graphics = new Graphics();
+  private buttons: Button[] = [];
+  private panel: PanelId | null = null;
+  private toast: { text: string; until: number } | null = null;
+  /** Último botón tocado, para que se ilumine un instante. */
+  private pressed: { id: string; until: number } | null = null;
+  private seconds = 0;
+
+  constructor() {
+    this.container.scale.set(U);
+    this.container.addChild(this.graphics);
+  }
+
+  get panelOpen(): boolean {
+    return this.panel !== null;
+  }
+
+  openPanel(id: PanelId): void {
+    this.panel = id;
+  }
+
+  closePanel(): void {
+    this.panel = null;
+  }
+
+  /** Aviso corto abajo al centro. */
+  say(text: string): void {
+    this.toast = { text, until: this.seconds + 1.8 };
+  }
+
+  /** Marca un botón como recién tocado y avisa lo que se hizo. */
+  pressedCare(id: CareId): void {
+    this.pressed = { id, until: this.seconds + 0.25 };
+    this.say(texts.scene.done[id]);
+  }
+
+  /** ¿Qué botón hay en ese punto de la pantalla (píxeles del juego)? */
+  hit(screenX: number, screenY: number): UiHit | null {
+    if (this.panel) return { kind: 'panel' };
+    const x = screenX / U;
+    const y = screenY / U;
+    for (const b of this.buttons) {
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b.hit;
+    }
+    return null;
+  }
+
+  /** @param focusAge Segundos desde que se entró a la vista de cerca. */
+  update(mode: UiMode, state: SimState, seconds: number, focusAge: number): void {
+    this.seconds = seconds;
+    const g = this.graphics;
+    g.clear();
+    this.buttons = [];
+    const t = texts.scene;
+
+    if (mode !== 'room') {
+      this.button(g, t.back, W - 8 - textWidth(t.back) - 8, 6, { kind: 'back' }, 'back');
+      // Indicación para salir deslizando, que se apaga sola.
+      if (focusAge < 4) {
+        drawPixelText(g, t.swipeHint, Math.round((W - textWidth(t.swipeHint)) / 2), H - 9, INK, 1);
+      }
+    }
+
+    if (mode === 'tank') {
+      const visible = CARE.filter((care) => !care.when || care.when(state));
+      const width = Math.max(...visible.map((care) => textWidth(t.care[care.id]))) + 8;
+      visible.forEach((care, i) => {
+        this.button(g, t.care[care.id], W - 8 - width, 30 + i * 16, { kind: 'care', id: care.id, action: care.action(state) }, care.id, width);
+      });
+    }
+
+    if (this.toast && seconds < this.toast.until) {
+      const text = this.toast.text;
+      const w = textWidth(text) + 10;
+      const x = Math.round((W - w) / 2);
+      const y = H - 28;
+      g.rect(x, y, w, 11).fill({ color: BOX, alpha: 0.7 });
+      drawPixelText(g, text, x + 5, y + 3, INK, 1);
+    } else {
+      this.toast = null;
+    }
+
+    if (this.panel) {
+      const p = t.panels[this.panel];
+      const lines = [p.title, '', ...p.body];
+      const w = Math.max(...lines.map((line) => textWidth(line)), textWidth(t.panels.close)) + 24;
+      const h = lines.length * 8 + 26;
+      const x = Math.round((W - w) / 2);
+      const y = Math.round((H - h) / 2);
+      g.rect(0, 0, W, H).fill({ color: BOX, alpha: 0.35 });
+      g.rect(x, y, w, h).fill({ color: 0x2a1f18, alpha: 0.94 });
+      g.rect(x, y, w, 1).rect(x, y + h - 1, w, 1).rect(x, y, 1, h).rect(x + w - 1, y, 1, h).fill(0x9a6c46);
+      lines.forEach((line, i) => drawPixelText(g, line, x + 12, y + 10 + i * 8, i === 0 ? 0xffd98a : INK, 1));
+      drawPixelText(g, t.panels.close, x + 12, y + h - 12, 0xa9b6d8, 1);
+    }
+  }
+
+  private button(g: Graphics, label: string, x: number, y: number, hit: UiHit, id: string, width?: number): void {
+    const w = width ?? textWidth(label) + 8;
+    const h = 11;
+    const lit = this.pressed && this.pressed.id === id && this.seconds < this.pressed.until;
+    g.rect(x, y, w, h).fill({ color: lit ? 0x3a6a78 : BOX, alpha: 0.72 });
+    g.rect(x, y, w, 1).fill({ color: INK, alpha: 0.18 });
+    drawPixelText(g, label, x + 4, y + 3, INK, 1);
+    this.buttons.push({ x, y, w, h, hit });
+  }
+}

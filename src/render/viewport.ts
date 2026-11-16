@@ -50,7 +50,11 @@ export function computeLayout(
 }
 
 /** Aplica el layout al canvas y lo mantiene al día cuando cambia la pantalla. */
-export function attachViewport(canvas: HTMLCanvasElement, container: HTMLElement): () => void {
+export function attachViewport(
+  canvas: HTMLCanvasElement,
+  container: HTMLElement,
+  onLayout?: (layout: ViewportLayout) => void,
+): () => void {
   canvas.style.position = 'absolute';
   canvas.style.imageRendering = 'pixelated';
 
@@ -65,6 +69,7 @@ export function attachViewport(canvas: HTMLCanvasElement, container: HTMLElement
     canvas.style.left = `${layout.cssLeft}px`;
     canvas.style.top = `${layout.cssTop}px`;
     canvas.dataset.scale = String(layout.scale);
+    onLayout?.(layout);
   };
 
   apply();

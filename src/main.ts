@@ -1,6 +1,7 @@
 import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
 import { loadAssets } from './render/assets';
+import { display } from './render/camera';
 import { RoomScene } from './render/scene/room-scene';
 import { WelcomePanel } from './render/ui/welcome';
 import { DebugPanel } from './render/ui/debug-panel';
@@ -82,7 +83,13 @@ async function boot(): Promise<void> {
     preference: 'webgl',
   });
   stage.append(app.canvas);
-  attachViewport(app.canvas, stage);
+  // El canvas se dibuja a la resolución real de la pantalla (hasta 3x): así la
+  // cámara puede acercar y alejar sin perder el pixel perfect.
+  attachViewport(app.canvas, stage, (layout) => {
+    const resolution = Math.min(3, Math.max(1, layout.scale));
+    display.resolution = resolution;
+    app.renderer.resize(GAME_WIDTH, GAME_HEIGHT, resolution);
+  });
 
   const { game, savingWorks, note, lastTimestamp } = await loadGame();
   const welcome = new WelcomePanel(document.body);
@@ -150,7 +157,7 @@ async function boot(): Promise<void> {
   };
 
   await loadAssets();
-  const scene = new RoomScene();
+  const scene = new RoomScene((action) => void game.act(action));
   app.stage.addChild(scene.container);
 
   const panel = new DebugPanel(game, document.body, {
@@ -162,7 +169,7 @@ async function boot(): Promise<void> {
     },
   });
 
-  // --- Tocar la escena: acariciar al gato o golpear el vidrio ---
+  // --- Tocar la escena: la escena decide (zonas, cámara, caricias, botones) ---
   const canvas = app.canvas;
   canvas.style.touchAction = 'none';
   const toScene = (event: PointerEvent): { x: number; y: number } => {
@@ -172,53 +179,13 @@ async function boot(): Promise<void> {
       y: ((event.clientY - rect.top) / rect.height) * GAME_HEIGHT,
     };
   };
-  const STROKE_PIXELS = 14;
-  const STROKE_MS = 350;
-  let petting: { x: number; y: number; travelled: number; lastStroke: number } | null = null;
-  let tapStart: { x: number; y: number } | null = null;
   canvas.addEventListener('pointerdown', (event) => {
-    const p = toScene(event);
-    const hit = scene.pick(p.x, p.y);
-    if (hit === 'cat') {
-      // Apoyar la mano ya es una caricia; deslizar suma más.
-      petting = { ...p, travelled: 0, lastStroke: performance.now() };
-      game.act({ type: 'petCat' });
-    } else if (hit === 'tank') {
-      tapStart = p;
-    }
+    canvas.setPointerCapture?.(event.pointerId);
+    scene.pointerDown(toScene(event));
   });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!petting) return;
-    const p = toScene(event);
-    petting.travelled += Math.hypot(p.x - petting.x, p.y - petting.y);
-    petting.x = p.x;
-    petting.y = p.y;
-    const now = performance.now();
-    if (
-      petting.travelled >= STROKE_PIXELS &&
-      now - petting.lastStroke >= STROKE_MS &&
-      scene.pick(p.x, p.y) === 'cat'
-    ) {
-      petting.travelled = 0;
-      petting.lastStroke = now;
-      game.act({ type: 'petCat' });
-    }
-  });
-  const release = (event: PointerEvent): void => {
-    if (tapStart && event.type === 'pointerup') {
-      const p = toScene(event);
-      if (Math.hypot(p.x - tapStart.x, p.y - tapStart.y) < 6) {
-        // Golpecito en el vidrio: los peces se asustan (no hay que hacerlo).
-        game.act({ type: 'tapGlass' });
-        scene.scareFish(p.x, p.y);
-      }
-    }
-    petting = null;
-    tapStart = null;
-  };
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('pointerleave', release);
+  canvas.addEventListener('pointermove', (event) => scene.pointerMove(toScene(event)));
+  canvas.addEventListener('pointerup', (event) => scene.pointerUp(toScene(event)));
+  canvas.addEventListener('pointercancel', (event) => scene.pointerUp(toScene(event), true));
 
   app.ticker.add((ticker) => {
     game.update(ticker.deltaMS / 1000);

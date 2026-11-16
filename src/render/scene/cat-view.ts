@@ -46,6 +46,16 @@ export class CatView {
     this.container.addChild(this.graphics);
   }
 
+  /** Dónde está el gato ahora, en píxeles de la escena (las patas). */
+  get position(): { x: number; y: number } {
+    return { x: this.x, y: this.y };
+  }
+
+  /** Rectángulo que ocupa, en píxeles de la escena (para tocarlo). */
+  get rect(): { x: number; y: number; width: number; height: number } {
+    return { x: this.x - 16 * CAT_PX, y: this.y - 30 * CAT_PX, width: 32 * CAT_PX, height: 34 * CAT_PX };
+  }
+
   /** ¿El punto (en píxeles de la escena) toca al gato? */
   hit(sceneX: number, sceneY: number): boolean {
     return Math.abs(sceneX - this.x) <= 16 * CAT_PX && sceneY <= this.y + 4 * CAT_PX && sceneY >= this.y - 30 * CAT_PX;
