@@ -284,8 +284,8 @@ async function processBackground(path, rel, cfg) {
     return g > 24 && ((g >= r - 6 && g >= b + 14) || (g >= r && g >= b + 8));
   };
 
-  // Plantas que se mueven con el viento: sus píxeles verdes pasan a una capa
-  // propia y en el fondo el hueco se rellena con lo que tienen al lado.
+  // Plantas que se mueven con el viento: sus hojas se copian a una capa propia
+  // (y quedan también en el fondo, que asoma debajo cuando la capa se corre).
   const zones = cfg.plantZones ?? [];
   const plantFiles = [];
   for (let z = 0; z < zones.length; z++) {
@@ -299,7 +299,8 @@ async function processBackground(path, rel, cfg) {
       for (let x = 0; x < w; x++) if (isGreen(((y + y0) * W + x + x0) * 4)) mask[y * w + x] = 1;
     }
     const isDark = (i) => Math.max(data[i], data[i + 1], data[i + 2]) < 78 && data[i] < data[i + 1] + 24;
-    for (let pass = 0; pass < 2; pass++) {
+    // Una sola vuelta: el contorno pegado a la hoja, no la pared ni la soga.
+    for (let pass = 0; pass < 1; pass++) {
       const grown = [];
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -324,12 +325,8 @@ async function processBackground(path, rel, cfg) {
           const from = (y * W + k) * 4;
           data.copy(layer, ((y - y0) * w + (k - x0)) * 4, from, from + 4);
         }
-        // Relleno del fondo: mitad con el vecino de la izquierda, mitad con el de la derecha.
-        const leftSrc = (y * W + Math.max(0, x - 1)) * 4;
-        const rightSrc = (y * W + Math.min(W - 1, end)) * 4;
-        const leftPx = Buffer.from(data.subarray(leftSrc, leftSrc + 4));
-        const rightPx = Buffer.from(data.subarray(rightSrc, rightSrc + 4));
-        for (let k = x; k < end; k++) (k < (x + end) / 2 ? leftPx : rightPx).copy(data, (y * W + k) * 4);
+        // Las hojas también quedan en el fondo: la capa se corre a lo sumo 1 px,
+        // así que debajo asoma la misma hoja y no un relleno inventado (que hacía rayas).
         x = end;
       }
     }

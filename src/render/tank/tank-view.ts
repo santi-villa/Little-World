@@ -19,7 +19,7 @@
  * píxeles gordos (PX).
  */
 
-import { Container, Graphics, NineSliceSprite, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import decorData from '../../data/tank-decor.json';
 import type { DerivedValues, SimState } from '../../sim';
 import { asset, tex } from '../assets';
@@ -27,7 +27,8 @@ import { lerpColor, scatter } from '../pixel-utils';
 import { PX } from '../scene/scene-layout';
 import { SwayFilter } from '../sway-filter';
 import { FishLayer } from './fish-layer';
-import { tankRect, tankSize, type TankRect } from './tank-layout';
+import { display } from '../camera';
+import { tankFrame, type TankRect } from './tank-layout';
 
 /** Una pieza de la decoración. */
 export interface TankDecorItem {
@@ -52,8 +53,7 @@ export interface TankDecor {
 
 const GLASS = 'vidrio';
 /** Medidas del arte del vidrio si faltara el manifest. */
-const GLASS_INNER = { x: 16, y: 86, width: 440, height: 202 };
-const SLICE = 40;
+const GLASS_FALLBACK = { width: 378, height: 249, inner: { x: 13, y: 69, width: 352, height: 161 } };
 const EQUIP = 0x23272f;
 const EQUIP_HI = 0x3d4450;
 const NIGHT = 0x081420;
@@ -87,10 +87,10 @@ export class TankView {
   private readonly fx = new Graphics();
   private readonly waterMask = new Graphics();
   private readonly ledOff = new Graphics();
-  private readonly glass: NineSliceSprite;
+  private readonly glass = new Sprite(tex(GLASS));
   private readonly sway = new SwayFilter('bottom', 100);
   private decor: TankDecor = decorData.default;
-  private inner: TankRect = tankRect(30, 30);
+  private inner: TankRect = { x: 0, y: 0, width: 1, height: 1 };
   private outer: TankRect = this.inner;
   private decorKey = '';
   private glassKey = '';
@@ -99,16 +99,6 @@ export class TankView {
   private lastSeconds = 0;
 
   constructor() {
-    const meta = asset(GLASS);
-    const gi = meta?.inner ?? GLASS_INNER;
-    const texHeight = meta?.height ?? 311;
-    this.glass = new NineSliceSprite({
-      texture: tex(GLASS),
-      leftWidth: SLICE,
-      rightWidth: SLICE,
-      topHeight: gi.y,
-      bottomHeight: texHeight - gi.y - gi.height,
-    });
     for (const g of [this.equip, this.mid, this.fx, this.fish.graphics]) g.scale.set(PX);
     this.plants.filters = [this.sway];
     this.inside.addChild(this.substrate, this.hardscape, this.plants, this.mid, this.fish.graphics, this.fx);
@@ -154,7 +144,7 @@ export class TankView {
     for (const child of this.plants.children) child.tint = tint;
     // La corriente mueve las plantas: más fuerte con el filtro andando.
     const flow = state.filter.flowLph > 0 ? Math.min(1, derived.effectiveFlowLph / state.filter.flowLph) : 0;
-    this.sway.set(seconds, 1 + flow, this.plants.height);
+    this.sway.set(seconds, 1 + flow, this.plants.worldTransform.a * display.resolution, this.plants.height);
 
     const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
     this.drawMid(state, derived, geo, shade, seconds);
@@ -176,26 +166,13 @@ export class TankView {
   /** Ubica el interior y el vidrio según las medidas de la pecera. */
   private layout(state: SimState, derived: DerivedValues): Geo {
     const meta = asset(GLASS);
-    const gi = meta?.inner ?? GLASS_INNER;
-    const texWidth = meta?.width ?? 472;
-    const texHeight = meta?.height ?? 311;
-    const size = tankSize(state.tank.lengthCm, state.tank.heightCm);
-    // El marco se escala parejo según el alto; a lo ancho se estira solo el medio.
-    const k = size.height / gi.height;
-    const inner = tankRect(state.tank.lengthCm, state.tank.heightCm, (texHeight - gi.y - gi.height) * k);
-    const side = Math.round(gi.x * k);
-    const outer = {
-      x: inner.x - side,
-      y: inner.y - Math.round(gi.y * k),
-      width: inner.width + side * 2,
-      height: Math.round(texHeight * k),
-    };
-    const glassKey = `${outer.x},${outer.y},${outer.width},${outer.height}`;
+    const glass = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_FALLBACK;
+    // El vidrio se escala parejo: nunca se estira.
+    const { outer, inner, scale: k } = tankFrame(state.tank.lengthCm, glass);
+    const glassKey = `${outer.x},${outer.y},${k}`;
     if (glassKey !== this.glassKey) {
       this.glassKey = glassKey;
       this.glass.scale.set(k);
-      this.glass.width = outer.width / k;
-      this.glass.height = texHeight;
       this.glass.position.set(outer.x, outer.y);
     }
     this.inner = inner;
@@ -205,19 +182,15 @@ export class TankView {
     const led = meta?.led;
     this.ledOff.clear();
     if (led && !derived.lightOn) {
-      const localWidth = outer.width / k;
-      const mapX = (tx: number): number =>
-        outer.x + k * (tx <= SLICE ? tx : SLICE + ((tx - SLICE) * (localWidth - SLICE * 2)) / (texWidth - SLICE * 2));
-      const x0 = Math.round(mapX(led.x));
       this.ledOff
-        .rect(x0, Math.round(outer.y + led.y * k), Math.round(mapX(led.x + led.width)) - x0, Math.ceil(led.height * k))
+        .rect(Math.round(outer.x + led.x * k), Math.round(outer.y + led.y * k), Math.round(led.width * k), Math.ceil(led.height * k))
         .fill({ color: 0x20242e, alpha: 0.85 });
     }
 
-    const left = inner.x / PX;
-    const top = inner.y / PX;
-    const width = inner.width / PX;
-    const height = inner.height / PX;
+    const left = Math.round(inner.x / PX);
+    const top = Math.round(inner.y / PX);
+    const width = Math.round(inner.width / PX);
+    const height = Math.round(inner.height / PX);
     const bottom = top + height;
     const sandH = clamp(Math.round(height * 0.15), 10, 18);
     const fullHeight = Math.round(height * 0.92);

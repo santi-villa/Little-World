@@ -27,7 +27,7 @@
     },
     "pecera/vidrio": {
       "mode": "glass",
-      "scale": 0.25,
+      "scale": 0.2,
       "inner": [407, 434, 2167, 1240],
       "led": [700, 340, 1876, 372]
     }

@@ -1,13 +1,22 @@
-/** Dónde y de qué tamaño se dibuja la pecera en la escena de 1280x720. */
+/**
+ * Dónde y de qué tamaño se dibuja la pecera en la escena de 1280x720.
+ *
+ * El vidrio es una imagen y nunca se estira: se escala parejo, manteniendo su
+ * proporción. Su ancho sale del largo real de la pecera, con la rectangular
+ * mediana (60 cm) ocupando justo la parte libre del escritorio.
+ */
 
 /** Línea del escritorio sobre la que apoya la base de la pecera. */
-export const TANK_BASE_Y = 470;
-/** Centro de la parte libre del escritorio (a la derecha de la lámpara y la taza). */
-const TANK_CENTER_X = 790;
-const MAX_PX_PER_CM = 6.75;
-const MAX_WIDTH = 372;
-/** Con este alto el arte del vidrio queda a escala 1 (sin deformar). */
-const MAX_HEIGHT = 202;
+export const TANK_BASE_Y = 466;
+/** Parte libre del escritorio: a la derecha del frasco hasta el borde. */
+const DESK_FREE = { left: 588, right: 976 };
+/** Largo de la pecera que llena la parte libre del escritorio. */
+const REFERENCE_LENGTH_CM = 60;
+/** Ni más chica que esto, para que se pueda mirar. */
+const MIN_WIDTH = 220;
+/** Ni más ancha que el escritorio entero. */
+const MAX_WIDTH = 620;
+const DESK_RIGHT = 978;
 
 export interface TankRect {
   x: number;
@@ -16,21 +25,37 @@ export interface TankRect {
   height: number;
 }
 
-/** Tamaño en pantalla del interior (números pares) según las medidas reales. */
-export function tankSize(lengthCm: number, heightCm: number): { width: number; height: number } {
-  const scale = Math.min(MAX_PX_PER_CM, MAX_WIDTH / lengthCm, MAX_HEIGHT / heightCm);
-  return {
-    width: Math.round((lengthCm * scale) / 2) * 2,
-    height: Math.round((heightCm * scale) / 2) * 2,
-  };
+export interface TankFrame {
+  /** La imagen del vidrio entera (tapa y base incluidas). */
+  outer: TankRect;
+  /** El hueco del vidrio, donde va el agua. */
+  inner: TankRect;
+  /** Escala de la imagen del vidrio (la misma a lo ancho y a lo alto). */
+  scale: number;
 }
 
 /**
- * Rectángulo del interior de la pecera (de vidrio a vidrio, sin tapa ni base).
- * @param baseMargin Alto de la base del marco, que queda entre el interior y el escritorio.
+ * @param glass Medidas de la imagen del vidrio y de su hueco.
  */
-export function tankRect(lengthCm: number, heightCm: number, baseMargin = 0): TankRect {
-  const { width, height } = tankSize(lengthCm, heightCm);
-  const bottom = TANK_BASE_Y - Math.round(baseMargin / 2) * 2;
-  return { x: Math.round((TANK_CENTER_X - width / 2) / 2) * 2, y: bottom - height, width, height };
+export function tankFrame(
+  lengthCm: number,
+  glass: { width: number; height: number; inner: TankRect },
+): TankFrame {
+  const free = DESK_FREE.right - DESK_FREE.left;
+  const wanted = (free * lengthCm) / REFERENCE_LENGTH_CM;
+  const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, wanted));
+  const scale = width / glass.width;
+  const w = Math.round(glass.width * scale);
+  const h = Math.round(glass.height * scale);
+  // Centrada en la parte libre; si es más ancha, crece hacia la izquierda.
+  let x = Math.round((DESK_FREE.left + DESK_FREE.right) / 2 - w / 2);
+  x = Math.min(x, DESK_RIGHT - w);
+  const outer = { x, y: TANK_BASE_Y - h, width: w, height: h };
+  const inner = {
+    x: x + Math.round(glass.inner.x * scale),
+    y: outer.y + Math.round(glass.inner.y * scale),
+    width: Math.round(glass.inner.width * scale),
+    height: Math.round(glass.inner.height * scale),
+  };
+  return { outer, inner, scale };
 }

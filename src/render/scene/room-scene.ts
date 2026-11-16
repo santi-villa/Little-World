@@ -15,6 +15,7 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { DerivedValues, SimState, Weather } from '../../sim';
 import { asset, assetNames, tex } from '../assets';
+import { display } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
 import { SwayFilter } from '../sway-filter';
 import { TankView } from '../tank/tank-view';
@@ -36,8 +37,11 @@ const NIGHT_TINT = 0x3a4472;
 const NIGHT = 0x0a0f22;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
-/** Viento de cada clima: cuántos píxeles se corren las puntas de las plantas. */
-const WEATHER_WIND: Record<Weather, number> = { clear: 0.8, cloudy: 1.2, rain: 1.6, storm: 2.4 };
+/**
+ * Viento de cada clima: cuánto se hamacan las plantas colgantes. 1 = la punta
+ * llega a correrse 1 píxel del arte (el máximo, para que no se deforme).
+ */
+const WEATHER_WIND: Record<Weather, number> = { clear: 0.6, cloudy: 0.75, rain: 0.9, storm: 1 };
 
 export class RoomScene {
   readonly container = new Container();
@@ -140,7 +144,7 @@ export class RoomScene {
     const wind = WEATHER_WIND[view.weather];
     for (const plant of this.plants) {
       plant.sprite.tint = tint;
-      plant.filter.set(seconds, wind);
+      plant.filter.set(seconds, wind, plant.sprite.worldTransform.a * display.resolution);
     }
 
     // Vapor y plato.
