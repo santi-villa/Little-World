@@ -9,7 +9,12 @@
 // separan las piezas y se nombran <archivo>-1, <archivo>-2... (o <archivo> si
 // es una sola). En assets/raw/assets.config.json se pueden dar nombres y
 // opciones por archivo:
-//   mode       "sprites" (por defecto) | "glass" | "background"
+//   mode       "sprites" (por defecto) | "glass" | "background" | "sheet"
+//   skip       true para no procesar ese archivo (con "why" explicando por qué)
+//   sourceArtPx  cuántos píxeles del original mide un píxel del dibujo (por
+//              defecto 4 en las hojas de 1376 px y 5.4 en las de 2576). Con eso
+//              el manifest dice `artPx`: cuántos píxeles del PNG mide un píxel
+//              del dibujo, para dibujar todo con el mismo tamaño de píxel.
 //   names      nombres de las piezas, en orden de lectura (filas, de izq. a der.)
 //   name       nombre base para numerar (madera -> madera-1, madera-2...)
 //   order      "rows" (por defecto) | "x" (de izquierda a derecha)
@@ -18,6 +23,12 @@
 //   tolerance  cuánto magenta se tolera antes de borrar (por defecto 60)
 // Las imágenes de una carpeta "plantas" son etapas de crecimiento: se ordenan
 // de izquierda a derecha (chica -> grande) y se numeran <planta>-1/2/3.
+//
+// Modo "sheet" (hojas de animación, como el gato): `rows` dice, fila por fila,
+// el nombre de la animación, cuántos cuadros tiene y cuáles descartar
+// ({ "anim": "sentado", "frames": 4, "discard": [3] }, contando desde 1). Cada
+// cuadro sale como <name>-<anim>-<n>.png; todos los de una animación tienen el
+// mismo tamaño y están alineados por la base (los pies), así no saltan.
 
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
@@ -217,6 +228,12 @@ function readingOrder(pieces) {
 
 const manifest = { generated: 'npm run assets', assets: {} };
 
+/** Píxeles del PNG por píxel del dibujo. */
+function artPxOf(cfg, sourceWidth, scale) {
+  const source = cfg.sourceArtPx ?? (sourceWidth >= 2000 ? 5.4 : 4);
+  return Math.round(source * scale * 100) / 100;
+}
+
 function register(name, file, size, source, extra = {}) {
   if (manifest.assets[name]) throw new Error(`Nombre de asset repetido: ${name} (${source})`);
   manifest.assets[name] = { file: file.split(sep).join('/'), width: size.width, height: size.height, source, ...extra };
@@ -237,7 +254,7 @@ async function processSprites(path, rel, cfg) {
     const name = cfg.names?.[i] ?? (pieces.length === 1 ? stem : `${stem}-${i + 1}`);
     const file = join(dir, `${name}.png`);
     const size = await savePng(img, pieces[i], scale, join(OUT, file));
-    const extra = { kind: isPlant ? 'plant' : 'sprite' };
+    const extra = { kind: isPlant ? 'plant' : 'sprite', artPx: artPxOf(cfg, img.width, scale) };
     if (isPlant) Object.assign(extra, { plant: stem, stage: i + 1, stages: pieces.length });
     register(name, file, size, rel, extra);
   }
@@ -251,10 +268,30 @@ async function processGlass(path, rel, cfg) {
   const box = contentBox(img, 0, 0, img.width, img.height, 128);
   const scale = cfg.scale ?? 0.25;
   const name = cfg.name ?? basename(rel);
+  // Lo que se ve a través del agua (las aristas del vidrio de atrás y la parte
+  // de abajo de la tapa) va en una capa aparte, que se dibuja detrás del agua.
+  // Adelante quedan el marco y los reflejos claros.
+  const back = { data: Buffer.alloc(img.data.length), width: img.width, height: img.height };
+  if (cfg.inner) {
+    const [ix0, iy0, ix1, iy1] = cfg.inner;
+    for (let y = iy0; y < iy1; y++) {
+      for (let x = ix0; x < ix1; x++) {
+        const i = (y * img.width + x) * 4;
+        const d = img.data;
+        const light = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+        // Los reflejos son casi blancos; las aristas de atrás, gris azulado.
+        if (d[i + 3] < 40 || light >= 214) continue;
+        d.copy(back.data, i, i, i + 4);
+        d[i + 3] = 0;
+      }
+    }
+  }
   const file = join(dirname(rel), `${name}.png`);
   const size = await savePng(img, box, scale, join(OUT, file));
+  const backFile = join(dirname(rel), `${name}-fondo.png`);
+  const backSize = await savePng(back, box, scale, join(OUT, backFile));
   // El hueco (donde va el agua) y otras medidas vienen en px del original.
-  const extra = { kind: 'glass' };
+  const extra = { kind: 'glass', artPx: artPxOf(cfg, img.width, scale) };
   for (const key of ['inner', 'led']) {
     const r = cfg[key];
     if (r) {
@@ -267,7 +304,115 @@ async function processGlass(path, rel, cfg) {
     }
   }
   register(name, file, size, rel, extra);
-  return 1;
+  register(`${name}-fondo`, backFile, backSize, rel, { kind: 'glass-back', of: name, artPx: extra.artPx });
+  return 2;
+}
+
+/** Hoja de animación: filas de cuadros sobre magenta. */
+async function processSheet(path, rel, cfg) {
+  const img = await loadRgba(sharp(path));
+  const { data, width: W, height: H } = img;
+  // Magenta: solo el del fondo (los rosas de la lengua o la nariz tienen bastante verde).
+  const isKey = (r, g, b) => r > 150 && b > 150 && g < 110 && Math.abs(r - b) < 70;
+  for (let i = 0; i < data.length; i += 4) {
+    if (isKey(data[i], data[i + 1], data[i + 2])) data[i + 3] = 0;
+  }
+  // Borde: lo que quedó teñido de magenta al lado del fondo se limpia.
+  const at = (x, y) => (y * W + x) * 4;
+  const nearKey = (x, y) =>
+    (x > 0 && data[at(x - 1, y) + 3] === 0) ||
+    (x < W - 1 && data[at(x + 1, y) + 3] === 0) ||
+    (y > 0 && data[at(x, y - 1) + 3] === 0) ||
+    (y < H - 1 && data[at(x, y + 1) + 3] === 0);
+  const fringe = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = at(x, y);
+      if (data[i + 3] === 0 || !nearKey(x, y)) continue;
+      const tint = Math.min(data[i], data[i + 2]) - data[i + 1];
+      if (tint > 40) fringe.push(i);
+    }
+  }
+  for (const i of fringe) {
+    const light = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    if (light < 90) {
+      // Contorno oscuro mezclado con el fondo: pasa a ser contorno.
+      data[i] = 40;
+      data[i + 1] = 22;
+      data[i + 2] = 16;
+    } else {
+      data[i + 3] = 0;
+    }
+  }
+  const solid = (x, y) => data[at(x, y) + 3] > 0;
+
+  // Filas: bandas de píxeles opacos separadas por renglones vacíos.
+  const spans = (count, isSolid, minRun, minLength) => {
+    const out = [];
+    let start = -1;
+    for (let k = 0; k <= count; k++) {
+      const on = k < count && isSolid(k) > minRun;
+      if (on && start < 0) start = k;
+      if (!on && start >= 0) {
+        if (k - start >= minLength) out.push([start, k]);
+        start = -1;
+      }
+    }
+    return out;
+  };
+  const bands = spans(H, (y) => { let n = 0; for (let x = 0; x < W; x += 2) if (solid(x, y)) n++; return n; }, 2, 12);
+  const rows = cfg.rows ?? [];
+  if (bands.length !== rows.length) throw new Error(`${rel}: hay ${bands.length} filas y el config dice ${rows.length}`);
+
+  const scale = cfg.scale ?? 0.5;
+  const name = cfg.name ?? basename(rel);
+  const dir = dirname(rel);
+  let count = 0;
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const [y0, y1] = bands[r];
+    const segs = spans(W, (x) => { let n = 0; for (let y = y0; y < y1; y += 2) if (solid(x, y)) n++; return n; }, 1, 8);
+    if (segs.length !== row.frames) throw new Error(`${rel}: la fila ${r + 1} tiene ${segs.length} cuadros y el config dice ${row.frames}`);
+    // Caja de cada cuadro, y su lugar en la grilla pareja de la hoja (para que no se corran).
+    const boxes = segs.map(([x0, x1]) => {
+      let top = y1;
+      let bottom = y0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (solid(x, y)) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
+      return { x0, x1, top, bottom };
+    });
+    const first = (boxes[0].x0 + boxes[0].x1) / 2;
+    const last = (boxes[boxes.length - 1].x0 + boxes[boxes.length - 1].x1) / 2;
+    const pitch = boxes.length > 1 ? (last - first) / (boxes.length - 1) : 0;
+    const anchors = boxes.map((_, k) => Math.round(first + k * pitch));
+    const left = Math.min(...boxes.map((b, k) => b.x0 - anchors[k]));
+    const right = Math.max(...boxes.map((b, k) => b.x1 - anchors[k]));
+    const height = Math.max(...boxes.map((b) => b.bottom - b.top + 1));
+    const fw = right - left;
+    const discard = new Set(row.discard ?? []);
+    let n = 0;
+    for (let k = 0; k < boxes.length; k++) {
+      if (discard.has(k + 1)) continue;
+      n++;
+      const b = boxes[k];
+      // Cuadro del mismo tamaño para todos, con los pies en la base.
+      const frame = { data: Buffer.alloc(fw * height * 4), width: fw, height };
+      const dx = b.x0 - anchors[k] - left;
+      const dy = height - 1 - b.bottom;
+      for (let y = b.top; y <= b.bottom; y++) {
+        for (let x = b.x0; x < b.x1; x++) {
+          const i = at(x, y);
+          if (data[i + 3] === 0) continue;
+          data.copy(frame.data, ((y + dy) * fw + (x - b.x0 + dx)) * 4, i, i + 4);
+        }
+      }
+      const frameName = `${name}-${row.anim}-${n}`;
+      const file = join(dir, `${frameName}.png`);
+      const size = await savePng(frame, { x: 0, y: 0, w: fw, h: height }, scale, join(OUT, file));
+      register(frameName, file, size, rel, { kind: 'frame', anim: `${name}-${row.anim}`, frame: n, artPx: artPxOf(cfg, W, scale) });
+      count++;
+    }
+  }
+  return count;
 }
 
 async function processBackground(path, rel, cfg) {
@@ -377,13 +522,19 @@ let total = 0;
 for (const path of walk(RAW)) {
   const rel = relative(RAW, path).slice(0, -extname(path).length);
   const cfg = fileConfig[rel.split(sep).join('/')] ?? {};
+  if (cfg.skip) {
+    console.log(`${rel}: salteado (${cfg.why ?? 'skip en el config'})`);
+    continue;
+  }
   const mode = cfg.mode ?? 'sprites';
   const count =
     mode === 'background'
       ? await processBackground(path, rel, cfg)
       : mode === 'glass'
         ? await processGlass(path, rel, cfg)
-        : await processSprites(path, rel, cfg);
+        : mode === 'sheet'
+          ? await processSheet(path, rel, cfg)
+          : await processSprites(path, rel, cfg);
   total += count;
   console.log(`${rel}: ${count} ${count === 1 ? 'pieza' : 'piezas'}`);
 }

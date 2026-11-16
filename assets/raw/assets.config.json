@@ -2,34 +2,142 @@
   "files": {
     "habitacion/dormitorio": {
       "mode": "background",
-      "size": [1280, 720],
+      "size": [
+        1280,
+        720
+      ],
       "plantZones": [
-        [30, 76, 124, 162],
-        [262, 88, 350, 170],
-        [300, 170, 376, 342],
-        [782, 4, 920, 140],
-        [958, 76, 1090, 336],
-        [1144, 44, 1250, 336]
+        [
+          30,
+          76,
+          124,
+          162
+        ],
+        [
+          262,
+          88,
+          350,
+          170
+        ],
+        [
+          300,
+          170,
+          376,
+          342
+        ],
+        [
+          782,
+          4,
+          920,
+          140
+        ],
+        [
+          958,
+          76,
+          1090,
+          336
+        ],
+        [
+          1144,
+          44,
+          1250,
+          336
+        ]
       ]
     },
-    "pecera/maderas": { "name": "madera" },
+    "pecera/maderas": {
+      "name": "madera"
+    },
     "pecera/rocas-cuevas": {
       "names": [
-        "piedra-rio-1", "piedra-rio-2", "piedra-rio-3",
-        "roca-dragon-1", "roca-dragon-2", "roca-seiryu-1",
-        "cueva-piedra", "cueva-coco", "piedritas-1"
+        "piedra-rio-1",
+        "piedra-rio-2",
+        "piedra-rio-3",
+        "roca-dragon-1",
+        "roca-dragon-2",
+        "roca-seiryu-1",
+        "cueva-piedra",
+        "cueva-coco",
+        "piedritas-1"
       ],
       "gap": 16
     },
     "pecera/sustratos": {
-      "names": ["sustrato-arena", "sustrato-grava", "sustrato-nutritivo"],
-      "scale": 0.25
+      "names": [
+        "sustrato-arena",
+        "sustrato-grava",
+        "sustrato-nutritivo"
+      ],
+      "scale": 0.25,
+      "sourceArtPx": 5.4
     },
     "pecera/vidrio": {
       "mode": "glass",
       "scale": 0.2,
-      "inner": [407, 434, 2167, 1240],
-      "led": [700, 340, 1876, 372]
+      "inner": [
+        407,
+        434,
+        2167,
+        1240
+      ],
+      "led": [
+        700,
+        340,
+        1876,
+        372
+      ],
+      "sourceArtPx": 5.4
+    },
+    "gato/gato": {
+      "skip": true,
+      "why": "la pata y la lengua de la fila 4 tienen violetas casi iguales al magenta del fondo; se usa gato-alternativa",
+      "mode": "sheet",
+      "name": "gato-a",
+      "rows": [
+        {
+          "anim": "dormir",
+          "frames": 2
+        },
+        {
+          "anim": "sentado",
+          "frames": 4,
+          "discard": [
+            3
+          ]
+        },
+        {
+          "anim": "caminar",
+          "frames": 6
+        },
+        {
+          "anim": "lamer",
+          "frames": 4
+        }
+      ]
+    },
+    "gato/gato-alternativa": {
+      "mode": "sheet",
+      "name": "gato",
+      "scale": 0.5,
+      "sourceArtPx": 4,
+      "rows": [
+        {
+          "anim": "dormir",
+          "frames": 2
+        },
+        {
+          "anim": "sentado",
+          "frames": 4
+        },
+        {
+          "anim": "caminar",
+          "frames": 6
+        },
+        {
+          "anim": "lamer",
+          "frames": 4
+        }
+      ]
     }
   }
 }
