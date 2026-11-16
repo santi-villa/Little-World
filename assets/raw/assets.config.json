@@ -1,0 +1,42 @@
+{
+  "files": {
+    "habitacion/dormitorio": {
+      "mode": "background",
+      "size": [1280, 720],
+      "plantZones": [
+        [30, 76, 124, 162],
+        [262, 88, 350, 170],
+        [300, 170, 376, 342],
+        [782, 4, 920, 140],
+        [958, 76, 1090, 336],
+        [1144, 44, 1250, 336]
+      ],
+      "points": {
+        "lampShade": [417, 348],
+        "lampBase": [415, 442],
+        "mug": [470, 412],
+        "catBed": [870, 664],
+        "deskFront": 476
+      }
+    },
+    "pecera/maderas": { "name": "madera" },
+    "pecera/rocas-cuevas": {
+      "names": [
+        "piedra-rio-1", "piedra-rio-2", "piedra-rio-3",
+        "roca-dragon-1", "roca-dragon-2", "roca-seiryu-1",
+        "cueva-piedra", "cueva-coco", "piedritas-1"
+      ],
+      "gap": 16
+    },
+    "pecera/sustratos": {
+      "names": ["sustrato-arena", "sustrato-grava", "sustrato-nutritivo"],
+      "scale": 0.25
+    },
+    "pecera/vidrio": {
+      "mode": "glass",
+      "scale": 0.25,
+      "inner": [407, 434, 2167, 1240],
+      "led": [700, 340, 1876, 372]
+    }
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "generated": "npm run assets",
+  "assets": {
+    "dormitorio": {
+      "file": "habitacion/dormitorio.png",
+      "width": 1280,
+      "height": 720,
+      "source": "habitacion/dormitorio",
+      "kind": "background",
+      "hole": {
+        "x": 413,
+        "y": 85,
+        "width": 496,
+        "height": 300
+      },
+      "points": {
+        "lampShade": [
+          417,
+          348
+        ],
+        "lampBase": [
+          415,
+          442
+        ],
+        "mug": [
+          470,
+          412
+        ],
+        "catBed": [
+          870,
+          664
+        ],
+        "deskFront": 476
+      }
+    },
+    "dormitorio-planta-1": {
+      "file": "habitacion/dormitorio-planta-1.png",
+      "width": 94,
+      "height": 86,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 30,
+      "y": 76
+    },
+    "dormitorio-planta-2": {
+      "file": "habitacion/dormitorio-planta-2.png",
+      "width": 88,
+      "height": 82,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 262,
+      "y": 88
+    },
+    "dormitorio-planta-3": {
+      "file": "habitacion/dormitorio-planta-3.png",
+      "width": 76,
+      "height": 172,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 300,
+      "y": 170
+    },
+    "dormitorio-planta-4": {
+      "file": "habitacion/dormitorio-planta-4.png",
+      "width": 138,
+      "height": 136,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 782,
+      "y": 4
+    },
+    "dormitorio-planta-5": {
+      "file": "habitacion/dormitorio-planta-5.png",
+      "width": 132,
+      "height": 260,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 958,
+      "y": 76
+    },
+    "dormitorio-planta-6": {
+      "file": "habitacion/dormitorio-planta-6.png",
+      "width": 106,
+      "height": 292,
+      "source": "habitacion/dormitorio",
+      "kind": "wind-plant",
+      "of": "dormitorio",
+      "x": 1144,
+      "y": 44
+    },
+    "madera-1": {
+      "file": "pecera/madera-1.png",
+      "width": 373,
+      "height": 146,
+      "source": "pecera/maderas",
+      "kind": "sprite"
+    },
+    "madera-2": {
+      "file": "pecera/madera-2.png",
+      "width": 234,
+      "height": 334,
+      "source": "pecera/maderas",
+      "kind": "sprite"
+    },
+    "madera-3": {
+      "file": "pecera/madera-3.png",
+      "width": 172,
+      "height": 152,
+      "source": "pecera/maderas",
+      "kind": "sprite"
+    },
+    "madera-4": {
+      "file": "pecera/madera-4.png",
+      "width": 181,
+      "height": 135,
+      "source": "pecera/maderas",
+      "kind": "sprite"
+    },
+    "helecho-java-1": {
+      "file": "pecera/plantas/helecho-java-1.png",
+      "width": 83,
+      "height": 135,
+      "source": "pecera/plantas/helecho-java",
+      "kind": "plant",
+      "plant": "helecho-java",
+      "stage": 1,
+      "stages": 3
+    },
+    "helecho-java-2": {
+      "file": "pecera/plantas/helecho-java-2.png",
+      "width": 167,
+      "height": 243,
+      "source": "pecera/plantas/helecho-java",
+      "kind": "plant",
+      "plant": "helecho-java",
+      "stage": 2,
+      "stages": 3
+    },
+    "helecho-java-3": {
+      "file": "pecera/plantas/helecho-java-3.png",
+      "width": 255,
+      "height": 338,
+      "source": "pecera/plantas/helecho-java",
+      "kind": "plant",
+      "plant": "helecho-java",
+      "stage": 3,
+      "stages": 3
+    },
+    "piedra-rio-1": {
+      "file": "pecera/piedra-rio-1.png",
+      "width": 103,
+      "height": 63,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "piedra-rio-2": {
+      "file": "pecera/piedra-rio-2.png",
+      "width": 143,
+      "height": 83,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "piedra-rio-3": {
+      "file": "pecera/piedra-rio-3.png",
+      "width": 172,
+      "height": 112,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "roca-dragon-1": {
+      "file": "pecera/roca-dragon-1.png",
+      "width": 146,
+      "height": 109,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "roca-dragon-2": {
+      "file": "pecera/roca-dragon-2.png",
+      "width": 155,
+      "height": 106,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "roca-seiryu-1": {
+      "file": "pecera/roca-seiryu-1.png",
+      "width": 155,
+      "height": 118,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "cueva-piedra": {
+      "file": "pecera/cueva-piedra.png",
+      "width": 184,
+      "height": 109,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "cueva-coco": {
+      "file": "pecera/cueva-coco.png",
+      "width": 149,
+      "height": 100,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "piedritas-1": {
+      "file": "pecera/piedritas-1.png",
+      "width": 140,
+      "height": 69,
+      "source": "pecera/rocas-cuevas",
+      "kind": "sprite"
+    },
+    "sustrato-arena": {
+      "file": "pecera/sustrato-arena.png",
+      "width": 601,
+      "height": 79,
+      "source": "pecera/sustratos",
+      "kind": "sprite"
+    },
+    "sustrato-grava": {
+      "file": "pecera/sustrato-grava.png",
+      "width": 601,
+      "height": 80,
+      "source": "pecera/sustratos",
+      "kind": "sprite"
+    },
+    "sustrato-nutritivo": {
+      "file": "pecera/sustrato-nutritivo.png",
+      "width": 601,
+      "height": 80,
+      "source": "pecera/sustratos",
+      "kind": "sprite"
+    },
+    "vidrio": {
+      "file": "pecera/vidrio.png",
+      "width": 472,
+      "height": 311,
+      "source": "pecera/vidrio",
+      "kind": "glass",
+      "inner": {
+        "x": 16,
+        "y": 86,
+        "width": 440,
+        "height": 202
+      },
+      "led": {
+        "x": 89,
+        "y": 62,
+        "width": 294,
+        "height": 8
+      }
+    }
+  }
+}
