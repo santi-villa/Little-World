@@ -24,6 +24,13 @@ export interface AssetEntry {
   /** Cuadro de animación: nombre de la animación (gato-caminar) y número de cuadro (desde 1). */
   anim?: string;
   frame?: number;
+  /** Animación en tira (videos del gato): cuadros, su tamaño, velocidad y punto de apoyo. */
+  frames?: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  fps?: number;
+  loop?: boolean;
+  anchor?: { x: number; y: number };
   /** Fondo: el hueco transparente (los vidrios de la ventana). */
   hole?: AssetRect;
   /** Vidrio: dónde va el agua y dónde está la tira de luz. */
