@@ -297,6 +297,8 @@ export interface DebugPanelOptions {
   saveStatus: () => string;
   /** Empezar una pecera nueva del modelo elegido. */
   onReset: (tankId: string) => void;
+  /** Borrar el guardado y empezar de cero (pecera inicial con un solo betta). */
+  onNewGame: () => void;
   /** Simular que el juego estuvo cerrado tantos minutos (catch-up + resumen). */
   onSimulateAway: (minutes: number) => void;
 }
@@ -484,7 +486,15 @@ export class DebugPanel {
         this.refresh();
       }
     });
-    game_.append(this.save, model, reset);
+    const newGame = el('button', 'debug-button bad', T.buttons.newGame);
+    newGame.type = 'button';
+    newGame.addEventListener('click', () => {
+      if (window.confirm(T.newGameConfirm)) {
+        this.options.onNewGame();
+        this.refresh();
+      }
+    });
+    game_.append(this.save, model, reset, newGame);
 
     parent.append(this.root, this.toggle);
     this.setOpen(this.open);

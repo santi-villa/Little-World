@@ -75,6 +75,7 @@
     "yes": "sí",
     "no": "no",
     "resetConfirm": "¿Empezar una pecera nueva? Se pierde la partida actual.",
+    "newGameConfirm": "¿Empezar una partida nueva de cero? Se borra el guardado y arranca con un solo betta.",
     "sections": {
       "time": "Tiempo",
       "actions": "Acciones de prueba",
@@ -123,6 +124,7 @@
       "heater": "Calefactor sí/no",
       "lid": "Tapa sí/no",
       "reset": "Pecera nueva (borra la partida)",
+      "newGame": "Nueva partida (borra el guardado)",
       "pinch": "Pizca de comida (0,02 g)",
       "tapGlass": "Golpear el vidrio",
       "removeDead": "Retirar muertos",

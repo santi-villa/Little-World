@@ -7,7 +7,7 @@ import { DebugPanel } from './render/ui/debug-panel';
 import { fill, texts } from './render/ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH, attachViewport } from './render/viewport';
 import { SAVE_FORMAT_VERSION, createSave } from './save/save-format';
-import { readSave, writeSave } from './save/storage';
+import { deleteSave, readSave, writeSave } from './save/storage';
 import { MINUTES_PER_DAY, defaultConfig, derive } from './sim';
 import { FixedOutdoorTemperature, type OutdoorTemperatureSource } from './world/outdoor';
 import './styles.css';
@@ -159,6 +159,13 @@ async function boot(): Promise<void> {
   const panel = new DebugPanel(game, document.body, {
     saveStatus,
     onReset: (tankId) => game.reset(randomSeed(), tankId),
+    onNewGame: () => {
+      // Se borra el guardado y se arranca de cero: pecera inicial con un solo betta.
+      void deleteSave().finally(() => {
+        game.reset(randomSeed());
+        game.act({ type: 'addAnimals', speciesId: 'betta', count: 1 });
+      });
+    },
     onSimulateAway: (minutes) => {
       const report = game.catchUp(minutes * 60_000);
       if (report) welcome.show(report.result.summary);
