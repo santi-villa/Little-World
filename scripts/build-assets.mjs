@@ -11,6 +11,10 @@
 // opciones por archivo:
 //   mode       "sprites" (por defecto) | "glass" | "background" | "sheet"
 //   skip       true para no procesar ese archivo (con "why" explicando por qué)
+//   cropTop    píxeles del original que se descartan arriba (para separar piezas pegadas)
+//   kernel     cómo se achica: "nearest" (por defecto) o "mitchell" (promedia; para
+//              achicar mucho un dibujo de píxeles finos, como el pájaro)
+//   pivot      [x, y] en fracción: de dónde cuelga o se apoya (va al manifest)
 //   sourceArtPx  cuántos píxeles del original mide un píxel del dibujo (por
 //              defecto 4 en las hojas de 1376 px y 5.4 en las de 2576). Con eso
 //              el manifest dice `artPx`: cuántos píxeles del PNG mide un píxel
@@ -24,6 +28,11 @@
 // Las imágenes de una carpeta "plantas" son etapas de crecimiento: se ordenan
 // de izquierda a derecha (chica -> grande) y se numeran <planta>-1/2/3.
 //
+// Videos (.mp4, .mov, .webm): necesitan "clips" en su config (nombre, from y to
+// en segundos, loop) y un "refTime" con el gato sentado (para igualar la escala
+// entre videos). Ver scripts/video-frames.mjs. Requieren ffmpeg. El bloque
+// "video" del config da el nombre de las animaciones y la carpeta de salida.
+//
 // Modo "sheet" (hojas de animación, como el gato): `rows` dice, fila por fila,
 // el nombre de la animación, cuántos cuadros tiene y cuáles descartar
 // ({ "anim": "sentado", "frames": 4, "discard": [3] }, contando desde 1). Cada
@@ -34,12 +43,14 @@ import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, 
 import { basename, dirname, extname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { processVideos } from './video-frames.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const RAW = join(ROOT, 'assets', 'raw');
 const OUT = join(ROOT, 'public', 'assets');
 const CONFIG_PATH = join(RAW, 'assets.config.json');
 const IMAGE = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const VIDEO = new Set(['.mp4', '.mov', '.webm']);
 
 const config = existsSync(CONFIG_PATH) ? JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) : {};
 const fileConfig = config.files ?? {};
@@ -49,7 +60,7 @@ function walk(dir) {
   for (const entry of readdirSync(dir).sort()) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) found.push(...walk(path));
-    else if (IMAGE.has(extname(entry).toLowerCase())) found.push(path);
+    else if (IMAGE.has(extname(entry).toLowerCase()) || VIDEO.has(extname(entry).toLowerCase())) found.push(path);
   }
   return found;
 }
@@ -62,7 +73,7 @@ async function loadRgba(input) {
   return { data, width: info.width, height: info.height };
 }
 
-async function savePng(img, rect, scale, outFile) {
+async function savePng(img, rect, scale, outFile, kernel = 'nearest') {
   const { data, width } = img;
   const piece = Buffer.alloc(rect.w * rect.h * 4);
   for (let y = 0; y < rect.h; y++) {
@@ -78,10 +89,16 @@ async function savePng(img, rect, scale, outFile) {
   const w = Math.max(1, Math.round(rect.w * scale));
   const h = Math.max(1, Math.round(rect.h * scale));
   mkdirSync(dirname(outFile), { recursive: true });
-  await sharp(piece, { raw: { width: rect.w, height: rect.h, channels: 4 } })
-    .resize(w, h, { kernel: 'nearest', fit: 'fill' })
-    .png({ compressionLevel: 9 })
-    .toFile(outFile);
+  const resized = sharp(piece, { raw: { width: rect.w, height: rect.h, channels: 4 } }).resize(w, h, { kernel, fit: 'fill' });
+  if (kernel === 'nearest') {
+    await resized.png({ compressionLevel: 9 }).toFile(outFile);
+  } else {
+    // Achicando mucho (un pájaro enorme a tamaño de pájaro) se promedia, pero el
+    // borde queda duro: transparente u opaco, nada a medias.
+    const { data } = await resized.raw().toBuffer({ resolveWithObject: true });
+    for (let i = 3; i < data.length; i += 4) data[i] = data[i] >= 128 ? 255 : 0;
+    await sharp(data, { raw: { width: w, height: h, channels: 4 } }).png({ compressionLevel: 9 }).toFile(outFile);
+  }
   return { width: w, height: h };
 }
 
@@ -242,9 +259,11 @@ function register(name, file, size, source, extra = {}) {
 async function processSprites(path, rel, cfg) {
   const img = await loadRgba(sharp(path));
   keyHard(img, cfg.tolerance ?? 60);
+  if (cfg.cropTop) img.data.fill(0, 0, cfg.cropTop * img.width * 4);
   const dir = dirname(rel);
   const base = basename(rel);
-  const isPlant = dir.split(sep).includes('plantas');
+  // Las plantas de pecera vienen en etapas de crecimiento (las de la habitación no).
+  const isPlant = dir.split(sep).includes('plantas') && dir.split(sep)[0] === 'pecera';
   const scaleRef = img.width / 1376;
   let pieces = findPieces(img, (cfg.gap ?? 14) * scaleRef);
   pieces = (cfg.order ?? (isPlant ? 'x' : 'rows')) === 'x' ? pieces.sort((a, b) => a.x - b.x) : readingOrder(pieces);
@@ -253,8 +272,10 @@ async function processSprites(path, rel, cfg) {
   for (let i = 0; i < pieces.length; i++) {
     const name = cfg.names?.[i] ?? (pieces.length === 1 ? stem : `${stem}-${i + 1}`);
     const file = join(dir, `${name}.png`);
-    const size = await savePng(img, pieces[i], scale, join(OUT, file));
+    const size = await savePng(img, pieces[i], scale, join(OUT, file), cfg.kernel);
     const extra = { kind: isPlant ? 'plant' : 'sprite', artPx: artPxOf(cfg, img.width, scale) };
+    // Dónde se agarra (cuelga) o apoya, en fracción del ancho y del alto.
+    if (cfg.pivot) extra.pivot = cfg.pivot;
     if (isPlant) Object.assign(extra, { plant: stem, stage: i + 1, stages: pieces.length });
     register(name, file, size, rel, extra);
   }
@@ -519,11 +540,21 @@ async function processBackground(path, rel, cfg) {
 
 rmSync(OUT, { recursive: true, force: true });
 let total = 0;
+const videos = [];
 for (const path of walk(RAW)) {
   const rel = relative(RAW, path).slice(0, -extname(path).length);
   const cfg = fileConfig[rel.split(sep).join('/')] ?? {};
   if (cfg.skip) {
     console.log(`${rel}: salteado (${cfg.why ?? 'skip en el config'})`);
+    continue;
+  }
+  if (VIDEO.has(extname(path).toLowerCase())) {
+    // Los videos se procesan todos juntos al final (comparten paleta).
+    if (!cfg.clips) {
+      console.log(`${rel}: video sin "clips" en el config, salteado`);
+      continue;
+    }
+    videos.push({ path, rel, cfg });
     continue;
   }
   const mode = cfg.mode ?? 'sprites';
@@ -537,6 +568,28 @@ for (const path of walk(RAW)) {
           : await processSprites(path, rel, cfg);
   total += count;
   console.log(`${rel}: ${count} ${count === 1 ? 'pieza' : 'piezas'}`);
+}
+if (videos.length > 0) {
+  const group = config.video ?? {};
+  for (const clip of processVideos(videos, group)) {
+    const name = `${group.name ?? 'video'}-${clip.name}`;
+    const file = join(group.dir ?? 'video', `${name}.png`);
+    mkdirSync(dirname(join(OUT, file)), { recursive: true });
+    const width = clip.frameWidth * clip.frames;
+    await sharp(clip.strip, { raw: { width, height: clip.frameHeight, channels: 4 } }).png({ compressionLevel: 9 }).toFile(join(OUT, file));
+    register(name, file, { width, height: clip.frameHeight }, clip.source, {
+      kind: 'anim',
+      artPx: 1,
+      frames: clip.frames,
+      frameWidth: clip.frameWidth,
+      frameHeight: clip.frameHeight,
+      fps: clip.fps,
+      loop: clip.loop,
+      anchor: { x: clip.anchorX, y: clip.anchorY },
+    });
+    total++;
+    console.log(`  ${name}: ${clip.frames} cuadros de ${clip.frameWidth}x${clip.frameHeight}`);
+  }
 }
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -1,49 +1,14 @@
 {
+  "video": {
+    "name": "gato",
+    "dir": "gato",
+    "colors": 32,
+    "refHeight": 41
+  },
   "files": {
     "habitacion/dormitorio": {
-      "mode": "background",
-      "size": [
-        1280,
-        720
-      ],
-      "plantZones": [
-        [
-          30,
-          76,
-          124,
-          162
-        ],
-        [
-          262,
-          88,
-          350,
-          170
-        ],
-        [
-          300,
-          170,
-          376,
-          342
-        ],
-        [
-          782,
-          4,
-          920,
-          140
-        ],
-        [
-          958,
-          76,
-          1090,
-          336
-        ],
-        [
-          1144,
-          44,
-          1250,
-          336
-        ]
-      ]
+      "skip": true,
+      "why": "reemplazado por dormitorio-sin-plantas (las plantas ahora son piezas aparte)"
     },
     "pecera/maderas": {
       "name": "madera"
@@ -136,6 +101,197 @@
         {
           "anim": "lamer",
           "frames": 4
+        }
+      ],
+      "skip": true,
+      "why": "reemplazado por los videos del gato"
+    },
+    "habitacion/dormitorio-sin-plantas": {
+      "mode": "background",
+      "name": "dormitorio",
+      "size": [
+        1280,
+        720
+      ]
+    },
+    "habitacion/plantas/colgantes": {
+      "names": [
+        "colgante-macrame",
+        "colgante-potus",
+        "potus-1",
+        "potus-2"
+      ],
+      "pivot": [
+        0.5,
+        0
+      ]
+    },
+    "habitacion/plantas/enredadera-barra": {
+      "name": "enredadera",
+      "pivot": [
+        0.5,
+        0
+      ]
+    },
+    "habitacion/objetos/cortinas-largas": {
+      "names": [
+        "cortina-izquierda",
+        "cortina-derecha"
+      ],
+      "cropTop": 62,
+      "pivot": [
+        0.5,
+        0
+      ]
+    },
+    "habitacion/cielo/noche": {
+      "mode": "background",
+      "name": "cielo-noche",
+      "size": [
+        544,
+        304
+      ]
+    },
+    "animales/pajaro": {
+      "name": "pajaro",
+      "scale": 0.1,
+      "kernel": "mitchell"
+    },
+    "animales/caracol-2": {
+      "name": "caracol-b"
+    },
+    "gato/videos/secuencia-dormir-caminar-lavarse": {
+      "refTime": 4.2,
+      "clips": [
+        {
+          "name": "dormir",
+          "from": 0.0,
+          "to": 2.0,
+          "loop": true
+        },
+        {
+          "name": "despertar",
+          "from": 2.0,
+          "to": 3.6
+        },
+        {
+          "name": "cola",
+          "from": 4.0,
+          "to": 6.0,
+          "loop": true
+        },
+        {
+          "name": "pararse",
+          "from": 6.0,
+          "to": 6.6
+        },
+        {
+          "name": "caminar",
+          "from": 6.6,
+          "to": 8.6,
+          "loop": true
+        },
+        {
+          "name": "sentarse",
+          "from": 8.8,
+          "to": 10.2
+        },
+        {
+          "name": "lavarse",
+          "from": 10.4,
+          "to": 13.6,
+          "loop": true
+        },
+        {
+          "name": "acostarse",
+          "from": 13.6,
+          "to": 15.0
+        }
+      ]
+    },
+    "gato/videos/relax-estirarse-bostezar-echarse": {
+      "refTime": 0.5,
+      "clips": [
+        {
+          "name": "sentado",
+          "from": 0.0,
+          "to": 2.1,
+          "loop": true
+        },
+        {
+          "name": "estirarse",
+          "from": 3.5,
+          "to": 6.0
+        },
+        {
+          "name": "bostezar",
+          "from": 6.0,
+          "to": 8.0
+        },
+        {
+          "name": "echarse",
+          "from": 8.0,
+          "to": 9.6
+        },
+        {
+          "name": "loaf",
+          "from": 9.6,
+          "to": 11.6,
+          "loop": true
+        },
+        {
+          "name": "levantarse",
+          "from": 11.6,
+          "to": 14.2
+        }
+      ]
+    },
+    "gato/videos/mimos-panza-lavarse-dormir": {
+      "refTime": 0.3,
+      "clips": [
+        {
+          "name": "mimos",
+          "from": 0.5,
+          "to": 3.0,
+          "loop": true
+        },
+        {
+          "name": "rodar",
+          "from": 5.0,
+          "to": 6.1
+        },
+        {
+          "name": "panza",
+          "from": 6.1,
+          "to": 10.1,
+          "loop": true
+        },
+        {
+          "name": "incorporarse",
+          "from": 10.1,
+          "to": 11.2
+        }
+      ]
+    },
+    "gato/videos/comer-relamerse-rascarse": {
+      "refTime": 0.4,
+      "why": "solo la parte de comer: desde los 7 s la cámara hace zoom y gira de frente",
+      "clips": [
+        {
+          "name": "agacharse",
+          "from": 2.4,
+          "to": 3.1
+        },
+        {
+          "name": "comer",
+          "from": 3.1,
+          "to": 6.0,
+          "loop": true
+        },
+        {
+          "name": "erguirse",
+          "from": 6.0,
+          "to": 6.8
         }
       ]
     }
