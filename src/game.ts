@@ -84,6 +84,8 @@ export class Game {
     const game = new Game(
       createNewTank({ seed, tankId, startMinuteOfDay: localMinuteOfDay(now) }),
     );
+    // Una pecera nueva arranca con un solo betta.
+    game.act({ type: 'addAnimals', speciesId: 'betta', count: 1 });
     game.dirty = true;
     game.saveSoon = true;
     return game;

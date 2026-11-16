@@ -1,19 +1,19 @@
 /**
  * Escalado pixel perfect.
  *
- * La escena siempre se dibuja a 640x360. El canvas se agranda un número
+ * La escena siempre se dibuja a 1280x720. El canvas se agranda un número
  * ENTERO de veces medido en píxeles físicos de la pantalla (no en píxeles
  * CSS), así cada píxel del juego ocupa exactamente NxN píxeles del celular
  * aunque el devicePixelRatio sea 2, 3 o 2,625.
  */
 
-export const GAME_WIDTH = 640;
-export const GAME_HEIGHT = 360;
+export const GAME_WIDTH = 1280;
+export const GAME_HEIGHT = 720;
 
 export interface ViewportLayout {
   /** Píxeles físicos por píxel del juego. */
   scale: number;
-  /** false solo si la pantalla es más chica que 640x360 físicos. */
+  /** false solo si la pantalla es más chica que 1280x720 físicos. */
   integer: boolean;
   cssWidth: number;
   cssHeight: number;

@@ -1,26 +1,28 @@
 /**
- * Escena de 640x360: el dormitorio con la pecera sobre el escritorio.
+ * Escena de 1280x720: el dormitorio (imagen) con la pecera sobre el escritorio.
  * Capas, de atrás hacia adelante:
- *   sky     (animado)  lo que se ve por la ventana: cielo, nubes, lluvia, relámpagos
- *   room    (fijo)     pared, marco de la ventana, muebles y objetos
- *   anim    (animado)  plantas colgantes y vapor de la taza
+ *   sky      (código)  lo que se ve por los vidrios de la ventana: cielo y clima
+ *   room     (imagen)  dormitorio.png, con los vidrios transparentes
+ *   plants   (imagen)  las plantas colgantes, con el shader de viento
+ *   anim     (código)  vapor de la taza y plato del gato
  *   pecera -> gato
- *   lights  (aditivo)  lámpara, resplandor de la pecera y sol en el piso
- *   flash   (aditivo)  relámpago iluminando la habitación
+ *   lights   (aditivo) lámpara, resplandor de la pecera y sol en el piso
+ *   flash    (aditivo) relámpago iluminando la habitación
  *   UI
- * La capa fija solo se redibuja cuando cambia la luz, la pecera o el plato del gato.
+ * El día y la noche se hacen tiñendo las imágenes.
  */
 
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { DerivedValues, SimState, Weather } from '../../sim';
+import { asset, assetNames, tex } from '../assets';
 import { daylight, lerpColor } from '../pixel-utils';
-import { Batch } from '../tank/tank-decor';
+import { SwayFilter } from '../sway-filter';
 import { TankView } from '../tank/tank-view';
 import { Hud } from '../ui/hud';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
-import { drawLights, drawRoom, drawRoomAnim, drawRoomShadows, type RoomParams } from './room-decor';
-import { deskSpan, scenePreview } from './scene-layout';
+import { drawLights, drawRoomAnim } from './room-fx';
+import { PX, scenePreview } from './scene-layout';
 import { drawSky } from './window-view';
 
 /** Lo que la escena necesita además del estado de la simulación. */
@@ -28,32 +30,59 @@ export interface SceneView {
   weather: Weather;
 }
 
+const ROOM = 'dormitorio';
+/** Tinte de la habitación de noche (multiplica la imagen). */
+const NIGHT_TINT = 0x3a4472;
 const NIGHT = 0x0a0f22;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
+/** Viento de cada clima: cuántos píxeles se corren las puntas de las plantas. */
+const WEATHER_WIND: Record<Weather, number> = { clear: 0.8, cloudy: 1.2, rain: 1.6, storm: 2.4 };
 
 export class RoomScene {
   readonly container = new Container();
   private readonly sky = new Graphics();
-  private readonly room = new Graphics();
+  private readonly room = new Sprite(tex(ROOM));
+  private readonly plants: { sprite: Sprite; filter: SwayFilter }[] = [];
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
   private readonly tank = new TankView();
   private readonly cat = new CatView();
   private readonly hud = new Hud();
-  private readonly ordered = new Batch(true);
-  private readonly batch = new Batch();
-  private roomKey = '';
+  /** Los vidrios de la ventana, en píxeles gordos. */
+  private readonly window: { x: number; y: number; width: number; height: number };
   private lightsKey = '';
   private lastSeconds = 0;
 
   constructor() {
+    const hole = asset(ROOM)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
+    this.window = {
+      x: Math.floor(hole.x / PX),
+      y: Math.floor(hole.y / PX),
+      width: Math.ceil(hole.width / PX) + 1,
+      height: Math.ceil(hole.height / PX) + 1,
+    };
+    this.sky.scale.set(PX);
+    this.anim.scale.set(PX);
     this.lights.blendMode = 'add';
     this.flash.blendMode = 'add';
+
+    const plantLayer = new Container();
+    assetNames('wind-plant', ROOM).forEach((name, i) => {
+      const entry = asset(name);
+      const sprite = new Sprite(tex(name));
+      sprite.position.set(entry?.x ?? 0, entry?.y ?? 0);
+      const filter = new SwayFilter('top', sprite.height, i * 1.9);
+      sprite.filters = [filter];
+      plantLayer.addChild(sprite);
+      this.plants.push({ sprite, filter });
+    });
+
     this.container.addChild(
       this.sky,
       this.room,
+      plantLayer,
       this.anim,
       this.tank.container,
       this.cat.container,
@@ -74,9 +103,9 @@ export class RoomScene {
       Math.max(light, derived.lightOn ? 0.6 : 0.3),
       seconds,
       dt,
-      this.tank.fish.watchPoint(),
+      this.tank.watchPoint(),
     );
-    this.hud.update(state, this.tank.bounds);
+    this.hud.update(state);
   }
 
   /** ¿Qué hay en ese punto de la escena? */
@@ -89,7 +118,7 @@ export class RoomScene {
 
   /** Golpe en el vidrio en ese punto: los peces se alejan de ahí. */
   scareFish(x: number, y: number): void {
-    this.tank.fish.scareAt(x, y);
+    this.tank.scareAt(x, y);
   }
 
   /** Dibuja la habitación y devuelve cuánta luz de día hay (0 noche .. 1 pleno día). */
@@ -99,39 +128,33 @@ export class RoomScene {
     const day = daylight(scenePreview.hour ?? derived.hour);
     const light = day * WEATHER_LIGHT[view.weather];
     const night = 1 - light;
-    const tone = (c: number): number => lerpColor(lerpColor(c, NIGHT, 0.62), c, light);
-    const params: RoomParams = {
-      tank,
-      desk: deskSpan(tank.width),
-      lampOn: light < 0.5,
-      bowl: Math.round(state.cat.bowl * 7) / 7,
-    };
+    const lampOn = light < 0.5;
 
     // Ventana.
     this.sky.clear();
-    const bolt = drawSky(this.sky, day, view.weather, seconds);
+    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds);
 
-    // Lo fijo.
-    const roomKey = `${Math.round(light * 40)},${tank.x},${tank.y},${tank.width},${params.bowl},${params.lampOn}`;
-    if (roomKey !== this.roomKey) {
-      this.roomKey = roomKey;
-      this.room.clear();
-      drawRoom(this.ordered, params);
-      this.ordered.flush(this.room, tone);
-      drawRoomShadows(this.room, params);
+    // Día y noche: las imágenes se tiñen.
+    const tint = lerpColor(NIGHT_TINT, 0xffffff, light);
+    this.room.tint = tint;
+    const wind = WEATHER_WIND[view.weather];
+    for (const plant of this.plants) {
+      plant.sprite.tint = tint;
+      plant.filter.set(seconds, wind);
     }
 
-    // Plantas y vapor.
+    // Vapor y plato.
+    const tone = (c: number): number => lerpColor(lerpColor(c, NIGHT, 0.62), c, light);
     this.anim.clear();
-    drawRoomAnim(this.batch, this.anim, params, tone, seconds);
+    drawRoomAnim(this.anim, tone, seconds, state.cat.bowl);
 
     // Luces.
     const sun = view.weather === 'clear' && day > 0.5 ? day : 0;
-    const lightsKey = `${roomKey},${derived.lightOn},${Math.round(sun * 20)}`;
+    const lightsKey = `${Math.round(night * 40)},${lampOn},${tank.x},${tank.y},${tank.width},${derived.lightOn},${Math.round(sun * 20)}`;
     if (lightsKey !== this.lightsKey) {
       this.lightsKey = lightsKey;
       this.lights.clear();
-      drawLights(this.lights, params, night, derived.lightOn, sun);
+      drawLights(this.lights, tank, lampOn, night, derived.lightOn, sun);
     }
     this.flash.clear();
     if (bolt > 0) {

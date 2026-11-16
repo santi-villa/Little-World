@@ -12,25 +12,6 @@
         "y": 85,
         "width": 496,
         "height": 300
-      },
-      "points": {
-        "lampShade": [
-          417,
-          348
-        ],
-        "lampBase": [
-          415,
-          442
-        ],
-        "mug": [
-          470,
-          412
-        ],
-        "catBed": [
-          870,
-          664
-        ],
-        "deskFront": 476
       }
     },
     "dormitorio-planta-1": {

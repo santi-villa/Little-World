@@ -7,7 +7,6 @@
 import type { Graphics } from 'pixi.js';
 import type { Weather } from '../../sim';
 import { lerpColor, scatter } from '../pixel-utils';
-import { WINDOW } from './scene-layout';
 
 /** Cuánto tapa el cielo cada clima (0 despejado .. 1 cerrado). */
 const OVERCAST: Record<Weather, number> = { clear: 0, cloudy: 0.6, rain: 0.85, storm: 1 };
@@ -27,8 +26,14 @@ function lightning(t: number): { flash: number; bolt: number } {
 }
 
 /** Dibuja la ventana y devuelve la intensidad del relámpago (para iluminar la habitación). */
-export function drawSky(g: Graphics, day: number, weather: Weather, t: number): number {
-  const { x, y, width: W, height: H } = WINDOW;
+export function drawSky(
+  g: Graphics,
+  window: { x: number; y: number; width: number; height: number },
+  day: number,
+  weather: Weather,
+  t: number,
+): number {
+  const { x, y, width: W, height: H } = window;
   const ov = OVERCAST[weather];
   const night = 1 - day;
   const right = x + W;

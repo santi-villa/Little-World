@@ -40,6 +40,11 @@ export interface FishSprite {
   tempo?: number;
   /** Amplitud de la ondulación del cuerpo, como fracción del largo. */
   wave?: number;
+  /**
+   * Cuánto mide el dibujo entero respecto de `len` (1 por defecto). Las aletas
+   * de velo lo alargan: así el animal completo mide lo que dice su ficha.
+   */
+  span?: number;
   /** Largo mínimo en píxeles para que se lea. */
   minLen?: number;
   draw(p: SpritePainter, pose: SpritePose): void;

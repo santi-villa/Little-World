@@ -186,9 +186,16 @@ export class FishLayer {
     };
     const main = tint(hex(sp.color));
     const accent = tint(hex(sp.accent));
-    const cx = Math.round(this.area.x + body.x * this.pxPerCm);
-    const cy = Math.round(this.area.y + body.y * this.pxPerCm);
     const len = Math.max(3, Math.round(animal.sizeCm * this.pxPerCm * scale));
+    // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
+    const area = this.area;
+    const halfLen = Math.min(len / 2, area.width / 2);
+    const cx = Math.round(
+      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x + body.x * this.pxPerCm)),
+    );
+    const cy = Math.round(
+      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm)),
+    );
     const dir = body.facing;
 
     // Especies con sprite propio; el resto sigue con el placeholder de abajo.
@@ -210,7 +217,7 @@ export class FishLayer {
       // Giro suave: el sprite se acorta, se da vuelta y se vuelve a estirar.
       const ease = Math.sin((a.turn * Math.PI) / 2);
       const turn = (a.turn >= 0 ? 1 : -1) * Math.max(0.3, Math.abs(ease));
-      const spriteLen = Math.max(sprite.minLen ?? 6, Math.round(animal.sizeCm * this.pxPerCm * scale));
+      const spriteLen = Math.max(sprite.minLen ?? 6, Math.round(len / (sprite.span ?? 1)));
       const painter = this.painter;
       painter.begin(spriteLen, turn, (sprite.wave ?? 0.07) * spriteLen * (0.3 + 0.7 * swim), a.wag, !animal.alive);
       sprite.draw(painter, {

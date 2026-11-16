@@ -47,7 +47,7 @@ Claves visuales:
 
 ### Resolución y capas
 
-- **Resolución base: 640×360** (16:9), escalada en múltiplos enteros (×2, ×3) para mantener el pixel perfecto.
+- **Resolución base: 1280×720** (16:9), escalada en múltiplos enteros cuando la pantalla lo permite. Lo dibujado por código usa píxeles de 2×2 para acompañar el grano del arte.
 - Orientación: **horizontal**, pensado primero para celular.
 - Cada escena se arma con capas (de atrás hacia adelante):
   1. Fondo de la habitación (paredes, ventana, cielo detrás de la ventana)

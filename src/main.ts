@@ -1,5 +1,6 @@
 import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
+import { loadAssets } from './render/assets';
 import { RoomScene } from './render/scene/room-scene';
 import { WelcomePanel } from './render/ui/welcome';
 import { DebugPanel } from './render/ui/debug-panel';
@@ -77,6 +78,8 @@ async function boot(): Promise<void> {
     autoDensity: false,
     roundPixels: true,
     powerPreference: 'low-power',
+    // Los filtros propios (vaivén de las plantas) están escritos en GLSL.
+    preference: 'webgl',
   });
   stage.append(app.canvas);
   attachViewport(app.canvas, stage);
@@ -146,6 +149,7 @@ async function boot(): Promise<void> {
     return `${prefix} · ${fill(texts.save.ago, { seconds })}`;
   };
 
+  await loadAssets();
   const scene = new RoomScene();
   app.stage.addChild(scene.container);
 

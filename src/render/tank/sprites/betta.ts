@@ -16,6 +16,7 @@ export const betta: FishSprite = {
   tempo: 0.55,
   wave: 0.05,
   minLen: 10,
+  span: 1.4,
   draw(p, pose) {
     const L = pose.len;
     const t = pose.wag;

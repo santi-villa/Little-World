@@ -28,33 +28,38 @@ Ideas para después:
 - Gamba con huevos ("bayada") y muda.
 - Variación de color en platys.
 
-## Pecera
+## Arte con imágenes (pipeline, habitación y pecera)
 
-`tank-view.ts` (vidrio, agua, luz, equipos) y `tank-decor.ts` (arena, piedras,
-madera, vallisneria, anubias, musgo). Todo se ubica en proporción al tamaño de
-la pecera.
+- Pipeline: `npm run assets` (`scripts/build-assets.mjs`) lee `assets/raw/` y
+  genera `public/assets/` + `manifest.json`. Opciones por archivo en
+  `assets/raw/assets.config.json`. Una imagen nueva se procesa sola (piezas
+  numeradas); para darle nombres propios se agrega al config.
+- Habitación: `render/scene/` (`room-scene.ts`, `room-fx.ts`, `window-view.ts`,
+  `cat-view.ts`). Pecera: `render/tank/tank-view.ts` + `src/data/tank-decor.json`.
 
-**Sin revisar en pantalla**: se escribió sin capturas (solo compilación). Falta
-mirarla en el juego con cada modelo de `tanks.json` y ajustar posiciones y colores.
+**Sin revisar en pantalla**: el juego no se abrió después de este cambio (solo
+compilación de tipos). Lo primero es mirarlo y ajustar. Lo más probable de tener
+que tocar:
 
-- La redonda (`shape: "round"`) se dibuja como caja, igual que antes.
-- Plantas, madera y piedras son fijas: todavía no salen del estado de la simulación.
-- El termómetro se muestra siempre (no hay equipo "termómetro" en la simulación).
+- Posiciones a ojo en `scene-layout.ts` (lámpara, taza, alféizar, cama del gato,
+  piso) y `tank-layout.ts` (dónde apoya la pecera en el escritorio).
+- El shader de vaivén (`sway-filter.ts`): si las plantas se ven mal o no se ven,
+  el problema está ahí (se usa en las colgantes y en las de la pecera).
+- Zonas de plantas con viento (`plantZones` en el config): se separan por color
+  verde/oliva; puede colarse algún libro verde o quedar alguna hoja sin mover.
+- Composición de `tank-decor.json` (tamaños en cm y posiciones).
 
-## Dormitorio y gato
+Falta:
 
-`render/scene/`: `room-scene.ts` (capas), `room-decor.ts` (muebles, plantas,
-vapor, luces aditivas), `window-view.ts` (cielo y climas) y `cat-view.ts` (gato).
-
-**Sin revisar en pantalla**: se escribió sin capturas (solo compilación). Falta
-mirarlo en el juego con cada clima y hora (selector en el panel de debug) y
-ajustar posiciones y colores.
-
-- El selector de hora del debug es solo visual (ventana, oscuridad, lámpara):
-  no cambia la hora de la simulación ni la luz de la pecera.
-- La lámpara se prende sola cuando hay poca luz; no es un objeto interactivo todavía.
-- Con la pecera más grande (100 cm) tapa casi toda la ventana y el lugar del
-  gato en el alféizar queda pegado a ella.
-- Faltan de la sección 5 de DESIGN.md: pájaros, viento/cortina, colores del
-  amanecer reales y sonido.
-- Gato: faltan poses propias de lavarse y jugar (hoy usan sentado y caminando).
+- El vidrio se estira a lo ancho para peceras que no tienen la proporción del
+  dibujo (en el cubo queda angosto; la tapa se deforma). La redonda no tiene arte.
+- La decoración todavía es fija (datos por defecto): no sale del estado de la simulación.
+- Calefactor, termómetro, toma del filtro, gato, peces, plato del gato y cielo
+  siguen dibujados por código (no hay imágenes de eso todavía).
+- La lámpara se prende sola cuando hay poca luz; no es interactiva.
+- El viento sale del clima elegido (no hay viento en la simulación).
+- "Arranca con un betta" vale para peceras nuevas: una partida guardada conserva sus peces.
+- El selector de hora del debug es solo visual.
+- Los PNG de `public/assets/` no están en el precache de la PWA (sin revisar).
+- De la sección 5 de DESIGN.md: pájaros, cortina, sonido.
+- Gato: poses propias de lavarse y jugar.
