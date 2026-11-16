@@ -6,6 +6,12 @@
  * imagen, medido en el manifest): de vidrio a vidrio, debajo de la tapa y
  * arriba de la base. El agua lo llena, con la superficie apenas bajo la tapa.
  *
+ * Todo (vidrio e interior) es hijo de un mismo contenedor `art`, en
+ * coordenadas de la imagen del vidrio: el contenedor se ubica y se escala en la
+ * escena, y el interior queda pegado al vidrio en cualquier pantalla. Las
+ * medidas salen del tamaño real de la textura cargada (si el navegador tuviera
+ * guardada una imagen vieja de otro tamaño, el hueco igual se ajusta).
+ *
  * Capas, de atrás hacia adelante:
  *   water      (código)  degradé del agua: se oscurece de noche y se pone ámbar con taninos
  *   glassBack  (imagen)  las aristas del vidrio de atrás, vistas a través del agua
@@ -99,6 +105,8 @@ interface Plant {
 
 export class TankView {
   readonly container = new Container();
+  /** Vidrio e interior, en coordenadas de la imagen del vidrio. */
+  private readonly art = new Container();
   readonly fish = new FishLayer();
   private readonly water = new Graphics();
   private readonly glassBack = new Sprite(tex(GLASS_BACK));
@@ -125,7 +133,8 @@ export class TankView {
   constructor() {
     this.inside.addChild(this.substrate, this.hardscape, this.plantLayer, this.mid, this.fish.graphics, this.fx);
     this.inside.mask = this.waterMask;
-    this.container.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
+    this.art.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
+    this.container.addChild(this.art);
   }
 
   /** Rectángulo de la pecera entera, con tapa y base (para ubicar al gato y los toques). */
@@ -141,12 +150,15 @@ export class TankView {
 
   /** Golpe en el vidrio, en píxeles de la escena: los peces huyen de ese punto. */
   scareAt(sceneX: number, sceneY: number): void {
-    this.fish.scareAt(sceneX, sceneY);
+    const k = this.art.scale.x || 1;
+    this.fish.scareAt((sceneX - this.art.x) / k, (sceneY - this.art.y) / k);
   }
 
   /** Posición en la escena de un animal cualquiera (para que el gato lo siga con la cabeza). */
   watchPoint(): { x: number; y: number } | null {
-    return this.fish.watchPoint();
+    const p = this.fish.watchPoint();
+    const k = this.art.scale.x || 1;
+    return p ? { x: this.art.x + p.x * k, y: this.art.y + p.y * k } : null;
   }
 
   update(state: SimState, derived: DerivedValues, seconds: number): void {
@@ -186,30 +198,42 @@ export class TankView {
     );
   }
 
-  /** Ubica el vidrio según el largo de la pecera y mide su hueco. */
+  /**
+   * Ubica la pecera en la escena según su largo y mide el hueco del vidrio, en
+   * coordenadas de la imagen del vidrio (las del contenedor `art`).
+   */
   private layout(state: SimState, derived: DerivedValues): Geo {
     const meta = asset(GLASS);
-    const glass = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_ART;
-    // El vidrio se escala parejo: nunca se estira.
-    const { outer, inner, scale: k } = tankFrame(state.tank.lengthCm, glass);
-    const glassKey = `${outer.x},${outer.y},${k}`;
+    // Medidas de la textura que realmente se cargó; el hueco del manifest se lleva a ese tamaño.
+    const texture = this.glass.texture;
+    const texW = texture.width > 1 ? texture.width : (meta?.width ?? GLASS_ART.width);
+    const texH = texture.height > 1 ? texture.height : (meta?.height ?? GLASS_ART.height);
+    const source = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_ART;
+    const rx = texW / source.width;
+    const ry = texH / source.height;
+    const inner = {
+      x: Math.round(source.inner.x * rx),
+      y: Math.round(source.inner.y * ry),
+      width: Math.round(source.inner.width * rx),
+      height: Math.round(source.inner.height * ry),
+    };
+    // El vidrio se escala parejo (nunca se estira) y el interior viaja con él.
+    const frame = tankFrame(state.tank.lengthCm, { width: texW, height: texH, inner });
+    const k = frame.scale;
+    const glassKey = `${frame.outer.x},${frame.outer.y},${k}`;
     if (glassKey !== this.glassKey) {
       this.glassKey = glassKey;
-      for (const sprite of [this.glass, this.glassBack]) {
-        sprite.scale.set(k);
-        sprite.position.set(outer.x, outer.y);
-      }
+      this.art.position.set(frame.outer.x, frame.outer.y);
+      this.art.scale.set(k);
     }
     this.inner = inner;
-    this.outer = outer;
+    this.outer = frame.outer;
 
     // La tira de luz de la tapa, apagada.
     const led = meta?.led;
     this.ledOff.clear();
     if (led && !derived.lightOn) {
-      this.ledOff
-        .rect(Math.round(outer.x + led.x * k), Math.round(outer.y + led.y * k), Math.round(led.width * k), Math.ceil(led.height * k))
-        .fill({ color: 0x20242e, alpha: 0.85 });
+      this.ledOff.rect(Math.round(led.x * rx), Math.round(led.y * ry), Math.round(led.width * rx), Math.ceil(led.height * ry)).fill({ color: 0x20242e, alpha: 0.85 });
     }
 
     const { x: left, y: top, width, height } = inner;
@@ -347,8 +371,9 @@ export class TankView {
       if (!asset(name)) continue;
       const texture = tex(name);
       const unit = artPx(name);
-      // 1 píxel del dibujo = 1 píxel de la escena.
-      const scale = (item.scale ?? 1) / unit;
+      // 1 píxel del dibujo = 1 píxel del vidrio. Las plantas, a lo sumo un tercio del agua.
+      let scale = (item.scale ?? 1) / unit;
+      if (item.plant) scale = Math.min(scale, (geo.bottom - geo.top) / 3 / texture.height);
       const w = texture.width * scale;
       const h = texture.height * scale;
       const cx = Math.round(clamp(geo.left + item.x * geo.width, geo.left + w / 2, geo.right - w / 2));
