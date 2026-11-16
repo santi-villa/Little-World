@@ -72,14 +72,14 @@ Falta:
   Los gestos los resuelve `RoomScene` (`pointerDown/Move/Up`).
 - **Sin revisar en pantalla** (solo compilación). Ajustar a ojo: rectángulos de
   las zonas en `rooms.json`, vista inicial y zoom del gato.
-- Pixel perfect: el canvas se dibuja a la resolución de la pantalla (hasta 3x) y
-  en reposo el zoom se ajusta a un número entero de píxeles físicos si queda a
-  menos de 12% del pedido; si no, queda fraccionario (por ejemplo 1.5x en una
-  pantalla de 1280x720 justa).
-- Plantas colgantes: ahora la capa tiene solo las hojas (las hojas también quedan
-  en el fondo, sin relleno inventado), se corren como máximo 1 píxel del arte y
-  la onda es lenta y larga (toda la planta se hamaca junta). Si igual no queda
-  prolijo, se desactiva sacando `sprite.filters = [filter]` en `room-scene.ts`.
+- El canvas queda en 1280x720 y el navegador lo agranda (cambiar la resolución
+  del canvas según la pantalla corría y achicaba la escena en celulares). En
+  reposo el zoom se ajusta a un número entero si queda a menos de 12% del pedido.
+- **Viento en las plantas colgantes: desactivado** (el shader generaba rayas
+  horizontales y además no compilaba en algunos navegadores). Hacerlo con
+  sprites separados: recortar cada planta colgante como imagen propia (con su
+  maceta y sus tiras) y moverla entera o por tiras dibujadas aparte. El pipeline
+  todavía genera `dormitorio-planta-N.png` (`plantZones`), sin uso.
 - La lámpara la elige el jugador y no se guarda (al recargar vuelve a prenderse
   sola cuando oscurece).
 - Ventana abierta: cambia la simulación y entra más viento a las plantas, pero no
@@ -91,3 +91,30 @@ Falta:
 - Los textos de la UI van sin tildes porque la fuente de píxeles no las tiene.
 - La pecera inicial pasó a ser la rectangular mediana (`rect_65`); si algún test
   esperaba el cubo, hay que actualizarlo (no se corrieron los tests).
+
+## Pecera, píxel y gato con sprites
+
+- El hueco del vidrio sale del manifest (`inner` de `vidrio`, medido en la
+  imagen: de vidrio a vidrio, debajo de la tapa y arriba de la base). Agua,
+  arena, decoración y peces van recortados a ese hueco; el agua lo llena con la
+  superficie 3 px bajo la tapa. Las aristas del vidrio de atrás son otra capa
+  (`vidrio-fondo.png`) que va detrás del agua; en el frente quedan el marco y
+  los reflejos (separados por brillo: puede quedar algún resto fino).
+- Tamaño de píxel: el manifest trae `artPx` (píxeles del PNG por píxel del
+  dibujo, según `sourceArtPx` del config, medido a ojo). En la pecera todo va a
+  1 píxel del dibujo = 1 píxel de la escena, también lo dibujado por código
+  (peces, burbujas, equipos). El fondo de la habitación tiene píxeles de ~2,7 y
+  el gato está escalado a eso. La UI usa píxeles de 2 o 4 de la pantalla.
+- La decoración ya no se escala por cm sino a su tamaño natural (`scale`
+  opcional en `tank-decor.json`). En peceras más chicas o más grandes que la
+  rectangular mediana, revisar que entre (el helecho grande llega a la superficie).
+- Las plantas de la pecera ondulan con una malla (`MeshPlane`), de a píxeles
+  enteros del dibujo: no usan shader.
+- Gato: sale de `gato-alternativa.jpg`. `gato.jpg` se saltea en el pipeline
+  porque la pata y la lengua de la fila 4 tienen violetas casi iguales al
+  magenta del fondo. Animaciones: dormir, sentado (también mirar peces, pedir
+  comida, ronronear y comer), caminar (espejado a la izquierda), lamerse
+  (lavarse) y tocar el vidrio (dos cuadros de la pata levantada). Falta una
+  animación propia de comer y de jugar.
+- Revisado con capturas de pantalla (escritorio, 1280x720): vista habitación y
+  vista pecera. No se probó en un celular real.

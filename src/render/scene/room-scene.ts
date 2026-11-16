@@ -30,7 +30,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
 import { drawLights, drawRoomAnim } from './room-fx';
 import { inRect, roomData, zoneRect, type RoomZone } from './room-zones';
-import { CAT_PX, PX, scenePreview } from './scene-layout';
+import { PX, scenePreview } from './scene-layout';
 import { drawSky } from './window-view';
 
 /** Lo que la escena necesita además del estado de la simulación. */
@@ -286,8 +286,8 @@ export class RoomScene {
   }
 
   private catFocus(): CameraView {
-    const c = this.cat.position;
-    return { x: c.x, y: c.y - 12 * CAT_PX, zoom: this.zoomCat };
+    const r = this.cat.rect;
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, zoom: this.zoomCat };
   }
 
   private enterFocus(mode: UiMode, view: CameraView): void {

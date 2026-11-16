@@ -6,10 +6,11 @@
  */
 export const PX = 2;
 /**
- * El gato va con píxeles de 3x3: así hecho un bollito ocupa unos dos tercios de
- * su cama redonda de la imagen, como el gato de la referencia.
+ * Escala de los sprites del gato. Sus cuadros miden 2 píxeles del PNG por
+ * píxel del dibujo: a 1.35 cada píxel del gato mide 2.7 de la escena, lo mismo
+ * que el píxel del fondo, y hecho un bollito ocupa unos dos tercios de su cama.
  */
-export const CAT_PX = 3;
+export const CAT_SCALE = 1.35;
 
 /** Altura a la que apoyan las patas en el piso (sobre la alfombra). */
 export const GROUND_Y = 688;

@@ -116,7 +116,9 @@ export class SceneUi {
     const t = texts.scene;
 
     if (mode !== 'room') {
-      this.button(g, t.back, W - 8 - textWidth(t.back) - 8, 6, { kind: 'back' }, 'back');
+      // Volver: botón grande, fácil de tocar con el dedo.
+      const bw = textWidth(t.back, 2) + 16;
+      this.button(g, t.back, W - 6 - bw, 6, { kind: 'back' }, 'back', bw, 2);
       // Indicación para salir deslizando, que se apaga sola.
       if (focusAge < 4) {
         const w = textWidth(t.swipeHint) + 8;
@@ -187,13 +189,13 @@ export class SceneUi {
     });
   }
 
-  private button(g: Graphics, label: string, x: number, y: number, hit: UiHit, id: string, width?: number): void {
-    const w = width ?? textWidth(label) + 8;
-    const h = 11;
+  private button(g: Graphics, label: string, x: number, y: number, hit: UiHit, id: string, width?: number, size = 1): void {
+    const w = width ?? textWidth(label, size) + 8;
+    const h = 5 * size + 6 * size;
     const lit = this.pressed && this.pressed.id === id && this.seconds < this.pressed.until;
     g.rect(x, y, w, h).fill({ color: lit ? 0x3a6a78 : BOX, alpha: 0.72 });
     g.rect(x, y, w, 1).fill({ color: INK, alpha: 0.18 });
-    drawPixelText(g, label, x + 4, y + 3, INK, 1);
+    drawPixelText(g, label, x + Math.round((w - textWidth(label, size)) / 2), y + 3 * size, INK, size);
     this.buttons.push({ x, y, w, h, hit });
   }
 }
