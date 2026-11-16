@@ -1,18 +1,16 @@
 /**
- * Cámara de la escena: zoom y paneo con easing, pixel perfect.
+ * Cámara de la escena: zoom y paneo con easing.
  *
  * Mueve un contenedor (el "mundo", de 1280x720) dentro de la pantalla del
- * mismo tamaño. Pixel perfect: el canvas se dibuja a la resolución real de la
- * pantalla (`display.resolution` píxeles físicos por píxel del juego); en
- * reposo, el zoom se ajusta para que cada píxel del mundo ocupe un número
- * entero de píxeles físicos (si queda cerca del pedido) y la posición se
- * redondea a píxeles físicos. Durante la transición se mueve libre.
+ * mismo tamaño. En reposo, el zoom se ajusta a un número entero de píxeles de
+ * la pantalla por píxel del mundo si queda cerca del pedido, y la posición se
+ * redondea a píxeles enteros. Durante la transición se mueve libre.
  */
 
 import type { Container } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './viewport';
 
-/** Píxeles físicos por píxel del juego (la resolución del canvas). La actualiza main. */
+/** Píxeles del canvas por píxel del juego (hoy siempre 1: el navegador agranda el canvas). */
 export const display = { resolution: 1 };
 
 export interface CameraView {

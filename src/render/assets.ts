@@ -17,8 +17,13 @@ export interface AssetEntry {
   width: number;
   height: number;
   source: string;
-  /** sprite, plant, glass, background o wind-plant. */
+  /** sprite, plant, glass, glass-back, background, wind-plant o frame. */
   kind: string;
+  /** Píxeles del PNG por píxel del dibujo (para dibujar todo con el mismo tamaño de píxel). */
+  artPx?: number;
+  /** Cuadro de animación: nombre de la animación (gato-caminar) y número de cuadro (desde 1). */
+  anim?: string;
+  frame?: number;
   /** Fondo: el hueco transparente (los vidrios de la ventana). */
   hole?: AssetRect;
   /** Vidrio: dónde va el agua y dónde está la tira de luz. */

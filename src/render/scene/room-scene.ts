@@ -5,7 +5,6 @@
  * Mundo (se mueve con la cámara), de atrás hacia adelante:
  *   sky      (código)  lo que se ve por los vidrios de la ventana: cielo y clima
  *   room     (imagen)  dormitorio.png, con los vidrios transparentes
- *   plants   (imagen)  las plantas colgantes, con el shader de viento
  *   anim     (código)  vapor de la taza y plato del gato
  *   pecera -> gato
  *   lights   (aditivo) lámpara, resplandor de la pecera y sol en el piso
@@ -20,10 +19,9 @@
 
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { DerivedValues, SimAction, SimState, Weather } from '../../sim';
-import { asset, assetNames, tex } from '../assets';
-import { Camera, display, type CameraView } from '../camera';
+import { asset, tex } from '../assets';
+import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
-import { SwayFilter } from '../sway-filter';
 import { TankView } from '../tank/tank-view';
 import { Hud } from '../ui/hud';
 import { SceneUi, type UiMode } from '../ui/scene-ui';
@@ -48,11 +46,6 @@ const NIGHT_TINT = 0x3a4472;
 const NIGHT = 0x0a0f22;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
-/**
- * Viento de cada clima: cuánto se hamacan las plantas colgantes. 1 = la punta
- * llega a correrse 1 píxel del arte (el máximo, para que no se deforme).
- */
-const WEATHER_WIND: Record<Weather, number> = { clear: 0.6, cloudy: 0.75, rain: 0.9, storm: 1 };
 /** Cuánto hay que mover el dedo para que deje de ser un toque (píxeles de pantalla). */
 const DRAG_START = 10;
 /** Deslizar hacia abajo esto (en la vista de cerca) vuelve a la habitación. */
@@ -79,7 +72,6 @@ export class RoomScene {
   private readonly data = roomData(ROOM_ID);
   private readonly sky = new Graphics();
   private readonly room = new Sprite(tex(this.data.background));
-  private readonly plants: { sprite: Sprite; filter: SwayFilter }[] = [];
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
@@ -121,21 +113,12 @@ export class RoomScene {
     this.flash.blendMode = 'add';
     this.glow.blendMode = 'add';
 
-    const plantLayer = new Container();
-    assetNames('wind-plant', this.data.background).forEach((name, i) => {
-      const entry = asset(name);
-      const sprite = new Sprite(tex(name));
-      sprite.position.set(entry?.x ?? 0, entry?.y ?? 0);
-      const filter = new SwayFilter('top', sprite.height, i * 1.9);
-      sprite.filters = [filter];
-      plantLayer.addChild(sprite);
-      this.plants.push({ sprite, filter });
-    });
+    // Las plantas colgantes quedan quietas (son parte del fondo): el viento con
+    // un shader hacía rayas. Ver PENDIENTE.md: hacerlas con sprites separados.
 
     this.world.addChild(
       this.sky,
       this.room,
-      plantLayer,
       this.anim,
       this.tank.container,
       this.cat.container,
@@ -368,12 +351,6 @@ export class RoomScene {
     // Día y noche: las imágenes se tiñen.
     const tint = lerpColor(NIGHT_TINT, 0xffffff, light);
     this.room.tint = tint;
-    // Con la ventana abierta entra más viento (sin pasar de 1 píxel).
-    const wind = Math.min(1, WEATHER_WIND[view.weather] + (state.room.windowOpen ? 0.3 : 0));
-    for (const plant of this.plants) {
-      plant.sprite.tint = tint;
-      plant.filter.set(seconds, wind, plant.sprite.worldTransform.a * display.resolution);
-    }
 
     // Vapor y plato.
     const tone = (c: number): number => lerpColor(lerpColor(c, NIGHT, 0.62), c, light);

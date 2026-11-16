@@ -1,7 +1,6 @@
 import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
 import { loadAssets } from './render/assets';
-import { display } from './render/camera';
 import { RoomScene } from './render/scene/room-scene';
 import { WelcomePanel } from './render/ui/welcome';
 import { DebugPanel } from './render/ui/debug-panel';
@@ -83,13 +82,10 @@ async function boot(): Promise<void> {
     preference: 'webgl',
   });
   stage.append(app.canvas);
-  // El canvas se dibuja a la resolución real de la pantalla (hasta 3x): así la
-  // cámara puede acercar y alejar sin perder el pixel perfect.
-  attachViewport(app.canvas, stage, (layout) => {
-    const resolution = Math.min(3, Math.max(1, layout.scale));
-    display.resolution = resolution;
-    app.renderer.resize(GAME_WIDTH, GAME_HEIGHT, resolution);
-  });
+  // El canvas queda en 1280x720 y el navegador lo agranda (ver viewport.ts).
+  // Cambiar la resolución del canvas según la pantalla corría y achicaba la
+  // escena en algunos celulares, así que no se hace.
+  attachViewport(app.canvas, stage);
 
   const { game, savingWorks, note, lastTimestamp } = await loadGame();
   const welcome = new WelcomePanel(document.body);

@@ -1,15 +1,15 @@
 {
-  "_doc": "Decoración de la pecera, de atrás hacia adelante. x: posición a lo ancho (0 a 1). widthCm: ancho real. sink: cuánto se hunde en el sustrato (fracción de su alto). Las plantas van por especie y etapa de crecimiento (1 a 3).",
+  "_doc": "Decoración de la pecera, de atrás hacia adelante. x: posición a lo ancho (0 a 1). sink: cuánto se hunde en el sustrato (fracción de su alto). scale (opcional): 1 = tamaño natural del dibujo, con el mismo píxel que el resto. Las plantas van por especie y etapa de crecimiento (1 a 3).",
   "default": {
     "substrate": "sustrato-arena",
     "items": [
-      { "asset": "madera-4", "x": 0.5, "widthCm": 13, "sink": 0.12 },
-      { "asset": "roca-dragon-1", "x": 0.8, "widthCm": 8.5, "sink": 0.14 },
-      { "asset": "piedra-rio-1", "x": 0.3, "widthCm": 4.5, "sink": 0.2 },
-      { "asset": "piedritas-1", "x": 0.66, "widthCm": 5.5, "sink": 0.35 },
-      { "plant": "helecho-java", "stage": 3, "x": 0.19, "widthCm": 10.5, "sink": 0.2 },
-      { "plant": "helecho-java", "stage": 2, "x": 0.88, "widthCm": 6, "sink": 0.2 },
-      { "plant": "helecho-java", "stage": 1, "x": 0.6, "widthCm": 3, "sink": 0.2, "flip": true }
+      { "plant": "helecho-java", "stage": 3, "x": 0.16, "sink": 0.2 },
+      { "asset": "madera-4", "x": 0.48, "sink": 0.1 },
+      { "plant": "helecho-java", "stage": 2, "x": 0.86, "sink": 0.2, "flip": true },
+      { "asset": "roca-dragon-1", "x": 0.7, "sink": 0.18 },
+      { "asset": "piedra-rio-1", "x": 0.33, "sink": 0.25 },
+      { "plant": "helecho-java", "stage": 1, "x": 0.58, "sink": 0.22 },
+      { "asset": "piedritas-1", "x": 0.45, "sink": 0.45 }
     ]
   }
 }

@@ -2,32 +2,37 @@
  * La pecera. Refleja el estado de la simulación: tamaño del modelo, nivel del
  * agua, luz, taninos, calefactor, filtro, algas y residuos.
  *
+ * Todo lo de adentro ocupa EXACTAMENTE el hueco del vidrio (`inner` de la
+ * imagen, medido en el manifest): de vidrio a vidrio, debajo de la tapa y
+ * arriba de la base. El agua lo llena, con la superficie apenas bajo la tapa.
+ *
  * Capas, de atrás hacia adelante:
- *   water     (código)  degradé del agua: se oscurece de noche y se pone ámbar con taninos
- *   equip     (código)  calefactor, termómetro y toma del filtro
- *   inside    (recortado al agua)
- *     substrate (imagen)  sustrato
- *     hardscape (imagen)  maderas y rocas
- *     plants    (imagen)  plantas, ondulando con el shader de vaivén
- *     mid       (código)  residuos sobre el fondo y burbujas
- *     fish               animales
- *     fx        (código)  tinte del agua, rayos de luz, partículas, brillos y algas del vidrio
- *   glass     (imagen)  el vidrio con su tapa, como capa frontal
+ *   water      (código)  degradé del agua: se oscurece de noche y se pone ámbar con taninos
+ *   glassBack  (imagen)  las aristas del vidrio de atrás, vistas a través del agua
+ *   equip      (código)  calefactor, termómetro y toma del filtro
+ *   inside     (recortado al hueco del vidrio)
+ *     substrate  (imagen)  sustrato
+ *     hardscape  (imagen)  maderas y rocas
+ *     plants     (imagen)  plantas, ondulando (malla que se dobla)
+ *     mid        (código)  residuos sobre el fondo y burbujas
+ *     fish                animales
+ *     fx         (código)  tinte del agua, rayos de luz, partículas, brillos y algas del vidrio
+ *   glass      (imagen)  el marco del vidrio con su tapa y los reflejos, adelante
+ *
+ * Tamaño de píxel: las imágenes de la pecera se dibujan con 1 píxel del dibujo
+ * = 1 píxel de la escena (usando el `artPx` del manifest), y lo dibujado por
+ * código también usa 1 píxel de la escena. Así nada tiene píxeles más gordos.
  *
  * La decoración sale de datos (`src/data/tank-decor.json`), para que más
- * adelante venga del estado de la simulación. Lo dibujado por código usa
- * píxeles gordos (PX).
+ * adelante venga del estado de la simulación.
  */
 
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics, MeshPlane, Sprite, TilingSprite } from 'pixi.js';
 import decorData from '../../data/tank-decor.json';
 import type { DerivedValues, SimState } from '../../sim';
 import { asset, tex } from '../assets';
 import { lerpColor, scatter } from '../pixel-utils';
-import { PX } from '../scene/scene-layout';
-import { SwayFilter } from '../sway-filter';
 import { FishLayer } from './fish-layer';
-import { display } from '../camera';
 import { GLASS_ART, tankFrame, type TankRect } from './tank-layout';
 
 /** Una pieza de la decoración. */
@@ -39,10 +44,10 @@ export interface TankDecorItem {
   stage?: number;
   /** Posición a lo ancho de la pecera, 0 a 1. */
   x: number;
-  /** Ancho real en cm. */
-  widthCm: number;
   /** Cuánto se hunde en el sustrato (fracción de su alto). */
   sink?: number;
+  /** Agrandar o achicar (1 = su tamaño natural, con el píxel del resto). */
+  scale?: number;
   flip?: boolean;
 }
 
@@ -52,13 +57,23 @@ export interface TankDecor {
 }
 
 const GLASS = 'vidrio';
+const GLASS_BACK = 'vidrio-fondo';
 const EQUIP = 0x23272f;
 const EQUIP_HI = 0x3d4450;
 const NIGHT = 0x081420;
+/** Distancia de la superficie del agua a la tapa, como fracción del alto del hueco. */
+const SURFACE_GAP = 0.035;
+/** Filas de la malla de cada planta (más filas, curva más suave). */
+const PLANT_ROWS = 8;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
-/** Interior en píxeles gordos (lo que se dibuja por código). */
+/** Píxeles del PNG por píxel del dibujo (del manifest). */
+function artPx(name: string): number {
+  return asset(name)?.artPx ?? 2;
+}
+
+/** El hueco del vidrio y el agua, en píxeles de la escena. */
 interface Geo {
   left: number;
   right: number;
@@ -68,25 +83,36 @@ interface Geo {
   height: number;
   waterTop: number;
   waterHeight: number;
+  /** Donde apoyan las cosas sobre la arena. */
   sandTop: number;
   sandH: number;
+}
+
+interface Plant {
+  mesh: MeshPlane;
+  /** Posiciones originales de los vértices. */
+  rest: Float32Array;
+  /** Píxeles del PNG por píxel del dibujo. */
+  unit: number;
+  phase: number;
 }
 
 export class TankView {
   readonly container = new Container();
   readonly fish = new FishLayer();
   private readonly water = new Graphics();
+  private readonly glassBack = new Sprite(tex(GLASS_BACK));
   private readonly equip = new Graphics();
   private readonly inside = new Container();
-  private readonly substrate = new Sprite();
+  private readonly substrate = new TilingSprite({ texture: tex('sustrato-arena') });
   private readonly hardscape = new Container();
-  private readonly plants = new Container();
+  private readonly plantLayer = new Container();
+  private plants: Plant[] = [];
   private readonly mid = new Graphics();
   private readonly fx = new Graphics();
   private readonly waterMask = new Graphics();
   private readonly ledOff = new Graphics();
   private readonly glass = new Sprite(tex(GLASS));
-  private readonly sway = new SwayFilter('bottom', 100);
   private decor: TankDecor = decorData.default;
   private inner: TankRect = { x: 0, y: 0, width: 1, height: 1 };
   private outer: TankRect = this.inner;
@@ -97,11 +123,9 @@ export class TankView {
   private lastSeconds = 0;
 
   constructor() {
-    for (const g of [this.equip, this.mid, this.fx, this.fish.graphics]) g.scale.set(PX);
-    this.plants.filters = [this.sway];
-    this.inside.addChild(this.substrate, this.hardscape, this.plants, this.mid, this.fish.graphics, this.fx);
+    this.inside.addChild(this.substrate, this.hardscape, this.plantLayer, this.mid, this.fish.graphics, this.fx);
     this.inside.mask = this.waterMask;
-    this.container.addChild(this.water, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
+    this.container.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
   }
 
   /** Rectángulo de la pecera entera, con tapa y base (para ubicar al gato y los toques). */
@@ -117,13 +141,12 @@ export class TankView {
 
   /** Golpe en el vidrio, en píxeles de la escena: los peces huyen de ese punto. */
   scareAt(sceneX: number, sceneY: number): void {
-    this.fish.scareAt(sceneX / PX, sceneY / PX);
+    this.fish.scareAt(sceneX, sceneY);
   }
 
   /** Posición en la escena de un animal cualquiera (para que el gato lo siga con la cabeza). */
   watchPoint(): { x: number; y: number } | null {
-    const p = this.fish.watchPoint();
-    return p ? { x: p.x * PX, y: p.y * PX } : null;
+    return this.fish.watchPoint();
   }
 
   update(state: SimState, derived: DerivedValues, seconds: number): void {
@@ -134,15 +157,17 @@ export class TankView {
 
     this.drawWater(geo, lit, tannins);
     this.drawEquipment(state, geo, lit);
-    this.buildDecor(pxPerCm);
+    this.buildDecor(geo);
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
     const tint = lerpColor(lit ? 0xffffff : 0x4a5a80, lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
     this.substrate.tint = tint;
     for (const child of this.hardscape.children) child.tint = tint;
-    for (const child of this.plants.children) child.tint = tint;
-    // La corriente mueve las plantas: más fuerte con el filtro andando.
+    for (const plant of this.plants) plant.mesh.tint = tint;
+    // Las aristas de atrás se ven a través del agua: toman su color.
+    this.glassBack.tint = lerpColor(this.waterColor(lit, tannins, 0.4), 0xffffff, 0.45);
+    // La corriente mueve las plantas: más con el filtro andando.
     const flow = state.filter.flowLph > 0 ? Math.min(1, derived.effectiveFlowLph / state.filter.flowLph) : 0;
-    this.sway.set(seconds, 1 + flow, this.plants.worldTransform.a * display.resolution, this.plants.height);
+    this.swayPlants(seconds, 1 + flow);
 
     const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
     this.drawMid(state, derived, geo, shade, seconds);
@@ -150,18 +175,18 @@ export class TankView {
 
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
-    const swimTop = geo.waterTop + 1;
+    const swimTop = geo.waterTop + 2;
     this.fish.update(
       state,
       lit,
       { x: geo.left, y: swimTop, width: geo.width, height: Math.max(0, geo.sandTop - swimTop) },
-      pxPerCm / PX,
+      pxPerCm,
       seconds,
       dt,
     );
   }
 
-  /** Ubica el interior y el vidrio según las medidas de la pecera. */
+  /** Ubica el vidrio según el largo de la pecera y mide su hueco. */
   private layout(state: SimState, derived: DerivedValues): Geo {
     const meta = asset(GLASS);
     const glass = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_ART;
@@ -170,8 +195,10 @@ export class TankView {
     const glassKey = `${outer.x},${outer.y},${k}`;
     if (glassKey !== this.glassKey) {
       this.glassKey = glassKey;
-      this.glass.scale.set(k);
-      this.glass.position.set(outer.x, outer.y);
+      for (const sprite of [this.glass, this.glassBack]) {
+        sprite.scale.set(k);
+        sprite.position.set(outer.x, outer.y);
+      }
     }
     this.inner = inner;
     this.outer = outer;
@@ -185,14 +212,12 @@ export class TankView {
         .fill({ color: 0x20242e, alpha: 0.85 });
     }
 
-    const left = Math.round(inner.x / PX);
-    const top = Math.round(inner.y / PX);
-    const width = Math.round(inner.width / PX);
-    const height = Math.round(inner.height / PX);
+    const { x: left, y: top, width, height } = inner;
     const bottom = top + height;
-    const sandH = clamp(Math.round(height * 0.15), 10, 18);
-    const fullHeight = Math.round(height * 0.92);
-    const waterHeight = Math.round(fullHeight * clamp(derived.waterLevel, 0, 1.05));
+    // El agua llena el hueco; la evaporación la baja de a poco.
+    const fullTop = top + Math.max(2, Math.round(height * SURFACE_GAP));
+    const waterHeight = Math.round((bottom - fullTop) * clamp(derived.waterLevel, 0, 1));
+    const sandH = clamp(Math.round(height * 0.18), 16, 40);
     return {
       left,
       right: left + width,
@@ -202,7 +227,7 @@ export class TankView {
       height,
       waterTop: bottom - waterHeight,
       waterHeight,
-      sandTop: bottom - sandH + 3,
+      sandTop: bottom - Math.round(sandH * 0.6),
       sandH,
     };
   }
@@ -214,31 +239,26 @@ export class TankView {
     return lerpColor(clear, amber, tannins * 0.6);
   }
 
-  /** El agua: degradé en franjas, más clara arriba y en el centro. */
+  /** El agua: degradé en franjas, más clara arriba y en el centro. El hueco entero va recortado. */
   private drawWater(geo: Geo, lit: boolean, tannins: number): void {
-    const key = `${this.inner.x},${this.inner.y},${this.inner.width},${geo.waterHeight},${lit},${Math.round(tannins * 20)}`;
+    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${geo.waterHeight},${lit},${Math.round(tannins * 20)}`;
     if (key === this.waterKey) return;
     this.waterKey = key;
     const g = this.water;
     g.clear();
     this.waterMask.clear();
-    const x = this.inner.x;
-    const w = this.inner.width;
-    const top = geo.waterTop * PX;
-    const h = geo.waterHeight * PX;
-    if (h <= 0) {
-      this.waterMask.rect(x, top, w, 1).fill(0xffffff);
-      return;
-    }
-    this.waterMask.rect(x, top, w, h).fill(0xffffff);
-    const bands = clamp(Math.round(h / 16), 4, 14);
+    // Lo de adentro (arena, plantas, peces) se recorta al hueco del vidrio.
+    this.waterMask.rect(geo.left, geo.top, geo.width, geo.height).fill(0xffffff);
+    const { left: x, width: w, waterTop: top, waterHeight: h } = geo;
+    if (h <= 0) return;
+    const bands = clamp(Math.round(h / 12), 4, 16);
     for (let i = 0; i < bands; i++) {
-      const y0 = top + Math.round((i * h) / bands / PX) * PX;
-      const y1 = top + Math.round(((i + 1) * h) / bands / PX) * PX;
+      const y0 = top + Math.round((i * h) / bands);
+      const y1 = top + Math.round(((i + 1) * h) / bands);
       const color = this.waterColor(lit, tannins, i / (bands - 1));
       g.rect(x, y0, w, y1 - y0);
       // Borde entre franjas salpicado, para que no se vea la línea.
-      if (i > 0) for (let q = 0; q < w / 8; q++) g.rect(x + q * 8 + ((i + q) % 2) * 4, y0 - PX, 4, PX);
+      if (i > 0) for (let q = 0; q < w / 4; q++) g.rect(x + q * 4 + ((i + q) % 2) * 2, y0 - 1, 2, 1);
       g.fill({ color, alpha: 0.96 });
     }
     if (lit) {
@@ -246,8 +266,8 @@ export class TankView {
         .rect(x + Math.round(w * 0.34), top, Math.round(w * 0.32), h)
         .fill({ color: 0xc8fff0, alpha: 0.05 });
     }
-    g.rect(x, top, 10, h).rect(x + w - 10, top, 10, h).fill({ color: 0x04202a, alpha: 0.16 });
-    g.rect(x, top, w, PX).fill(lerpColor(this.waterColor(lit, tannins, 0), 0xffffff, 0.55));
+    g.rect(x, top, 6, h).rect(x + w - 6, top, 6, h).fill({ color: 0x04202a, alpha: 0.16 });
+    g.rect(x, top, w, 1).fill(lerpColor(this.waterColor(lit, tannins, 0), 0xffffff, 0.55));
   }
 
   /** Calefactor, termómetro y toma del filtro, al fondo. */
@@ -263,72 +283,107 @@ export class TankView {
     const { left, right, top, height } = geo;
 
     if (hasHeater) {
-      const hx = left + 12;
-      const hTop = top + Math.round(height * 0.26);
-      const hH = Math.round(height * 0.4);
-      g.rect(hx + 2, top, 1, hTop - top).fill(0x15181e); // cable
-      if (state.heater.on) g.rect(hx - 2, hTop + 6, 9, hH - 6).fill({ color: 0xff7a3a, alpha: 0.14 });
-      g.rect(hx, hTop, 5, hH).fill(shade(0xb9c7d0));
-      g.rect(hx + 1, hTop + 6, 3, hH - 8).fill(shade(0xe4edf2));
-      for (let yy = hTop + 9; yy < hTop + hH - 4; yy += 3) g.rect(hx + 1, yy, 3, 1);
+      const hx = left + 26;
+      const hTop = top + Math.round(height * 0.2);
+      const hH = Math.round(height * 0.42);
+      g.rect(hx + 3, top, 2, hTop - top).fill(0x15181e); // cable
+      if (state.heater.on) g.rect(hx - 4, hTop + 12, 16, hH - 12).fill({ color: 0xff7a3a, alpha: 0.12 });
+      g.rect(hx, hTop, 8, hH).fill(shade(0xb9c7d0));
+      g.rect(hx + 1, hTop + 10, 6, hH - 12).fill(shade(0xe4edf2));
+      g.rect(hx + 1, hTop + 10, 1, hH - 12).fill(shade(0xffffff));
+      for (let yy = hTop + 14; yy < hTop + hH - 6; yy += 4) g.rect(hx + 2, yy, 4, 2);
       g.fill(state.heater.on ? 0xff8a3a : shade(0x7a8590));
-      g.rect(hx, hTop, 5, 6).fill(EQUIP);
-      g.rect(hx + 2, hTop + 2, 1, 2).fill(!state.heater.enabled ? 0x30363f : state.heater.on ? 0xff3b30 : 0x3fd16b);
+      g.rect(hx, hTop, 8, 10).fill(EQUIP);
+      g.rect(hx, hTop, 8, 1).fill(EQUIP_HI);
+      g.rect(hx + 3, hTop + 3, 2, 3).fill(!state.heater.enabled ? 0x30363f : state.heater.on ? 0xff3b30 : 0x3fd16b);
+      g.rect(hx + 1, hTop + hH - 2, 6, 2).fill(shade(0x8a96a0));
     }
 
     // Termómetro pegado al vidrio de la izquierda (el número va en el HUD).
-    const tx = left + 3;
-    const tTop = top + Math.round(height * 0.22);
-    const tH = clamp(Math.round(height * 0.2), 16, 30);
-    g.rect(tx, tTop, 4, tH).fill(shade(0xdfe8ee));
-    g.rect(tx + 1, tTop + 1, 2, tH - 2).fill(shade(0xf8fafb));
-    const mercury = Math.round((tH - 7) * clamp((state.water.temperatureC - 14) / 20, 0.05, 1));
-    g.rect(tx + 1, tTop + tH - 4 - mercury, 1, mercury).fill(shade(0xe0443a));
-    g.rect(tx + 1, tTop + tH - 4, 2, 3).fill(shade(0xe0443a));
-    g.rect(tx + 1, tTop - 2, 2, 2).fill(EQUIP);
+    const tx = left + 8;
+    const tTop = top + Math.round(height * 0.24);
+    const tH = clamp(Math.round(height * 0.24), 26, 60);
+    g.rect(tx, tTop, 7, tH).fill(shade(0xdfe8ee));
+    g.rect(tx + 1, tTop + 1, 5, tH - 2).fill(shade(0xf8fafb));
+    for (let yy = tTop + 4; yy < tTop + tH - 8; yy += 4) g.rect(tx + 5, yy, 1, 1);
+    g.fill(shade(0x8a96a0));
+    const mercury = Math.round((tH - 10) * clamp((state.water.temperatureC - 14) / 20, 0.05, 1));
+    g.rect(tx + 3, tTop + tH - 6 - mercury, 1, mercury).fill(shade(0xe0443a));
+    g.rect(tx + 2, tTop + tH - 6, 3, 4).fill(shade(0xe0443a));
+    g.rect(tx + 2, tTop - 3, 3, 3).fill(EQUIP);
 
     if (hasFilter) {
-      const tubeX = right - 10;
+      const tubeX = right - 20;
       const tubeEnd = geo.sandTop - Math.round(height * 0.3);
-      g.rect(tubeX, top, 3, tubeEnd - top).fill(EQUIP);
+      g.rect(tubeX, top, 6, tubeEnd - top).fill(EQUIP);
       g.rect(tubeX, top, 1, tubeEnd - top).fill(EQUIP_HI);
-      g.rect(tubeX - 1, tubeEnd, 5, 9).fill(EQUIP);
-      for (let yy = tubeEnd + 1; yy < tubeEnd + 8; yy += 2) g.rect(tubeX, yy, 3, 1);
+      g.rect(tubeX - 2, tubeEnd, 10, 16).fill(EQUIP);
+      for (let yy = tubeEnd + 2; yy < tubeEnd + 15; yy += 3) g.rect(tubeX - 1, yy, 8, 1);
       g.fill(EQUIP_HI);
     }
   }
 
   /** Arma el sustrato, las maderas, las rocas y las plantas desde los datos. */
-  private buildDecor(pxPerCm: number): void {
-    const inner = this.inner;
-    const key = `${inner.x},${inner.y},${inner.width},${inner.height},${JSON.stringify(this.decor)}`;
+  private buildDecor(geo: Geo): void {
+    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${JSON.stringify(this.decor)}`;
     if (key === this.decorKey) return;
     this.decorKey = key;
-    const bottom = inner.y + inner.height;
-    const sandH = clamp(Math.round((inner.height / PX) * 0.15), 10, 18) * PX;
 
+    // Sustrato: se repite a lo ancho, con su píxel natural (no se estira).
+    const unit = artPx(this.decor.substrate);
     this.substrate.texture = tex(this.decor.substrate);
-    this.substrate.position.set(inner.x, bottom - sandH);
-    this.substrate.width = inner.width;
-    this.substrate.height = sandH;
+    this.substrate.tileScale.set(1 / unit);
+    this.substrate.position.set(geo.left, geo.bottom - geo.sandH);
+    this.substrate.width = geo.width;
+    this.substrate.height = geo.sandH;
 
-    for (const layer of [this.hardscape, this.plants]) {
-      for (const child of layer.removeChildren()) child.destroy();
-    }
-    for (const item of this.decor.items) {
+    for (const child of this.hardscape.removeChildren()) child.destroy();
+    for (const child of this.plantLayer.removeChildren()) child.destroy();
+    this.plants = [];
+    for (const [index, item] of this.decor.items.entries()) {
       const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
-      const texture = tex(name);
       if (!asset(name)) continue;
-      const sprite = new Sprite(texture);
-      sprite.anchor.set(0.5, 1);
-      const scale = (item.widthCm * pxPerCm) / texture.width;
-      sprite.scale.set(item.flip ? -scale : scale, scale);
-      const half = (texture.width * scale) / 2;
-      sprite.position.set(
-        Math.round(clamp(inner.x + item.x * inner.width, inner.x + half, inner.x + inner.width - half)),
-        Math.round(bottom - sandH + 8 + (item.sink ?? 0) * texture.height * scale),
-      );
-      (item.plant ? this.plants : this.hardscape).addChild(sprite);
+      const texture = tex(name);
+      const unit = artPx(name);
+      // 1 píxel del dibujo = 1 píxel de la escena.
+      const scale = (item.scale ?? 1) / unit;
+      const w = texture.width * scale;
+      const h = texture.height * scale;
+      const cx = Math.round(clamp(geo.left + item.x * geo.width, geo.left + w / 2, geo.right - w / 2));
+      const baseY = Math.round(geo.sandTop + (item.sink ?? 0) * h);
+      if (item.plant) {
+        const mesh = new MeshPlane({ texture, verticesX: 2, verticesY: PLANT_ROWS });
+        mesh.scale.set(item.flip ? -scale : scale, scale);
+        mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
+        this.plantLayer.addChild(mesh);
+        const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
+        this.plants.push({ mesh, rest: positions.slice(), unit, phase: index * 1.7 });
+      } else {
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5, 1);
+        sprite.scale.set(item.flip ? -scale : scale, scale);
+        sprite.position.set(cx, baseY);
+        this.hardscape.addChild(sprite);
+      }
+    }
+  }
+
+  /**
+   * Ondulación suave de las plantas: la base queda quieta y la punta se hamaca
+   * unos píxeles, de a píxeles enteros del dibujo; la malla dobla la planta de
+   * forma pareja (sin rayas).
+   */
+  private swayPlants(seconds: number, strength: number): void {
+    for (const plant of this.plants) {
+      const attribute = plant.mesh.geometry.getAttribute('aPosition');
+      const positions = attribute.buffer.data as Float32Array;
+      const height = plant.rest[plant.rest.length - 1] || 1;
+      for (let i = 0; i < positions.length; i += 2) {
+        const free = Math.pow(1 - (plant.rest[i + 1] as number) / height, 1.5);
+        const wave = Math.sin(seconds * 0.7 + plant.phase) * 0.8 + Math.sin(seconds * 0.43 + plant.phase * 2.1) * 0.2;
+        positions[i] = (plant.rest[i] as number) + Math.round(wave * strength * free) * plant.unit;
+      }
+      attribute.buffer.update();
     }
   }
 
@@ -352,13 +407,13 @@ export class TankView {
     // Burbujas que suben junto a la toma del filtro, serpenteando.
     if (state.filter.flowLph > 0 && derived.effectiveFlowLph > 1 && waterHeight > sandH + 6) {
       const strength = Math.min(1, derived.effectiveFlowLph / state.filter.flowLph);
-      const colX = geo.right - 16;
-      const from = sandTop - Math.round(geo.height * 0.3) + 6;
+      const colX = geo.right - 26;
+      const from = sandTop - Math.round(geo.height * 0.3) + 12;
       const travel = from - waterTop - 2;
       const bubbles = Math.round(8 + strength * 14);
       for (let i = 0; i < bubbles; i++) {
         const phase = (seconds * (0.22 + scatter(i, 9) * 0.3) + scatter(i, 10)) % 1;
-        const bx = colX + Math.round(Math.sin(phase * 11 + i) * 2 + (scatter(i, 12) - 0.5) * 5);
+        const bx = colX + Math.round(Math.sin(phase * 11 + i) * 3 + (scatter(i, 12) - 0.5) * 8);
         const size = scatter(i, 13) > 0.65 && phase > 0.3 ? 2 : 1;
         g.rect(bx, from - Math.round(travel * phase), size, size);
       }
@@ -382,11 +437,11 @@ export class TankView {
 
     // Rayos de luz que bajan desde la tapa, abriéndose y respirando.
     if (lit && waterHeight > 12) {
-      const rays = Math.max(3, Math.round(width / 26));
+      const rays = Math.max(3, Math.round(width / 52));
       const mid = left + width / 2;
       for (let i = 0; i < rays; i++) {
-        const baseX = left + ((i + 0.5) * width) / rays + Math.sin(seconds * 0.15 + i * 2) * 5;
-        const wd = 4 + 5 * scatter(i, 81);
+        const baseX = left + ((i + 0.5) * width) / rays + Math.sin(seconds * 0.15 + i * 2) * 10;
+        const wd = 8 + 10 * scatter(i, 81);
         const alpha = 0.06 + 0.04 * Math.sin(seconds * 0.6 + i * 1.9);
         const slant = 0.4 * ((baseX - mid) / width) + 0.05;
         const len = (waterHeight - sandH * 0.5) * (0.6 + 0.35 * scatter(i, 82));
@@ -410,11 +465,11 @@ export class TankView {
 
     // Partículas en suspensión, a la deriva.
     const column = Math.max(1, waterHeight - sandH - 3);
-    const specks = Math.min(60, Math.round((width * column) / 260));
+    const specks = Math.min(70, Math.round((width * column) / 900));
     for (let i = 0; i < specks; i++) {
       const drift = (i % 3 === 0 ? -1 : 1) * (0.5 + scatter(i, 83));
       const py = (((scatter(i, 84) * column + seconds * drift) % column) + column) % column;
-      const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 3;
+      const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 6;
       g.rect(clamp(Math.round(px), left, right - 1), waterTop + 2 + Math.floor(py), 1, 1);
     }
     if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.4 : 0.14 });
@@ -423,7 +478,7 @@ export class TankView {
     let run = 0;
     let glints = 0;
     for (let x = left; x <= right; x++) {
-      const on = x < right && Math.sin(x * 0.3 + seconds * 1.4) + Math.sin(x * 0.11 - seconds * 0.9) > 1.15;
+      const on = x < right && Math.sin(x * 0.15 + seconds * 1.4) + Math.sin(x * 0.055 - seconds * 0.9) > 1.15;
       if (on) {
         run++;
         continue;
@@ -437,7 +492,7 @@ export class TankView {
     if (glints > 0) g.fill({ color: 0xffffff, alpha: lit ? 0.7 : 0.25 });
 
     // Capa de algas en el vidrio.
-    const algaeSpecks = Math.round(Math.min(1, state.algae.glass) * width * 0.8);
+    const algaeSpecks = Math.round(Math.min(1, state.algae.glass) * width * 1.6);
     const algaeArea = Math.max(1, waterHeight - sandH - 4);
     for (let i = 0; i < algaeSpecks; i++) {
       g.rect(left + Math.floor(scatter(i, 7) * (width - 2)), waterTop + 2 + Math.floor(scatter(i, 8) * algaeArea), 2, 2);
