@@ -1,10 +1,7 @@
 /**
- * Escalado pixel perfect.
- *
- * La escena siempre se dibuja a 1280x720. El canvas se agranda un número
- * ENTERO de veces medido en píxeles físicos de la pantalla (no en píxeles
- * CSS), así cada píxel del juego ocupa exactamente NxN píxeles del celular
- * aunque el devicePixelRatio sea 2, 3 o 2,625.
+ * Escalado adaptable de la escena 1280x720, sin recortar ni deformar.
+ * Se permite una escala fraccionaria para aprovechar toda la pantalla.
+ * El filtrado nearest conserva los bordes pixelados del arte.
  */
 
 export const GAME_WIDTH = 1280;
@@ -13,7 +10,7 @@ export const GAME_HEIGHT = 720;
 export interface ViewportLayout {
   /** Píxeles físicos por píxel del juego. */
   scale: number;
-  /** false solo si la pantalla es más chica que 1280x720 físicos. */
+  /** Indica si el factor de escala resulta exactamente entero. */
   integer: boolean;
   cssWidth: number;
   cssHeight: number;
@@ -33,15 +30,14 @@ export function computeLayout(
   const deviceHeight = Math.round(viewportCssHeight * dpr);
   const fit = Math.min(deviceWidth / gameWidth, deviceHeight / gameHeight);
 
-  const integer = fit >= 1;
-  // Si no entra ni a 1x, se achica para que al menos se vea entera.
-  const scale = integer ? Math.floor(fit) : Math.max(fit, 0.01);
-
-  const width = Math.round(gameWidth * scale);
-  const height = Math.round(gameHeight * scale);
-  // Centrado, alineado a píxeles físicos enteros.
-  const left = Math.max(0, Math.floor((deviceWidth - width) / 2));
-  const top = Math.max(0, Math.floor((deviceHeight - height) / 2));
+  // El escalado entero dejaba márgenes enormes en pantallas de alta densidad.
+  // Usamos el máximo ajuste continuo manteniendo el aspecto 16:9.
+  const scale = Math.max(fit, 0.01);
+  const integer = Number.isInteger(scale);
+  const width = gameWidth * scale;
+  const height = gameHeight * scale;
+  const left = Math.max(0, (deviceWidth - width) / 2);
+  const top = Math.max(0, (deviceHeight - height) / 2);
 
   return {
     scale,
