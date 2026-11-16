@@ -183,7 +183,7 @@ describe('resumen de bienvenida', () => {
   it('sale de los eventos de la ausencia: hambre, gato, alertas', () => {
     const result = catchUp(community(), 4 * DAY);
     const text = result.summary.lines.map((l) => l.text).join('\n');
-    expect(text).toMatch(/sin comer|no comen/);
+    expect(text).toMatch(/tienen hambre|muy hambrientos/);
     // Lo que hizo el gato sale de los eventos.
     const watched = result.events.filter(
       (e) => e.type === 'cat_behavior' && e.behavior === 'watch_fish',

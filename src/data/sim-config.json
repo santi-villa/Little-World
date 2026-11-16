@@ -167,7 +167,7 @@
     "hungerPerDay": 0.14,
     "metabolismReferenceC": 25,
     "metabolismQ10": 2,
-    "hungryAt": 0.12,
+    "hungryAt": 0.2,
     "veryHungryAt": 0.6,
     "starvingAt": 0.8,
     "foodGPerBioloadPerDay": 0.02,

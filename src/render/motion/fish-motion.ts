@@ -185,18 +185,18 @@ export class FishMotion {
 
   /** Avanza `dt` segundos. Conviene llamarlo con pasos chicos (un cuadro). */
   update(dt: number, input: MotionInput): void {
-    if (!(dt > 0)) return;
-    this.time += dt;
     const { bounds, animals } = input;
     const r = this.random;
 
-    // Altas y bajas.
+    // Altas y bajas (también con dt = 0: quien dibuja necesita un cuerpo por animal).
     const present = new Set<number>();
     for (const animal of animals) {
       present.add(animal.id);
       if (!this.bodies.has(animal.id)) this.bodies.set(animal.id, this.spawn(animal, bounds));
     }
     for (const id of this.bodies.keys()) if (!present.has(id)) this.bodies.delete(id);
+    if (!(dt > 0)) return;
+    this.time += dt;
 
     // Vecinos por especie (para los boids) y todos (para el espacio personal).
     const bySpecies = new Map<string, FishBody[]>();

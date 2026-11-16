@@ -7,11 +7,19 @@
 import { DEFAULT_SPEED, SPEEDS, type Game, type SpeedId } from '../../game';
 import {
   DEFAULT_TANK_ID,
+  SPECIES,
   TANK_MODELS,
+  checkAddition,
+  defaultConfig,
   derive,
+  findSpecies,
+  getSpecies,
+  petTolerance,
+  stockFromAnimals,
   type DerivedValues,
   type SimAction,
   type SimState,
+  type Weather,
 } from '../../sim';
 import { describeEvent, fill, formatClock, texts } from './texts';
 
@@ -27,6 +35,20 @@ type Getter = (state: SimState, derived: DerivedValues) => string;
 const n = (value: number, digits = 2): string => value.toFixed(digits);
 const pct = (fraction: number, digits = 0): string => `${(fraction * 100).toFixed(digits)}%`;
 const yesNo = (value: boolean): string => (value ? T.yes : T.no);
+
+const CAT_ROWS: [RowId, Getter][] = [
+  [
+    'catBehavior',
+    (s) => `${texts.catBehaviors[s.cat.behavior]} · ${texts.catSpots[s.cat.spot]}`,
+  ],
+  [
+    'catNeeds',
+    (s) => `${n(s.cat.needs.sleep)} / ${n(s.cat.needs.hunger)} / ${n(s.cat.needs.curiosity)}`,
+  ],
+  ['catNeeds2', (s) => `${n(s.cat.needs.affection)} / ${n(s.cat.needs.energy)}`],
+  ['catPetting', (s) => `${n(s.cat.petting, 1)} / ${n(petTolerance(s.cat, defaultConfig), 1)}`],
+  ['catBowl', (s) => pct(s.cat.bowl)],
+];
 
 const ROWS: { section: SectionId; rows: [RowId, Getter][] }[] = [
   {
@@ -67,6 +89,7 @@ const ROWS: { section: SectionId; rows: [RowId, Getter][] }[] = [
   {
     section: 'waste',
     rows: [
+      ['foodColumn', (s) => `${n(s.food.surfaceG, 3)} / ${n(s.food.sinkingG, 3)} g`],
       ['food', (s) => `${n(s.organics.foodG)} g`],
       ['detritus', (s) => `${n(s.organics.detritusG)} g`],
       ['algaeGlass', (s) => n(s.algae.glass, 3)],
@@ -86,9 +109,7 @@ const ROWS: { section: SectionId; rows: [RowId, Getter][] }[] = [
       [
         'outdoor',
         (s) =>
-          `${n(s.room.outdoorC, 1)} °C (${fill(T.values.outdoorMean, {
-            value: n(s.room.outdoorBaseC, 0),
-          })})`,
+          `${n(s.room.outdoorC, 1)} °C`,
       ],
       ['room', (s) => `${n(s.room.temperatureC)} °C`],
       ['window', (s) => (s.room.windowOpen ? T.values.windowOpen : T.values.windowClosed)],
@@ -141,8 +162,9 @@ interface ActionButton {
 
 const act =
   (action: SimAction) =>
-  (game: Game): void =>
+  (game: Game): void => {
     game.act(action);
+  };
 
 const TIME_BUTTONS: ActionButton[] = [
   { id: 'plusHour', run: (game) => game.skip(60) },
@@ -153,7 +175,7 @@ const TIME_BUTTONS: ActionButton[] = [
 /** Cambio de agua bien hecho: sifonear, acondicionar e igualar la temperatura. */
 const waterChange =
   (conditioned: boolean) =>
-  (game: Game): void =>
+  (game: Game): void => {
     game.act({
       type: 'waterChange',
       fraction: 0.3,
@@ -161,8 +183,10 @@ const waterChange =
       vacuum: true,
       temperatureC: game.state.water.temperatureC,
     });
+  };
 
 const ACTION_BUTTONS: ActionButton[] = [
+  { id: 'pinch', run: act({ type: 'feed', grams: 0.02 }) },
   { id: 'feed', run: act({ type: 'feed', grams: 0.1 }) },
   { id: 'overfeed', bad: true, run: act({ type: 'feed', grams: 2 }) },
   { id: 'waterChange', run: waterChange(true) },
@@ -173,26 +197,52 @@ const ACTION_BUTTONS: ActionButton[] = [
   {
     id: 'topOff',
     run: (game) =>
-      game.act({ type: 'topOff', conditioned: true, temperatureC: game.state.water.temperatureC }),
+      void game.act({
+        type: 'topOff',
+        conditioned: true,
+        temperatureC: game.state.water.temperatureC,
+      }),
   },
   { id: 'conditioner', run: act({ type: 'addConditioner' }) },
   { id: 'cleanGlass', run: act({ type: 'cleanGlass' }) },
   { id: 'seededMedia', run: act({ type: 'addSeededMedia' }) },
   { id: 'doseAmmonia', run: act({ type: 'doseAmmonia', ppm: 2 }) },
+  { id: 'tapGlass', bad: true, run: act({ type: 'tapGlass' }) },
+  { id: 'removeDead', run: act({ type: 'removeDead' }) },
+];
+
+const CAT_BUTTONS: ActionButton[] = [
+  { id: 'petCat', run: act({ type: 'petCat' }) },
+  {
+    id: 'petCatMany',
+    bad: true,
+    run: (game) => {
+      for (let i = 0; i < 10; i++) game.act({ type: 'petCat' });
+    },
+  },
+  { id: 'fillBowl', run: act({ type: 'fillCatBowl' }) },
+];
+
+const AWAY_BUTTONS: { id: ButtonId; minutes: number }[] = [
+  { id: 'away3h', minutes: 180 },
+  { id: 'away3d', minutes: 3 * 1440 },
+  { id: 'away7d', minutes: 7 * 1440 },
+  { id: 'away40d', minutes: 40 * 1440 },
 ];
 
 const bioload =
   (delta: number) =>
-  (game: Game): void =>
+  (game: Game): void => {
     game.act({
       type: 'setBioload',
       ammoniaMgNPerDay: game.state.bioload.ammoniaMgNPerDay + delta,
     });
+  };
 
 const outdoor =
   (delta: number) =>
   (game: Game): void =>
-    game.act({ type: 'setOutdoorBase', baseC: game.state.room.outdoorBaseC + delta });
+    game.setOutdoor(game.outdoorC + delta);
 
 const SETTING_BUTTONS: ActionButton[] = [
   { id: 'loadDown', run: bioload(-2) },
@@ -201,17 +251,17 @@ const SETTING_BUTTONS: ActionButton[] = [
   { id: 'outdoorUp', run: outdoor(5) },
   {
     id: 'window',
-    run: (game) => game.act({ type: 'setWindow', open: !game.state.room.windowOpen }),
+    run: (game) => void game.act({ type: 'setWindow', open: !game.state.room.windowOpen }),
   },
   {
     id: 'filter',
-    run: (game) => game.act({ type: 'setFilterRunning', running: !game.state.filter.running }),
+    run: (game) => void game.act({ type: 'setFilterRunning', running: !game.state.filter.running }),
   },
   {
     id: 'heater',
-    run: (game) => game.act({ type: 'setHeater', enabled: !game.state.heater.enabled }),
+    run: (game) => void game.act({ type: 'setHeater', enabled: !game.state.heater.enabled }),
   },
-  { id: 'lid', run: (game) => game.act({ type: 'setLid', hasLid: !game.state.tank.hasLid }) },
+  { id: 'lid', run: (game) => void game.act({ type: 'setLid', hasLid: !game.state.tank.hasLid }) },
 ];
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -246,6 +296,8 @@ export interface DebugPanelOptions {
   saveStatus: () => string;
   /** Empezar una pecera nueva del modelo elegido. */
   onReset: (tankId: string) => void;
+  /** Simular que el juego estuvo cerrado tantos minutos (catch-up + resumen). */
+  onSimulateAway: (minutes: number) => void;
 }
 
 export class DebugPanel {
@@ -258,6 +310,13 @@ export class DebugPanel {
   private readonly alerts: HTMLElement;
   private readonly events: HTMLElement;
   private readonly save: HTMLElement;
+  private readonly animals: HTMLElement;
+  private readonly warnings: HTMLElement;
+  private readonly species: HTMLSelectElement;
+  private readonly weather: HTMLSelectElement;
+  private readonly catchUp: HTMLElement;
+  private lastAnimalsKey = '';
+  private lastWarningsKey = '';
   private readonly cells: { get: Getter; node: HTMLElement }[] = [];
   private open = readOpen();
   private lastRefresh = -Infinity;
@@ -289,6 +348,82 @@ export class DebugPanel {
     }
     this.speed.addEventListener('change', () => this.game.setSpeed(Number(this.speed.value)));
     time.append(this.clock, this.speed, this.buttons(TIME_BUTTONS));
+    // Simular una ausencia: corre el catch-up y muestra el resumen de bienvenida.
+    const away = el('div', 'debug-buttons');
+    for (const item of AWAY_BUTTONS) {
+      const button = el('button', 'debug-button', T.buttons[item.id]);
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        this.options.onSimulateAway(item.minutes);
+        this.refresh();
+      });
+      away.append(button);
+    }
+    this.catchUp = el('div', 'debug-save');
+    time.append(away, this.catchUp);
+
+    // --- Tienda de prueba: elegir especie, ver las advertencias y agregar ---
+    const shop = this.section('shop');
+    this.species = el('select', 'debug-speed');
+    this.species.setAttribute('aria-label', T.speciesLabel);
+    for (const sp of SPECIES) {
+      const node = el('option', undefined, `${sp.name} (${sp.minTankL} L, grupo ${sp.minGroup}+)`);
+      node.value = sp.id;
+      this.species.append(node);
+    }
+    this.species.addEventListener('change', () => this.refresh());
+    this.warnings = el('ul', 'debug-list');
+    const shopButtons = el('div', 'debug-buttons');
+    const addButton = (id: ButtonId, run: () => void, bad = false): void => {
+      const button = el('button', bad ? 'debug-button bad' : 'debug-button', T.buttons[id]);
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        run();
+        this.refresh();
+      });
+      shopButtons.append(button);
+    };
+    const add = (count: number): void => {
+      this.game.act({ type: 'addAnimals', speciesId: this.species.value, count });
+    };
+    addButton('addOne', () => add(1));
+    addButton('addGroup', () => add(getSpecies(this.species.value).minGroup));
+    addButton(
+      'removeAll',
+      () => {
+        for (const animal of [...this.game.state.animals]) {
+          this.game.act({ type: 'removeAnimal', id: animal.id });
+        }
+      },
+      true,
+    );
+    shop.append(this.species, this.warnings, shopButtons);
+
+    // --- Animales ---
+    this.animals = el('ol', 'debug-list');
+    this.section('animals').append(this.animals);
+
+    // --- Gato ---
+    const cat = this.section('cat');
+    const catTable = el('table', 'debug-table');
+    for (const [id, get] of CAT_ROWS) {
+      const tr = el('tr');
+      const value = el('td', 'debug-value');
+      tr.append(el('th', undefined, T.rows[id]), value);
+      catTable.append(tr);
+      this.cells.push({ get, node: value });
+    }
+    this.weather = el('select', 'debug-speed');
+    this.weather.setAttribute('aria-label', T.weatherLabel);
+    for (const id of Object.keys(texts.weather) as Weather[]) {
+      const node = el('option', undefined, `${T.weatherLabel}: ${texts.weather[id]}`);
+      node.value = id;
+      this.weather.append(node);
+    }
+    this.weather.addEventListener('change', () =>
+      this.game.setWeather(this.weather.value as Weather),
+    );
+    cat.append(catTable, this.buttons(CAT_BUTTONS), this.weather);
 
     // --- Acciones y ajustes ---
     this.section('actions').append(this.buttons(ACTION_BUTTONS));
@@ -421,7 +556,88 @@ export class DebugPanel {
       if (recent.length === 0) this.events.append(el('li', 'empty', T.noEvents));
     }
 
+    this.refreshLiving(state);
+
     const saveText = this.options.saveStatus();
     if (this.save.textContent !== saveText) this.save.textContent = saveText;
+  }
+
+  /** Animales, advertencias de la tienda, clima y último catch-up. */
+  private refreshLiving(state: SimState): void {
+    if (document.activeElement !== this.weather) this.weather.value = this.game.weather;
+
+    const last = this.game.lastCatchUp;
+    const catchUpText = `${T.rows.catchUp}: ${
+      last
+        ? fill(T.values.catchUp, {
+            minutes: Math.round(last.result.plan.simulatedMinutes),
+            ms: last.durationMs.toFixed(0),
+            steps: last.result.plan.count,
+          })
+        : T.values.catchUpNone
+    }`;
+    if (this.catchUp.textContent !== catchUpText) this.catchUp.textContent = catchUpText;
+
+    // Lo que diría la tienda si se suma uno más de la especie elegida.
+    const stock = stockFromAnimals(state.animals);
+    const warningsKey = `${this.species.value}|${state.tank.modelId}|${stock
+      .map((entry) => `${entry.speciesId}:${entry.count}:${entry.males ?? 0}`)
+      .join(',')}`;
+    if (warningsKey !== this.lastWarningsKey) {
+      this.lastWarningsKey = warningsKey;
+      const warnings = checkAddition(
+        { liters: state.tank.fullLiters, heightCm: state.tank.heightCm },
+        stock,
+        { speciesId: this.species.value, count: 1 },
+      );
+      this.warnings.replaceChildren(
+        ...warnings.map((warning) => el('li', warning.severity, warning.message)),
+      );
+      if (warnings.length === 0) this.warnings.append(el('li', 'ok', T.values.noWarnings));
+    }
+
+    const animalsKey = state.animals
+      .map(
+        (a) =>
+          `${a.id}${a.alive ? '' : 'x'}${a.intent}${a.mood}${Math.round(a.hunger * 50)}${Math.round(
+            a.stress,
+          )}${Math.round(a.health)}`,
+      )
+      .join('|');
+    if (animalsKey === this.lastAnimalsKey) return;
+    this.lastAnimalsKey = animalsKey;
+    this.animals.replaceChildren(
+      ...state.animals.map((a) => {
+        const name = `${a.name ?? findSpecies(a.speciesId)?.name ?? a.speciesId} #${a.id} ${
+          a.sex === 'male' ? '♂' : '♀'
+        }`;
+        const item = el(
+          'li',
+          a.alive ? undefined : 'dead',
+          a.alive
+            ? fill(T.values.animalRow, {
+                name,
+                mood: texts.moods[a.mood],
+                intent: texts.intents[a.intent],
+              })
+            : `${name} · ${T.values.dead}`,
+        );
+        if (a.alive) {
+          item.append(
+            el(
+              'small',
+              undefined,
+              fill(T.values.animalNeeds, {
+                hunger: n(a.hunger),
+                stress: n(a.stress, 0),
+                health: n(a.health, 0),
+              }),
+            ),
+          );
+        }
+        return item;
+      }),
+    );
+    if (state.animals.length === 0) this.animals.append(el('li', 'empty', T.values.noAnimals));
   }
 }

@@ -272,3 +272,113 @@ body.debug-open #stage {
     transform: rotate(-90deg);
   }
 }
+
+/* ---------- Resumen de bienvenida ---------- */
+
+.welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(5, 8, 18, 0.6);
+}
+
+.welcome[hidden] {
+  display: none;
+}
+
+.welcome-card {
+  max-width: min(440px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.welcome-card h2 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.welcome-card ul {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.welcome-card li {
+  margin: 4px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+}
+
+.welcome-card li.tone-good {
+  border-left-color: #3fd16b;
+}
+
+.welcome-card li.tone-warn {
+  border-left-color: #f0b34a;
+}
+
+.welcome-card li.tone-bad {
+  border-left-color: var(--bad);
+}
+
+.welcome-close {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--line);
+  background: #1b2440;
+  color: var(--text);
+  font: inherit;
+}
+
+.welcome-close:active {
+  background: #26315a;
+}
+
+/* ---------- Panel de debug: animales y tienda ---------- */
+
+.debug-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+.debug-list li {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+
+.debug-list li small {
+  display: block;
+  color: var(--muted);
+}
+
+.debug-list li.empty,
+.debug-list li.ok {
+  color: var(--muted);
+}
+
+.debug-list li.danger {
+  color: var(--bad);
+}
+
+.debug-list li.caution {
+  color: #f0b34a;
+}
+
+.debug-list li.dead {
+  color: var(--muted);
+  text-decoration: line-through;
+}

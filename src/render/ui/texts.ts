@@ -4,16 +4,9 @@
  */
 
 import texts from '../../data/texts.es.json';
-import type { SimEvent } from '../../sim';
+import { fill, findSpecies, type SimEvent } from '../../sim';
 
-export { texts };
-
-/** Reemplaza {clave} por su valor. */
-export function fill(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in values ? String(values[key]) : match,
-  );
-}
+export { fill, texts };
 
 export function clockParts(timeMinutes: number): { day: number; time: string } {
   const total = Math.floor(timeMinutes);
@@ -24,6 +17,10 @@ export function clockParts(timeMinutes: number): { day: number; time: string } {
 
 export function formatClock(timeMinutes: number): string {
   return fill(texts.clock, clockParts(timeMinutes));
+}
+
+function speciesName(id: string): string {
+  return findSpecies(id)?.name ?? id;
 }
 
 function percent(fraction: number): string {
@@ -70,5 +67,38 @@ export function describeEvent(event: SimEvent): string {
       return e.seededMediaAdded;
     case 'ammonia_dosed':
       return fill(e.ammoniaDosed, { ppm: event.ppm.toFixed(2) });
+    case 'animal_added':
+      return fill(e.animalAdded, { species: speciesName(event.speciesId) });
+    case 'animal_died': {
+      const name = event.name ?? speciesName(event.speciesId);
+      return event.cause === 'eaten'
+        ? fill(e.animalEaten, { name, predator: speciesName(event.bySpeciesId ?? '') })
+        : fill(e.animalDied, { name, cause: texts.deathCauses[event.cause] });
+    }
+    case 'animal_removed':
+      return fill(e.animalRemoved, { species: speciesName(event.speciesId) });
+    case 'animal_mood':
+      return fill(e.animalMood, {
+        name: `${speciesName(event.speciesId)} #${event.id}`,
+        mood: texts.moods[event.mood],
+      });
+    case 'fin_nipped':
+      return fill(e.finNipped, {
+        name: speciesName(event.speciesId),
+        nipper: speciesName(event.bySpeciesId),
+      });
+    case 'glass_tapped':
+      return event.by === 'cat' ? e.glassTappedCat : e.glassTappedPlayer;
+    case 'cat_behavior':
+      return fill(e.catBehavior, {
+        behavior: texts.catBehaviors[event.behavior],
+        spot: texts.catSpots[event.spot],
+      });
+    case 'cat_petted':
+      return e.catPetted;
+    case 'cat_annoyed':
+      return e.catAnnoyed;
+    case 'cat_bowl_filled':
+      return e.catBowlFilled;
   }
 }

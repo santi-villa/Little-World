@@ -74,6 +74,7 @@ export function stepFood(
   const sinkOut = 1 - Math.exp(-h / config.food.sinkMinutes);
 
   for (let step = 0; step < substeps; step++) {
+    const bottomOnly = food.surfaceG + food.sinkingG <= EPSILON_G;
     if (ctx.aliveCount > 0) {
       // Cuánto quiere comer cada uno en este rato.
       for (let i = 0; i < count; i++) {
@@ -81,6 +82,8 @@ export function stepFood(
         want[i] = 0;
         if (!a.alive || a.hunger <= 0.02 || a.stress > 85 || a.fright > 0.5) continue;
         const sp = ctx.species[i] as Species;
+        // Si solo queda comida en el fondo, los que no bajan ni se enteran.
+        if (bottomOnly && (config.food.access[sp.zone][2] as number) <= 0) continue;
         const size = sizeFactor(a, config);
         const ration = sp.bioload * size * f.foodGPerBioloadPerDay;
         const speed = Math.min(2, Math.max(0.3, sp.swim.speedCmS / f.referenceSpeedCmS));
@@ -88,7 +91,7 @@ export function stepFood(
         full[i] = ration / f.hungerPerDay;
         want[i] = Math.min(a.hunger * (full[i] as number), (ration / f.mealMinutes) * speed * appetite * h);
       }
-      for (let layer = 0 as 0 | 1 | 2; layer < 3; layer++) {
+      for (let layer = (bottomOnly ? 2 : 0) as 0 | 1 | 2; layer < 3; layer++) {
         const available = layer === 0 ? food.surfaceG : layer === 1 ? food.sinkingG : organics.foodG;
         if (available <= EPSILON_G) continue;
         let demand = 0;

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAction,
   catchUp,
-  createNewTank,
   defaultConfig,
   getSpecies,
   step,

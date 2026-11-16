@@ -162,12 +162,8 @@ export function buildWelcomeSummary(
     const f = config.fish;
     const hungriest = alive.reduce((max: number, animal: AnimalState) => Math.max(max, animal.hunger), 0);
     if (hungriest > f.hungryAt) {
-      // Cuánto llevan sin comer, según el hambre del más hambriento.
-      const fasting = formatDuration((hungriest / f.hungerPerDay) * MINUTES_PER_DAY);
-      add(
-        hungriest > f.veryHungryAt ? 'warn' : 'info',
-        fill(hungriest > f.veryHungryAt ? T.veryHungry : T.hungry, { duration: fasting }),
-      );
+      const very = hungriest > f.veryHungryAt;
+      add(very ? 'warn' : 'info', very ? T.veryHungry : T.hungry);
     }
     const sick = alive.filter((animal) => animal.mood === 'sick').length;
     const stressed = alive.filter((animal) => animal.mood === 'stressed').length;

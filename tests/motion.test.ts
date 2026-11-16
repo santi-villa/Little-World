@@ -402,6 +402,17 @@ describe('movimiento de los peces', () => {
     expect(motion.bodies.get(1)!.y).toBeLessThan(1);
   });
 
+  it('con dt = 0 (primer cuadro) igual hay un cuerpo por cada animal', () => {
+    const list = animals('platy', 3, 'explore');
+    const motion = new FishMotion(1);
+    motion.update(0, input(list));
+    expect(motion.bodies.size).toBe(3);
+    for (const b of bodiesOf(motion, list)) {
+      expect(b.x).toBeGreaterThan(0);
+      expect(b.x).toBeLessThan(BOUNDS.width);
+    }
+  });
+
   it('con la misma semilla el movimiento se repite', () => {
     const simulate = (seed: number): number[] => {
       const list = animals('neon_tetra', 6, 'school');

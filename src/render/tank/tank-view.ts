@@ -3,12 +3,14 @@
  * estado de la simulación: tamaño del modelo, nivel del agua, luz, taninos,
  * calefactor, filtro, algas y residuos.
  *
- * Orden de capas, de atrás hacia adelante: interior -> agua -> vidrio.
+ * Orden de capas, de atrás hacia adelante: interior y agua -> animales ->
+ * algas del vidrio -> vidrio.
  */
 
 import { Container, Graphics } from 'pixi.js';
 import type { DerivedValues, SimState } from '../../sim';
 import { lerpColor, scatter } from '../pixel-utils';
+import { FishLayer } from './fish-layer';
 import { tankRect, type TankRect } from './tank-layout';
 
 const SAND_HEIGHT = 12;
@@ -16,12 +18,15 @@ const SAND_HEIGHT = 12;
 export class TankView {
   readonly container = new Container();
   private readonly interior = new Graphics();
+  private readonly front = new Graphics();
   private readonly glass = new Graphics();
+  readonly fish = new FishLayer();
   private rect: TankRect = tankRect(30, 30);
   private glassKey = '';
+  private lastSeconds = 0;
 
   constructor() {
-    this.container.addChild(this.interior, this.glass);
+    this.container.addChild(this.interior, this.fish.graphics, this.front, this.glass);
   }
 
   /** Rectángulo actual (lo usan el fondo y el HUD para ubicarse). */
@@ -32,7 +37,17 @@ export class TankView {
   update(state: SimState, derived: DerivedValues, seconds: number): void {
     this.rect = tankRect(state.tank.lengthCm, state.tank.heightCm);
     this.drawGlass(state);
-    this.drawInterior(state, derived, seconds);
+    const swim = this.drawInterior(state, derived, seconds);
+    const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
+    this.lastSeconds = seconds;
+    this.fish.update(
+      state,
+      derived.lightOn,
+      swim,
+      this.rect.width / state.tank.lengthCm,
+      seconds,
+      dt,
+    );
   }
 
   /** El marco solo cambia si cambia la pecera o la tapa. */
@@ -52,9 +67,12 @@ export class TankView {
     if (state.tank.hasLid) g.rect(x - 2, y - 3, width + 4, 3).fill(0x39414f);
   }
 
-  private drawInterior(state: SimState, derived: DerivedValues, seconds: number): void {
+  /** Dibuja el interior y devuelve el rectángulo de agua donde se puede nadar. */
+  private drawInterior(state: SimState, derived: DerivedValues, seconds: number): TankRect {
     const g = this.interior;
     g.clear();
+    const front = this.front;
+    front.clear();
     const { x, y, width, height } = this.rect;
     const left = x + 2;
     const right = x + width - 2;
@@ -123,9 +141,9 @@ export class TankView {
     for (let i = 0; i < algaeSpecks; i++) {
       const sx = left + Math.floor(scatter(i, 7) * (innerWidth - 2));
       const sy = waterTop + 2 + Math.floor(scatter(i, 8) * algaeArea);
-      g.rect(sx, sy, 2, 2);
+      front.rect(sx, sy, 2, 2);
     }
-    if (algaeSpecks > 0) g.fill({ color: 0x3fae4a, alpha: 0.8 });
+    if (algaeSpecks > 0) front.fill({ color: 0x3fae4a, alpha: 0.8 });
 
     // Calefactor.
     if (state.heater.watts > 0) {
@@ -172,5 +190,12 @@ export class TankView {
         g.fill({ color: 0xffffff, alpha: 0.7 });
       }
     }
+    const swimTop = waterTop + 1;
+    return {
+      x: left,
+      y: swimTop,
+      width: innerWidth,
+      height: Math.max(0, sandTop - swimTop),
+    };
   }
 }

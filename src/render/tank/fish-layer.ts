@@ -1,0 +1,247 @@
+/**
+ * Animales y comida dentro del agua, dibujados con formas simples de colores
+ * (placeholders hasta que haya sprites). El movimiento sale de FishMotion;
+ * acá solo se pasa de centímetros a píxeles y se dibuja.
+ *
+ * Tres planos de profundidad: los de atrás se ven más chicos, más azulados y
+ * con menos contraste, y se dibujan primero.
+ */
+
+import { Graphics } from 'pixi.js';
+import { getSpecies, sizeFactor, defaultConfig, type SimState, type Species } from '../../sim';
+import { FishMotion, type FishBody, type MotionAnimal } from '../motion/fish-motion';
+import { lerpColor, scatter } from '../pixel-utils';
+import type { TankRect } from './tank-layout';
+
+const WATER_TINT = 0x2f7f8c;
+const NIGHT_TINT = 0x0a1420;
+const DEAD_COLOR = 0x8a8f96;
+const FOOD_COLOR = 0xd9703a;
+/** Cuánto dura el punto del susto (golpe en el vidrio). */
+const SCARE_SECONDS = 3;
+
+function hex(color: string): number {
+  return Number.parseInt(color.slice(1), 16);
+}
+
+export class FishLayer {
+  readonly graphics = new Graphics();
+  readonly motion = new FishMotion((Math.random() * 0xffffffff) >>> 0);
+  private foodXCm = 0;
+  private lastSurfaceG = 0;
+  private scare: { x: number; y: number; until: number } | null = null;
+  private area: TankRect = { x: 0, y: 0, width: 1, height: 1 };
+  private pxPerCm = 1;
+
+  /** Golpe en el vidrio, en píxeles de la escena: los peces huyen de ese punto. */
+  scareAt(sceneX: number, sceneY: number): void {
+    this.scare = {
+      x: (sceneX - this.area.x) / this.pxPerCm,
+      y: (sceneY - this.area.y) / this.pxPerCm,
+      until: this.motion.seconds + SCARE_SECONDS,
+    };
+  }
+
+  /** Posición en la escena de un animal cualquiera (para que el gato lo siga con la cabeza). */
+  watchPoint(): { x: number; y: number } | null {
+    for (const body of this.motion.bodies.values()) {
+      return { x: this.area.x + body.x * this.pxPerCm, y: this.area.y + body.y * this.pxPerCm };
+    }
+    return null;
+  }
+
+  /**
+   * @param area   Rectángulo del agua donde se puede nadar, en píxeles.
+   * @param pxPerCm Escala de la pecera.
+   */
+  update(
+    state: SimState,
+    lightOn: boolean,
+    area: TankRect,
+    pxPerCm: number,
+    seconds: number,
+    dtSeconds: number,
+  ): void {
+    this.area = area;
+    this.pxPerCm = pxPerCm;
+    const g = this.graphics;
+    g.clear();
+    if (area.height <= 2) return;
+    const bounds = { width: area.width / pxPerCm, height: area.height / pxPerCm };
+
+    // Comida nueva: cae en algún lugar de la superficie.
+    if (state.food.surfaceG > this.lastSurfaceG + 1e-6 || this.foodXCm === 0) {
+      this.foodXCm = bounds.width * (0.25 + 0.5 * Math.random());
+    }
+    this.lastSurfaceG = state.food.surfaceG;
+
+    const species = new Map<number, Species>();
+    const animals: MotionAnimal[] = state.animals.map((animal) => {
+      const sp = getSpecies(animal.speciesId);
+      species.set(animal.id, sp);
+      return {
+        id: animal.id,
+        species: sp,
+        intent: animal.intent,
+        targetId: animal.targetId,
+        fright: animal.fright,
+        sizeCm: sp.adultSizeCm * sizeFactor(animal, defaultConfig),
+        alive: animal.alive,
+        boldness: animal.personality.boldness,
+        activity: animal.personality.activity,
+      };
+    });
+    if (this.scare && this.motion.seconds > this.scare.until) this.scare = null;
+    const cat = state.cat.behavior;
+    this.motion.update(Math.min(0.1, Math.max(0, dtSeconds)), {
+      bounds,
+      animals,
+      food: {
+        surface: state.food.surfaceG > 1e-4,
+        sinking: state.food.sinkingG > 1e-4,
+        bottom: state.organics.foodG > 1e-3,
+        x: this.foodXCm,
+      },
+      scare: this.scare,
+      catAtGlass: cat === 'watch_fish' || cat === 'tap_glass',
+    });
+
+    this.drawFood(state, area, pxPerCm, seconds);
+
+    // De atrás hacia adelante.
+    const order = animals
+      .map((animal) => ({ animal, body: this.motion.bodies.get(animal.id) as FishBody }))
+      .sort((a, b) => a.body.plane - b.body.plane);
+    for (const { animal, body } of order) {
+      const state_ = state.animals.find((a) => a.id === animal.id);
+      this.drawAnimal(
+        animal,
+        body,
+        lightOn,
+        seconds,
+        state_?.finDamage ?? 0,
+        state_?.mood === 'sick',
+        state_?.intent === 'rest',
+      );
+    }
+  }
+
+  private drawFood(state: SimState, area: TankRect, pxPerCm: number, seconds: number): void {
+    const g = this.graphics;
+    const x0 = area.x + this.foodXCm * pxPerCm;
+    const spread = Math.max(10, area.width * 0.18);
+    const floating = Math.min(40, Math.ceil(state.food.surfaceG * 200));
+    for (let i = 0; i < floating; i++) {
+      const x = Math.round(x0 + (scatter(i, 21) - 0.5) * 2 * spread);
+      if (x < area.x || x > area.x + area.width - 2) continue;
+      g.rect(x, area.y, 2, 1);
+    }
+    const sinking = Math.min(40, Math.ceil(state.food.sinkingG * 200));
+    for (let i = 0; i < sinking; i++) {
+      const x = Math.round(x0 + (scatter(i, 22) - 0.5) * 2 * spread);
+      if (x < area.x || x > area.x + area.width - 2) continue;
+      const fall = (scatter(i, 23) + seconds * (0.05 + 0.04 * scatter(i, 24))) % 1;
+      g.rect(x, Math.round(area.y + fall * (area.height - 2)), 1, 1);
+    }
+    if (floating + sinking > 0) g.fill(FOOD_COLOR);
+  }
+
+  private drawAnimal(
+    animal: MotionAnimal,
+    body: FishBody,
+    lightOn: boolean,
+    seconds: number,
+    finDamage: number,
+    sick: boolean,
+    resting: boolean,
+  ): void {
+    const g = this.graphics;
+    const sp = animal.species;
+    // Plano: 0 lejos (chico y azulado) .. 2 cerca.
+    const far = (2 - body.plane) / 2;
+    const scale = 1 - 0.22 * far;
+    const tint = (color: number): number => {
+      let c = color;
+      if (!animal.alive) c = DEAD_COLOR;
+      else if (sick) c = lerpColor(c, 0xe8e8e8, 0.35);
+      // De noche los colores se apagan (los neones, más).
+      if (!lightOn) {
+        const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
+        c = lerpColor(c, NIGHT_TINT, fade);
+      }
+      return lerpColor(c, WATER_TINT, 0.5 * far);
+    };
+    const main = tint(hex(sp.color));
+    const accent = tint(hex(sp.accent));
+    const cx = Math.round(this.area.x + body.x * this.pxPerCm);
+    const cy = Math.round(this.area.y + body.y * this.pxPerCm);
+    const len = Math.max(3, Math.round(animal.sizeCm * this.pxPerCm * scale));
+    const dir = body.facing;
+
+    if (sp.category === 'snail') {
+      const size = Math.max(2, Math.round(len * 0.8));
+      g.rect(cx - Math.floor(size / 2), cy - size, size, size).fill(main);
+      g.rect(cx - Math.floor(size / 2) + (size > 2 ? 1 : 0), cy - size + 1, Math.max(1, size - 2), 1).fill(accent);
+      g.rect(cx - Math.floor(size / 2) - (dir < 0 ? 1 : 0), cy, size + 1, 1).fill(accent);
+      return;
+    }
+    if (sp.category === 'shrimp') {
+      const h = Math.max(1, Math.round(len * 0.3));
+      g.rect(cx - Math.floor(len / 2), cy - h, len, h).fill(main);
+      g.rect(cx + (dir > 0 ? Math.ceil(len / 2) : -Math.floor(len / 2) - 2), cy - h - 1, 2, 1).fill(accent);
+      if (Math.floor(seconds * 6 + body.phase) % 2 === 0) {
+        g.rect(cx - Math.floor(len / 2) + 1, cy, Math.max(1, len - 2), 1).fill(accent);
+      }
+      return;
+    }
+
+    const tall = sp.traits.includes('tall');
+    const eel = sp.traits.includes('eel_like');
+    const h = Math.max(2, Math.round(len * (tall ? 1.05 : eel ? 0.2 : 0.42)));
+    const bodyLen = Math.max(2, Math.round(len * (eel ? 0.85 : 0.68)));
+    const tailBase = len - bodyLen;
+    const tailLen = Math.max(
+      1,
+      Math.round((tailBase + (sp.longFins ? len * 0.35 : 0)) * (1 - 0.7 * finDamage)),
+    );
+    const flip = animal.alive ? 1 : -1; // muerto: panza arriba
+    const top = cy - Math.floor(h / 2);
+    const front = dir > 0 ? cx + Math.ceil(bodyLen / 2) : cx - Math.ceil(bodyLen / 2);
+    const back = dir > 0 ? cx - Math.floor(bodyLen / 2) : cx + Math.floor(bodyLen / 2);
+
+    // Cola: se abre hacia atrás y se mueve al nadar.
+    const speed = Math.sqrt(body.vx * body.vx + body.vy * body.vy);
+    const wagRate = animal.alive ? 4 + speed * 1.2 : 0;
+    for (let i = 0; i < tailLen; i++) {
+      const open = Math.min(h + (sp.longFins ? 2 : 0), 1 + Math.round((i * (h + 1)) / Math.max(1, tailLen)));
+      const wag = Math.round(Math.sin(seconds * wagRate + body.phase - i * 0.6) * Math.min(1.5, i * 0.5));
+      const x = dir > 0 ? back - 1 - i : back + i;
+      g.rect(x, cy - Math.floor(open / 2) + wag, 1, open);
+    }
+    g.fill(accent);
+
+    // Cuerpo, con el hocico un poco más angosto.
+    g.rect(Math.min(front, back), top, bodyLen, h).fill(main);
+    if (h >= 4) {
+      const noseX = dir > 0 ? front - 1 : front;
+      g.rect(noseX, top, 1, 1).rect(noseX, top + h - 1, 1, 1).fill(lerpColor(main, WATER_TINT, 0.6));
+    }
+    // Aletas altas (escalar) y franja de color.
+    if (tall && len >= 8) {
+      g.rect(cx - 1, top - Math.round(h * 0.35), 2, Math.round(h * 0.35))
+        .rect(cx - 1, top + h, 2, Math.round(h * 0.35))
+        .fill(main);
+    }
+    if (len >= 5) {
+      const stripe = Math.max(1, Math.round(bodyLen * 0.5));
+      g.rect(cx - Math.floor(stripe / 2), cy + (h >= 4 ? 0 : -Math.floor(h / 2)), stripe, 1).fill(accent);
+    }
+    // Ojo.
+    if (len >= 4) {
+      const eyeX = dir > 0 ? front - 2 : front + 1;
+      g.rect(eyeX, flip > 0 ? top + (h >= 4 ? 1 : 0) : top + h - 1 - (h >= 4 ? 1 : 0), 1, 1).fill(
+        animal.alive ? 0x10141c : 0xffffff,
+      );
+    }
+  }
+}

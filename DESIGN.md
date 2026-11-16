@@ -98,35 +98,42 @@ Posible migración futura a Godot 4 si se quiere publicar en Play Store con noti
   game.ts           une la simulación con el reloj real (el único que lo conoce)
   /sim          ← simulación pura (SIN imports de Pixi ni del DOM)
     index.ts        API pública: step, applyAction, createNewTank, derive
-    step.ts         step(state, deltaMinutes) -> { state, events }
+    step.ts         step(state, deltaMinutes, config?, env?) -> { state, events }
     actions.ts      acciones del jugador: applyAction(state, action)
     state.ts        creación de una pecera nueva
     types.ts        forma del estado, eventos y acciones
     config.ts       carga tipada de los JSON de /data
     chemistry.ts    fórmulas puras (NH3 libre, saturación de O2, pH)
     derive.ts       valores derivados del estado (NH3 libre, oxígeno 0–1, caudal)
-    clock.ts        tiempo: hora del día y pasos fijos (el catch-up offline llega en la Fase 3)
+    clock.ts        tiempo: hora del día, pasos fijos y plan del catch-up
+    catchup.ts      catch-up offline: catchUp(state, minutosAusente) -> estado + eventos + resumen
+    summary.ts      resumen de bienvenida a partir de los eventos de la ausencia
+    environment.ts  lo que llega de afuera: temperatura exterior horaria, clima, jugador presente
     water.ts        química del agua: residuos, gases, cloro, evaporación, pH/KH
     bacteria.ts     ciclo del nitrógeno
     thermal.ts      temperatura de la habitación y la pecera
     algae.ts
     events.ts       alertas (y, más adelante, entradas del diario)
     rng.ts          RNG con semilla (determinista)
-    fish.ts         (futuro) necesidades, estrés, salud, edad
-    behavior.ts     (futuro) decisiones de comportamiento
-    compat.ts       (futuro) compatibilidad entre especies
+    species.ts      carga tipada del catálogo (data/species.json)
+    fish.ts         necesidades por individuo: hambre, estrés, salud, edad, ánimo, personalidad
+    feeding.ts      la comida flota, se hunde y se reparte por zona y velocidad
+    behavior.ts     decisiones de comportamiento (la intención de cada animal)
+    compat.ts       compatibilidad entre especies: advertencias para la tienda
+    cat.ts          necesidades y comportamiento del gato
+    text.ts         plantillas de texto ({clave})
     plants.ts       (futuro)
-    cat.ts          (futuro) necesidades del gato
     economy.ts      (futuro)
   /render       ← todo lo visual
     viewport.ts     escalado entero pixel perfect
     scene/          habitaciones y capas
-    tank/           agua, vidrio, algas, peces, plantas
+    tank/           agua, vidrio, algas, peces (fish-layer.ts), plantas
+    motion/         movimiento: steering.ts y fish-motion.ts (lógica pura, SIN Pixi, con tests)
     fx/             (futuro) partículas, shaders, iluminación
     ui/             HUD, fuente de píxeles, textos, panel de debug
-  /world        ← (futuro) clima real y geolocalización
+  /world        ← outdoor.ts: de dónde sale la temperatura exterior (después: clima real y geolocalización)
   /audio        ← (futuro)
-  /data         ← JSON: sim-config, tanks, texts.es (y después species, plants, rooms, items, decor)
+  /data         ← JSON: sim-config, tanks, species, texts.es (y después plants, rooms, items, decor)
   /save         ← formato con versión + IndexedDB
 /docs
   /referencias
@@ -135,7 +142,7 @@ Posible migración futura a Godot 4 si se quiere publicar en Play Store con noti
 
 ### Regla de oro de la arquitectura
 
-**La simulación no sabe que existe el render.** `src/sim` recibe un estado y un `deltaMinutes`, y devuelve un estado nuevo más una lista de eventos. El render solo lee el estado y lo dibuja; el comportamiento visual (movimiento fino de los peces, animaciones) vive en `render/`, pero las *decisiones* (tengo hambre, tengo miedo, quiero esconderme) vienen de `sim/`.
+**La simulación no sabe que existe el render.** `src/sim` recibe un estado, un `deltaMinutes` y (opcional) el entorno de afuera, y devuelve un estado nuevo más una lista de eventos. El render solo lee el estado y lo dibuja; el comportamiento visual (movimiento fino de los peces, animaciones) vive en `render/`, pero las *decisiones* (tengo hambre, tengo miedo, quiero esconderme) vienen de `sim/`.
 
 Esto permite:
 - Simular días enteros offline sin dibujar nada.
@@ -151,7 +158,8 @@ Esto permite:
 - El juego usa la **hora real del dispositivo**. Un día en el juego es un día real.
 - El reloj de la simulación (`timeMinutes`) arranca en la hora local del dispositivo al crear la pecera.
 - El panel de debug permite acelerar el tiempo (1 min, 1 hora o 1 día por segundo) y saltar 1 hora, 1 día o 1 semana. Es solo para probar: la velocidad normal es 1:1.
-- El ciclo día/noche usa la **salida y puesta del sol reales** de tu ubicación.
+- El ciclo día/noche usa la **salida y puesta del sol reales** de tu ubicación. *(Pendiente: por ahora el día va de 7 a 20 h, `behavior.dayStartHour`/`dayEndHour`.)*
+- Con el juego abierto la simulación avanza de a pasitos de 10 segundos de juego (`game.ts`), así los peces y el gato reaccionan enseguida. Las acciones del jugador (dar de comer, golpear el vidrio, acariciar) hacen que los animales vuelvan a decidir en el momento.
 
 ### Catch-up offline
 
@@ -165,7 +173,14 @@ Esto permite:
 5. El RNG tiene semilla: la misma ausencia da siempre el mismo resultado (no se puede "rerollear" cerrando y abriendo).
 6. Al volver se muestra un **resumen de bienvenida** con lo que pasó: crías nacidas, parámetros que cambiaron, algas, el gato hizo algo, etc.
 
-Estado: la regla de los pasos fijos ya está en `sim/clock.ts` (`planSteps`) y `step()` la usa. El catch-up en sí (simular lo que pasó con el juego cerrado) llega en la Fase 3: por ahora, al volver, la pecera sigue desde donde quedó.
+Cómo está hecho:
+
+- `sim/catchup.ts`: `catchUp(state, minutosAusente, config, env)` es `step()` con el tope de 30 días y sin jugador presente. El tamaño del paso lo decide `planCatchUp` según el largo **total** de la ausencia: hasta 7 días todo va de a 1 minuto; una ausencia más larga va entera de a 10 minutos.
+- `main.ts` lo corre al abrir (desde el `lastTimestamp` guardado) y al volver de segundo plano (desde el momento en que se ocultó). El `lastTimestamp` que se guarda es siempre el momento hasta el que la simulación está al día, así un autoguardado en segundo plano no "se come" tiempo.
+- Ausencias de menos de 20 segundos no se recuperan. Con la simulación en pausa (panel de debug) no hay catch-up.
+- **Temperatura exterior**: `sim/environment.ts` define la serie horaria (`OutdoorSeries`: un valor por hora desde el inicio de la ausencia, interpolado entre horas) y `world/outdoor.ts` la interfaz `OutdoorTemperatureSource` (`currentC` para el juego abierto y `hourlyC(desde, horas)` para el histórico). **Por ahora la única implementación es un valor fijo configurable** (`outdoor.fixedC` en `sim-config.json`, 18 °C; se cambia desde el panel de debug y se guarda en los ajustes). Open-Meteo va a ser otra implementación de la misma interfaz. Sin serie, `step()` usa el exterior sintético (lo usan los tests).
+- **Resumen de bienvenida** (`sim/summary.ts`): se arma con los eventos del catch-up y comparando el estado de antes con el de después. Cuenta: tiempo afuera, muertes (agrupadas si son muchas), animales comidos, hambre, estresados y enfermos, aletas mordidas, alertas nuevas y normalizadas, ciclado, cambio de temperatura, evaporación, algas y lo que hizo el gato. Se muestra si la ausencia fue de 30 minutos o más (`clock.welcomeMinMinutes`).
+- **Velocidad**: 7 días de ausencia son 10.080 pasos. Con unos 30 animales tarda ~0,1 s en una PC y ~0,3 s con la CPU frenada ×4 (un celular de gama media), medido en el navegador. Para sostenerlo: lo que depende solo de quiénes viven en la pecera se calcula una vez por `step()`, cada animal decide qué hacer cada varios minutos (no en cada paso), y las mordidas y la depredación se resuelven una vez por hora de reloj.
 
 ### Realismo de la ausencia
 
@@ -211,7 +226,8 @@ Los colores del cielo cambian al amanecer y al atardecer reales.
   - `T_hab` tiende a `T_confort (20–22 °C) + k * (T_ext - T_confort)`, con `k ≈ 0.3` y ventana cerrada.
   - Con la ventana abierta, `k ≈ 0.7`.
   - La inercia es de unas 4 horas con la ventana cerrada y 1 hora con la ventana abierta.
-  - Hasta que llegue el clima real (Fase 3), la temperatura exterior es **sintética**: una media ajustable + ciclo diario + un desvío aleatorio lento que sale del RNG con semilla.
+  - Hasta que llegue el clima real, el juego usa una temperatura exterior **fija y configurable** (ver sección 4). La simulación conserva además un exterior **sintético** (media ajustable + ciclo diario + desvío aleatorio lento con semilla), que es el que corre cuando no se le pasa ninguna serie.
+  - El **clima** (despejado, nublado, lluvia, tormenta) también es por ahora un valor fijo que se elige en el panel de debug: cambia la ventana y lo que hace el gato.
 - **Temperatura del agua**: tiende a `T_hab`. El calefactor la empuja hacia su setpoint según potencia/litros.
   - Modelo: el agua pierde calor por los vidrios, la superficie y la evaporación (pérdidas proporcionales a la superficie) y tiene la inercia de su volumen. Por eso los mismos watts sostienen más grados en una pecera chica que en una grande.
 - **Luz solar directa** sobre la pecera (según ubicación, hora, nubes y cortina) → más algas y más temperatura.
@@ -234,7 +250,8 @@ pH, KH, GH                        water.ph, water.kh (dKH), water.gh (dGH)
 co2                               water.co2       mg/L (junto con el KH determina el pH)
 oxygen                            water.oxygen    mg/L; derive().oxygenRelative lo da de 0 a 1
 chlorine (0 si se usó acondicionador)
-organicWaste                      organics.foodG (comida sin comer) + organics.detritusG (restos)
+organicWaste                      organics.foodG (comida sin comer, ya en el fondo) + organics.detritusG (restos)
+food (en el agua)                 food.surfaceG (flotando) + food.sinkingG (hundiéndose)
 phosphate (simplificado, para algas)
 tannins (color ámbar, por madera u hojas)   0–1; por ahora solo se diluye, todavía no hay fuentes
 bacteria_AOB, bacteria_NOB        bacteria.filter y bacteria.surfaces, en mg de N por día
@@ -246,7 +263,7 @@ Notas sobre las unidades:
 - Las concentraciones se guardan en **ppm como las lee un test**: amoníaco total como NH3, nitrito como NO2⁻, nitrato como NO3⁻. Para las cuentas del ciclo se pasan a nitrógeno (1 mg de N de amoníaco → 1 mg de N de nitrito → 1 mg de N de nitrato).
 - El **oxígeno** se guarda en mg/L (es lo que se conserva al mezclar agua y lo que cambia con la temperatura). El valor de 0 a 1 de la tabla de umbrales es relativo a la saturación del agua a 20 °C (≈9,1 mg/L): así el agua caliente, aunque esté saturada, queda por debajo de 1.
 - La **población de bacterias** se mide por su capacidad máxima de oxidación (mg de N por día). Vive en dos lugares: el material filtrante (la mayor parte) y las superficies (sustrato, vidrios, decoración).
-- La **carga biológica** (peces, en fases futuras) entra como mg de N de amoníaco por día. Hasta que haya peces se ajusta a mano desde el panel de debug.
+- La **carga biológica** entra como mg de N de amoníaco por día. La ponen los animales: cada uno excreta según el `bioload` de su especie (1 unidad ≈ 1 mg de N por día en un adulto), su tamaño, la temperatura y cuánto comió (en ayunas, un 40%). También dejan heces (detrito) y consumen oxígeno. La carga manual del panel de debug sigue existiendo y se suma.
 
 ### Ciclo del nitrógeno
 
@@ -370,7 +387,23 @@ La simulación emite un evento cuando se cruza cada umbral (y otro cuando se nor
 }
 ```
 
+Campos que se agregaron a la ficha (están en todas las especies de `src/data/species.json`):
+
+| Campo | Para qué |
+|---|---|
+| `category` | `fish`, `shrimp` o `snail` (gambas y caracoles caminan, no nadan) |
+| `minTankHeightCm` | Altura mínima de la pecera (escalar: 45 cm). 0 = da igual |
+| `maxMales` | Máximo de machos por pecera (betta, ancistrus y espada: 1). `null` = sin límite |
+| `hitchhiker` | Polizón: no se compra |
+| `swim` | `speedCmS` y `turnDegS`: velocidad y giro máximos para el movimiento |
+| `color`, `accent` | Colores del placeholder |
+| `notes` | Las notas de comportamiento de la tabla |
+
+`bioload` es la carga de un adulto (≈ mg de N de amoníaco por día). `predatorOf` lista las presas seguras; además hay una **regla general por tamaño**: una especie con el rasgo `opportunistic_predator` (escalar, goldfish) se come a cualquier otra cuyo tamaño adulto sea ≤ 30% del suyo (`fish.predationSizeRatio`). Rasgos (`traits`) que usa el código: `schooling`, `shoaling`, `labyrinth`, `algae_eater`, `opportunistic_predator`, `attacks_long_fins`, `courts`, `flares`, `sold_as_male`, `shy`, `curious`, `messy`, `color_fades_at_night`, `tall`, `eel_like`, `upper_levels`, `midwater_too`. El resto son descriptivos, para la enciclopedia y fases futuras.
+
 ### Catálogo inicial
+
+Está entero en `src/data/species.json`: 24 peces, 4 invertebrados y 2 polizones.
 
 > Valores de referencia simplificados. **Verificarlos con fuentes de acuarismo antes de cerrar los datos.** El juego tiene que enseñar bien.
 
@@ -447,6 +480,40 @@ age                 edad real en días
 mood                derivado: feliz / normal / estresado / enfermo
 ```
 
+Cómo está modelado (`sim/fish.ts`, constantes en `fish`, `stress` y `health` de `sim-config.json`):
+
+- **Personalidad**: valentía, actividad y curiosidad, de 0 a 1, sorteadas al nacer con el RNG con semilla. También se sortean el sexo y la esperanza de vida (dentro del rango de la especie).
+- **Hambre**: de 0 (recién comido) a 1 (famélico) en ~7 días a 25 °C; más rápido con el agua cálida (Q10 = 2). A los 3 días tienen hambre (~0,45) y nada más: el estrés por hambre empieza en 0,6 (~4 días) y la salud recién baja desde 0,8 (~6 días). Sin comida, las primeras muertes llegan recién cerca de las dos semanas.
+- **Estrés**: tiende de a poco (sube en ~3 h, baja en ~12 h) a la suma de lo que lo molesta: temperatura y pH fuera del rango de la especie (al pH le toleran 0,3 de desvío), NH3, nitrito, nitrato, falta de oxígeno (a los de laberinto les afecta menos), cloro, grupo más chico que `minGroup` (proporcional a cuánto falta), pecera más chica que `minTankL`, machos rivales, mordedores de aletas, depredadores, aletas dañadas, hambre y el gato mirando mucho rato. Los golpes al vidrio, la pata del gato y los cambios de agua bruscos (otra temperatura o más del 50%) lo suben de golpe.
+- **Salud**: baja con estrés alto sostenido (> 60), hambre extrema, agua tóxica y temperatura muy fuera de rango; si no, se recupera. La pérdida tiene tope (90 puntos por día): nada mata en menos de ~24 h.
+- **Edad**: los animales llegan jóvenes (90 días, 60% del tamaño) y son adultos a los 240 días. Mueren de viejos al llegar a su esperanza de vida.
+- **Algas y biofilm**: gambas, caracoles y peces comealgas se alimentan solos de a poco (y se comen las algas). Sin eso, un nerita se moriría de hambre.
+- Un animal muerto queda en la pecera pudriéndose (suma residuos) hasta que se retira. Los comidos por un depredador desaparecen.
+- **Pendiente**: escondites (todavía no hay decoración), enfermedades, reproducción, modo suave, saltos sin tapa.
+
+### Alimentación (`sim/feeding.ts`)
+
+- La comida cae a la superficie, flota unos minutos (`food.floatMinutes`), se hunde (`food.sinkMinutes`) y termina en el fondo como `organics.foodG`, donde se pudre.
+- Cada animal come de las capas a las que llega según su zona (`food.access`): los de superficie no bajan al fondo, los de fondo no suben, los de media agua van a todos lados.
+- Con poca comida se reparte según cuánto puede comer cada uno por minuto, que depende de su tamaño y de su **velocidad**: los rápidos se llevan más. Los **tímidos** de media agua suben menos a la superficie: necesitan comida que se hunda.
+- Una ración diaria es ~0,02 g por unidad de `bioload`; la comen en ~2 minutos. Lo que sobra queda de residuo. Los de fondo (corydoras, gambas) limpian lo que cae.
+- Dar de comer con el juego abierto les enseña que el jugador trae comida (`feedingTrust`).
+
+### Compatibilidad (`sim/compat.ts`)
+
+`checkCompatibility(pecera, población)` devuelve advertencias con código, gravedad (`caution` o `danger`), especies involucradas y un texto en español listo para mostrar (plantillas en `texts.es.json`). `checkAddition` devuelve solo las que tienen que ver con la especie que se quiere comprar: es lo que va a usar la tienda (hoy la usa la "tienda de prueba" del panel de debug).
+
+| Regla | Cuándo avisa |
+|---|---|
+| Temperatura | Sin rango en común (peligro) o menos de 2 °C en común (aviso) |
+| pH | Sin rango en común (peligro) o menos de 0,5 en común (aviso) |
+| Depredación | `predatorOf`, o la regla general por tamaño |
+| Mordedores | Un `finNipper` con una especie de `longFins` |
+| Agresión | Una especie que ataca aletas largas (betta) con otra de aletas largas |
+| Territoriales | Más machos que `maxMales` (los bettas se asumen machos) |
+| Grupo mínimo | Menos individuos que `minGroup` |
+| Pecera mínima | Menos litros que `minTankL` (peligro si no llega al 60%) o menos altura que `minTankHeightCm` |
+
 ### Salud y enfermedades (simple y realista)
 
 - **Punto blanco (ich)**: aparece con estrés alto más cambios bruscos de temperatura. Se ven puntitos blancos en el sprite y el pez se roza contra objetos. Tratamiento: subir la temperatura de a poco y medicación.
@@ -458,7 +525,7 @@ mood                derivado: feliz / normal / estresado / enfermo
 
 - Los peces **pueden morir**, porque es realista y enseña. Pero:
   - Siempre hay señales de aviso previas (comportamiento, color, diario).
-  - Ningún problema mata en menos de ~24 h, salvo errores muy grandes (cloro más un cambio del 90%).
+  - Ningún problema mata en menos de ~24 h, salvo errores muy grandes (cloro más un cambio del 90%). *(Hoy ni eso: la pérdida de salud tiene tope diario.)*
   - Un pez muerto que no retirás pudre el agua (sube el amoníaco).
   - Muerte por vejez: al final de su vida, con una entrada tranquila en el diario.
 - Opción **"modo suave"** en ajustes: los peces se enferman, pero no mueren.
@@ -474,7 +541,20 @@ mood                derivado: feliz / normal / estresado / enfermo
 
 ## 8. Comportamiento e interacciones (que se sienta vivo)
 
+### Decisiones de comportamiento (`sim/behavior.ts`)
+
+La simulación decide la **intención** de cada animal; el render decide cómo se ve. Intenciones: `explore`, `school` (cardumen), `eat`, `rest`, `hide`, `chase`, `flee`, `court`, `beg` (pedir comida al frente) y `gasp` (boquear en la superficie: la señal de poco oxígeno o agua tóxica).
+
+- Cada animal puntúa sus opciones según sus necesidades, su personalidad, la hora y lo que pasa alrededor, y se queda con la mejor durante 2 a 8 minutos (descansar dura más). Un susto o comida nueva lo hacen decidir de nuevo en el momento.
+- **Ritmo**: los diurnos están activos con la luz de la pecera prendida o de día, y descansan a oscuras. Los nocturnos (ancistrus, kuhli) están activos solo con la luz apagada; con luz se esconden.
+- Se esconden más los estresados, los tímidos, los recién llegados (primer día) y, si el gato está en el vidrio, los que todavía no se acostumbraron.
+- Persiguen: los machos rivales entre sí, los mordedores a los de aletas largas (más en grupo chico) y los depredadores adultos a sus presas (más con hambre). El perseguido pasa a huir.
+- Las **consecuencias** de mordidas y depredación no dependen de lo que se ve: se resuelven una vez por hora (las aletas se dañan de a poco y se curan si se va el mordedor; cada depredador adulto tiene una chance chica por hora de comerse una presa).
+- Piden comida solo si el jugador está presente y ya aprendieron que trae comida.
+
 ### Movimiento de peces
+
+Está en `src/render/motion/` como lógica pura (sin Pixi) y con tests: `steering.ts` tiene los behaviors (seek, arrive, flee, wander, separación, alineación, cohesión, contención) y la integración con velocidad, aceleración y giro máximos; `fish-motion.ts` convierte la intención de cada animal en un objetivo y maneja los boids y los tres planos. Trabaja en centímetros dentro del agua; el render solo pasa a píxeles y dibuja (`render/tank/fish-layer.ts`, con formas simples de colores hasta que haya sprites).
 
 - **Steering behaviors**: cada pez tiene objetivo, velocidad, aceleración y giro máximos según su especie.
 - **Zona preferida**: superficie, medio o fondo, con salidas ocasionales.
@@ -500,13 +580,22 @@ mood                derivado: feliz / normal / estresado / enfermo
 
 - **Hora de comer**: con el tiempo, los peces aprenden a acercarse al frente cuando te ven (pasa en la vida real). Los nuevos son más tímidos.
 - **Tocar un pez**: abre su ficha (nombre, especie, edad, ánimo, necesidades).
-- **Golpear el vidrio**: los peces se asustan y sube el estrés. El diario explica que no hay que hacerlo.
+- **Golpear el vidrio**: los peces se asustan y sube el estrés. El diario explica que no hay que hacerlo. *(Provisorio: hoy cualquier toque sobre la pecera cuenta como golpe, para poder probar la reacción. Cuando tocar la pecera abra su panel, el golpe va a ser un gesto aparte.)*
 - **Prender la luz de golpe** de noche: susto breve. Con el temporizador más adelante, hay amanecer gradual.
 - **Ponerles nombre** a todos.
 
 ### El gato
 
 El gato es un ser vivo con **necesidades** (sueño, hambre, curiosidad, cariño, energía) y elige qué hacer según ellas, la hora real y el clima.
+
+Cómo está hecho (`sim/cat.ts`, constantes en `cat` de `sim-config.json`): igual que los peces, la simulación decide el **comportamiento** (`sleep`, `watch_fish`, `tap_glass`, `look_window`, `beg_food`, `eat`, `groom`, `wander`, `play`, `purr`, `sulk`) y el **lugar** (cama, rayo de sol, tapa de la pecera, frente a la pecera, ventana, plato, piso, se fue), y el render lo lleva caminando hasta ahí (`render/scene/cat-view.ts`, placeholder de formas simples).
+
+- Decide cada 5 a 25 minutos puntuando opciones. Duerme unas 13 horas por día: al sol si está despejado y es de día, a veces sobre la tapa si la luz lleva un rato prendida, y si no en su cama. Con lluvia mira más por la ventana.
+- **Pecera**: cuando tiene curiosidad se sienta a mirar. Al terminar, a veces (30%) toca el vidrio: susto general. Si se queda más de 10 minutos, los peces que no se acostumbraron se estresan.
+- **Acostumbramiento**: cada animal tiene un `catHabituation` de 0 a 0,85 que sube con los días en la pecera (unos 10 días; más rápido mientras el gato mira). Reduce en esa proporción el susto y el estrés que causa el gato.
+- **Caricias**: cada caricia baja su necesidad de cariño y suma a un contador que se va solo (1,5 por minuto). Mientras no pase su aguante (6 caricias, hasta 18 si tiene muchas ganas de mimos; menos si come o duerme) ronronea. Si se pasa, se molesta, se va 20 minutos y no se deja acariciar. En pantalla: apoyar el dedo es una caricia y deslizarlo suma más.
+- **Comida**: come de su plato cuando tiene hambre; con el plato vacío pide comida si hay alguien. Durante una ausencia no le pasa nada malo: solo te espera con hambre.
+- **Pendiente**: juguetes, tirar cosas, pescar con la tapa abierta, pájaros, la ventana abierta.
 
 | Comportamiento | Cuándo |
 |---|---|
@@ -750,7 +839,7 @@ Volúmenes separados: música, ambiente y efectos.
 - Se guarda en IndexedDB: estado de la simulación, `lastTimestamp`, ubicación, ajustes y semilla del RNG.
 - Autoguardado cada 1 minuto, al pasar a segundo plano y enseguida después de cada acción del jugador.
 - Exportar e importar la partida como archivo JSON (backup). *(Pendiente.)*
-- Versión del formato del save con migraciones (`formatVersion` en `src/save/save-format.ts`). Un guardado ilegible o de una versión más nueva no se pisa: queda una copia de respaldo.
+- Versión del formato del save con migraciones (`formatVersion` en `src/save/save-format.ts`). Versión actual: **2** (la migración desde la 1 agrega los animales, la comida en el agua y el gato). Los ajustes guardan también la temperatura exterior fija y el clima fijo. Un guardado ilegible o de una versión más nueva no se pisa: queda una copia de respaldo.
 - La "semilla del RNG" que se guarda es el estado actual del generador, que vive dentro del estado de la simulación.
 
 ---
@@ -773,12 +862,12 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 
 ### Fase 2: Una pecera viva
 - [ ] Cubo de 20 L dibujado con agua, burbujas, rayos de luz y planta ondulando
-- [ ] Un betta animado con steering y comportamiento día/noche
-- [ ] Alimentar y que coma
+- [x] Peces con steering y comportamiento día/noche (con placeholders de formas simples; falta el arte)
+- [x] Alimentar y que coman
 - [ ] Ficha del pez
 
 ### Fase 3: Tiempo real y clima
-- [ ] Catch-up offline más resumen de bienvenida
+- [x] Catch-up offline más resumen de bienvenida (con temperatura exterior fija; la interfaz para la horaria real ya está)
 - [ ] Open-Meteo, día/noche real y clima en la ventana
 - [ ] Temperatura habitación → agua
 
@@ -791,15 +880,15 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 ### Fase 5: El dormitorio vivo
 - [ ] Habitación completa con capas e iluminación
 - [ ] Objetos interactivos: lámpara, ventana, cortina, taza, tocadiscos
-- [ ] El gato con necesidades, dormir, mirar peces, acariciar
+- [x] El gato con necesidades, dormir, mirar peces, acariciar (lógica completa, placeholder en pantalla)
 
 ### Fase 6: Tutorial y economía
 - [ ] Tutorial completo
 - [ ] Monedas, tienda y logros
 
 ### Fase 7: Más vida
-- [ ] Catálogo inicial de especies con boids y cardúmenes
-- [ ] Compatibilidad e interacciones entre peces
+- [x] Catálogo inicial de especies con boids y cardúmenes
+- [x] Compatibilidad e interacciones entre peces (mordidas, depredación, territorio, cortejo)
 - [ ] Reproducción de vivíparos y gambas
 - [ ] Plantas que crecen y se podan
 
@@ -823,6 +912,8 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - Todos los números de balance van en `src/data/*.json`, no hardcodeados.
 - La simulación es **determinista**: mismo estado + misma semilla + mismo delta = mismo resultado.
 - Toda mecánica nueva de la simulación va con al menos un test en Vitest.
+- El movimiento vive en `src/render/motion/` pero tampoco importa Pixi ni toca el DOM: también se testea.
+- Los textos que arma la simulación (advertencias de compatibilidad, resumen de bienvenida) salen de `src/data/texts.es.json`, igual que los del render.
 - Mobile first: probar en el celular, apuntar a 60 fps y no pasarse con las partículas.
 - Pixel perfect: posiciones enteras, escalado entero, sin suavizado de texturas. El múltiplo entero se calcula en píxeles físicos de la pantalla (píxeles CSS × devicePixelRatio).
 - Commits chicos y descriptivos, una funcionalidad por vez.
