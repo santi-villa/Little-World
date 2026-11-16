@@ -28,7 +28,7 @@ import { PX } from '../scene/scene-layout';
 import { SwayFilter } from '../sway-filter';
 import { FishLayer } from './fish-layer';
 import { display } from '../camera';
-import { tankFrame, type TankRect } from './tank-layout';
+import { GLASS_ART, tankFrame, type TankRect } from './tank-layout';
 
 /** Una pieza de la decoración. */
 export interface TankDecorItem {
@@ -52,8 +52,6 @@ export interface TankDecor {
 }
 
 const GLASS = 'vidrio';
-/** Medidas del arte del vidrio si faltara el manifest. */
-const GLASS_FALLBACK = { width: 378, height: 249, inner: { x: 13, y: 69, width: 352, height: 161 } };
 const EQUIP = 0x23272f;
 const EQUIP_HI = 0x3d4450;
 const NIGHT = 0x081420;
@@ -166,7 +164,7 @@ export class TankView {
   /** Ubica el interior y el vidrio según las medidas de la pecera. */
   private layout(state: SimState, derived: DerivedValues): Geo {
     const meta = asset(GLASS);
-    const glass = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_FALLBACK;
+    const glass = meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_ART;
     // El vidrio se escala parejo: nunca se estira.
     const { outer, inner, scale: k } = tankFrame(state.tank.lengthCm, glass);
     const glassKey = `${outer.x},${outer.y},${k}`;

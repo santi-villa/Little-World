@@ -59,3 +59,14 @@ export function tankFrame(
   };
   return { outer, inner, scale };
 }
+
+/** Medidas de la imagen del vidrio (`npm run assets`), por si falta el manifest. */
+export const GLASS_ART = { width: 378, height: 249, inner: { x: 13, y: 69, width: 352, height: 161 } };
+
+/**
+ * Rectángulo de la pecera entera en la escena (tapa y base incluidas). El alto
+ * no sale de los cm: lo da la proporción de la imagen del vidrio.
+ */
+export function tankRect(lengthCm: number, _heightCm?: number): TankRect {
+  return tankFrame(lengthCm, GLASS_ART).outer;
+}
