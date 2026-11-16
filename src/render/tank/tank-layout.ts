@@ -7,16 +7,16 @@
  */
 
 /** Línea del escritorio sobre la que apoya la base de la pecera. */
-export const TANK_BASE_Y = 466;
+export const TANK_BASE_Y = 462;
 /** Parte libre del escritorio: a la derecha del frasco hasta el borde. */
-const DESK_FREE = { left: 588, right: 976 };
+const DESK_FREE = { left: 592, right: 980 };
 /** Largo de la pecera que llena la parte libre del escritorio. */
 const REFERENCE_LENGTH_CM = 60;
 /** Ni más chica que esto, para que se pueda mirar. */
 const MIN_WIDTH = 220;
 /** Ni más ancha que el escritorio entero. */
 const MAX_WIDTH = 620;
-const DESK_RIGHT = 978;
+const DESK_RIGHT = 982;
 
 export interface TankRect {
   x: number;

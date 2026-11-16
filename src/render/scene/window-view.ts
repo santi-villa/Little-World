@@ -1,5 +1,6 @@
 /**
- * Lo que se ve por la ventana: cielo según la hora, estrellas y luna, nubes,
+ * Lo que se ve por la ventana: cielo según la hora (de noche, la imagen
+ * cielo-noche.png va entre el degradé y lo de adelante), estrellas, nubes,
  * arboleda lejana con lucecitas, lluvia, gotas que corren por el vidrio y
  * relámpagos. Se dibuja detrás de la pared (el marco va encima).
  */
@@ -32,6 +33,8 @@ export function drawSky(
   day: number,
   weather: Weather,
   t: number,
+  /** 'base': solo el degradé del cielo; 'front': estrellas, nubes, árboles, lluvia y rayos. */
+  part: 'base' | 'front' = 'front',
 ): number {
   const { x, y, width: W, height: H } = window;
   const ov = OVERCAST[weather];
@@ -60,37 +63,28 @@ export function drawSky(
   low = lerpColor(low, 0xf2a25c, twilight * 0.7 * (1 - ov));
   const bands = 9;
   const skyAt = (k: number): number => lerpColor(top, low, k);
-  for (let i = 0; i < bands; i++) {
+  for (let i = 0; part === 'base' && i < bands; i++) {
     const y0 = y + Math.round((i * H) / bands);
     const y1 = y + Math.round(((i + 1) * H) / bands);
     g.rect(x, y0, W, y1 - y0).fill(skyAt(i / (bands - 1)));
   }
 
-  // Estrellas que titilan y la luna.
-  if (day < 0.35 && ov < 0.9) {
-    const stars = Math.round(48 * (1 - ov));
-    let drawn = 0;
-    for (let i = 0; i < stars; i++) {
-      if (Math.sin(t * (1 + scatter(i, 96) * 2) + i * 7) < -0.55) continue;
-      const sx = x + 3 + Math.floor(scatter(i, 31) * (W - 6));
-      const sy = y + 3 + Math.floor(scatter(i, 32) * H * 0.62);
-      g.rect(sx, sy, 1, 1);
-      if (i % 9 === 0) g.rect(sx - 1, sy, 3, 1).rect(sx, sy - 1, 1, 3);
-      drawn++;
+  if (part === 'base') return 0;
+
+  // Estrellas que titilan suave, sobre el cielo de noche (la imagen ya trae la luna).
+  if (day < 0.5 && ov < 0.9) {
+    const groups = 3;
+    for (let k = 0; k < groups; k++) {
+      let drawn = 0;
+      for (let i = k; i < 36; i += groups) {
+        const sx = x + 3 + Math.floor(scatter(i, 31) * (W - 6));
+        const sy = y + 3 + Math.floor(scatter(i, 32) * H * 0.6);
+        g.rect(sx, sy, 1, 1);
+        drawn++;
+      }
+      const twinkle = 0.5 + 0.5 * Math.sin(t * (0.7 + k * 0.23) + k * 2.1);
+      if (drawn > 0) g.fill({ color: 0xf4f1d0, alpha: (1 - day / 0.5) * (1 - ov) * (0.25 + 0.6 * twinkle) });
     }
-    if (drawn > 0) g.fill({ color: 0xf4f1d0, alpha: (1 - day / 0.35) * 0.9 });
-    const mx = x + Math.round(W * 0.8);
-    const my = y + 30;
-    for (let r = -7; r <= 7; r++) {
-      const half = Math.round(Math.sqrt(49 - r * r));
-      g.rect(mx - half, my + r, half * 2, 1);
-    }
-    g.fill({ color: 0xf2efd8, alpha: (1 - day / 0.35) * (1 - ov * 0.7) });
-    for (let r = -6; r <= 6; r++) {
-      const half = Math.round(Math.sqrt(36 - r * r));
-      g.rect(mx - half + 4, my + r - 2, half * 2, 1);
-    }
-    g.fill(skyAt(0.16));
   }
 
   // Nubes que pasan.

@@ -3,8 +3,13 @@
  * vista a través de una cámara con zoom y paneo.
  *
  * Mundo (se mueve con la cámara), de atrás hacia adelante:
- *   sky      (código)  lo que se ve por los vidrios de la ventana: cielo y clima
+ *   skyBase  (código)  degradé del cielo según la hora
+ *   night    (imagen)  cielo-noche.png, que aparece de a poco al anochecer
+ *   sky      (código)  estrellas que titilan, nubes, árboles, lluvia y rayos
+ *   bird     (imagen)  el pájaro que a veces se posa afuera, en el alféizar
  *   room     (imagen)  dormitorio.png, con los vidrios transparentes
+ *   curtains (imagen)  los dos paños de la cortina, con vaivén
+ *   plants   (imagen)  plantas colgantes y enredadera, con vaivén
  *   anim     (código)  vapor de la taza y plato del gato
  *   pecera -> gato
  *   lights   (aditivo) lámpara, resplandor de la pecera y sol en el piso
@@ -30,7 +35,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
 import { drawLights, drawRoomAnim } from './room-fx';
 import { inRect, roomData, zoneRect, type RoomZone } from './room-zones';
-import { PX, scenePreview } from './scene-layout';
+import { BIRD_PERCH, CURTAINS, CURTAIN_ROD, HANGING, PX, scenePreview } from './scene-layout';
 import { drawSky } from './window-view';
 
 /** Lo que la escena necesita además del estado de la simulación. */
@@ -70,7 +75,14 @@ export class RoomScene {
   private readonly world = new Container();
   private readonly camera = new Camera(this.world);
   private readonly data = roomData(ROOM_ID);
+  private readonly skyBase = new Graphics();
+  private readonly night = new Sprite(tex('cielo-noche'));
   private readonly sky = new Graphics();
+  private readonly bird = new Sprite(tex('pajaro'));
+  /** Plantas y cortinas que se hamacan: rotación muy leve con el pivote arriba. */
+  private readonly swaying: { sprite: Sprite; phase: number; amount: number }[] = [];
+  private birdVisit: { start: number; stay: number; flip: boolean } | null = null;
+  private nextBird = 25;
   private readonly room = new Sprite(tex(this.data.background));
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
@@ -107,7 +119,30 @@ export class RoomScene {
       width: Math.ceil(hole.width / PX) + 1,
       height: Math.ceil(hole.height / PX) + 1,
     };
+    this.skyBase.scale.set(PX);
     this.sky.scale.set(PX);
+    // El cielo de noche cubre el hueco de la ventana (la pared tapa lo que sobra).
+    this.night.anchor.set(0.5);
+    this.night.position.set(hole.x + Math.round(hole.width / 2), hole.y + Math.round(hole.height / 2));
+    this.bird.anchor.set(0.5, 1);
+    this.bird.visible = false;
+
+    const decor = new Container();
+    const hang = (name: string, x: number, y: number, scale: number, phase: number, amount: number, flip = false): void => {
+      const sprite = new Sprite(tex(name));
+      // Pivote arriba al centro: de ahí cuelga y alrededor de ahí se hamaca.
+      sprite.anchor.set(0.5, 0);
+      sprite.scale.set(flip ? -scale : scale, scale);
+      sprite.position.set(x, y);
+      decor.addChild(sprite);
+      this.swaying.push({ sprite, phase, amount });
+    };
+    for (const c of CURTAINS) {
+      const w = (tex(c.asset).width * c.scale) / 2;
+      const x = c.side === 'left' ? CURTAIN_ROD.left + w + 4 : CURTAIN_ROD.right - w - 4;
+      hang(c.asset, Math.round(x), CURTAIN_ROD.y + 2, c.scale, c.phase, 0.8);
+    }
+    for (const p of HANGING) hang(p.asset, p.x, p.y, p.scale, p.phase, 1);
     this.anim.scale.set(PX);
     this.lights.blendMode = 'add';
     this.flash.blendMode = 'add';
@@ -117,8 +152,12 @@ export class RoomScene {
     // un shader hacía rayas. Ver PENDIENTE.md: hacerlas con sprites separados.
 
     this.world.addChild(
+      this.skyBase,
+      this.night,
       this.sky,
+      this.bird,
       this.room,
+      decor,
       this.anim,
       this.tank.container,
       this.cat.container,
@@ -144,7 +183,7 @@ export class RoomScene {
       Math.max(light, derived.lightOn ? 0.6 : 0.3),
       seconds,
       dt,
-      this.tank.watchPoint(),
+      this.birdVisit && this.bird.alpha > 0.5 ? { x: this.bird.x, y: this.bird.y - 20 } : null,
     );
     // De cerca, la cámara acompaña al gato si camina.
     if (this.mode === 'cat' && !this.gesture?.dragging) this.focusOn(this.catFocus(), false);
@@ -163,7 +202,7 @@ export class RoomScene {
       if (this.cat.hit(w.x, w.y)) {
         // Apoyar la mano ya es una caricia; deslizar suma más.
         this.gesture.petting = { travelled: 0, lastStroke: this.seconds };
-        this.act({ type: 'petCat' });
+        this.petCat();
       }
     }
   }
@@ -184,7 +223,7 @@ export class RoomScene {
       ) {
         g.petting.travelled = 0;
         g.petting.lastStroke = this.seconds;
-        this.act({ type: 'petCat' });
+        this.petCat();
       }
       return;
     }
@@ -239,7 +278,7 @@ export class RoomScene {
       return;
     }
     if (this.mode === 'cat') {
-      if (this.cat.hit(w.x, w.y)) this.act({ type: 'petCat' });
+      if (this.cat.hit(w.x, w.y)) this.petCat();
       return;
     }
 
@@ -258,7 +297,7 @@ export class RoomScene {
       case 'pet-cat':
         this.zoomCat = zone.zoom ?? 2.2;
         this.enterFocus('cat', this.catFocus());
-        this.act({ type: 'petCat' });
+        this.petCat();
         break;
       case 'panel':
         if (zone.panel) this.ui.openPanel(zone.panel);
@@ -312,6 +351,62 @@ export class RoomScene {
     this.camera.goTo(this.roomView);
   }
 
+  /** Acaricia al gato: la simulación lo registra y el gato pasa a los mimos. */
+  private petCat(): void {
+    this.act({ type: 'petCat' });
+    this.cat.pet(this.seconds);
+  }
+
+  /**
+   * El pájaro: de vez en cuando, en días despejados, se posa afuera en el
+   * alféizar, se queda unos segundos (a veces se da vuelta) y se va volando.
+   */
+  private updateBird(seconds: number, allowed: boolean, light: number): void {
+    const b = this.bird;
+    if (!this.birdVisit) {
+      b.visible = false;
+      if (seconds >= this.nextBird) {
+        if (allowed) this.birdVisit = { start: seconds, stay: 6 + Math.random() * 5, flip: Math.random() < 0.5 };
+        else this.nextBird = seconds + 20;
+      }
+      return;
+    }
+    const v = this.birdVisit;
+    const age = seconds - v.start;
+    const arrive = 0.7;
+    const leave = 0.8;
+    if (age > arrive + v.stay + leave) {
+      this.birdVisit = null;
+      this.nextBird = seconds + 40 + Math.random() * 60;
+      b.visible = false;
+      return;
+    }
+    let dx = 0;
+    let dy = 0;
+    let alpha = 1;
+    if (age < arrive) {
+      // Llega bajando.
+      const k = 1 - age / arrive;
+      dy = -18 * k * k;
+      dx = -10 * k;
+      alpha = 1 - k;
+    } else if (age > arrive + v.stay) {
+      // Se va volando hacia arriba.
+      const k = (age - arrive - v.stay) / leave;
+      dy = -30 * k;
+      dx = 24 * k;
+      alpha = 1 - k;
+    }
+    // A mitad de la visita se da vuelta, y da saltitos de vez en cuando.
+    const turned = v.flip !== age > arrive + v.stay / 2;
+    const hop = age > arrive && age < arrive + v.stay && Math.sin(age * 5) > 0.97 ? -2 : 0;
+    b.visible = true;
+    b.alpha = alpha;
+    b.scale.set(turned ? -1 : 1, 1);
+    b.position.set(Math.round(BIRD_PERCH.x + dx), Math.round(BIRD_PERCH.y + dy + hop));
+    b.tint = lerpColor(NIGHT_TINT, 0xffffff, light);
+  }
+
   /** Brillo sutil sobre la zona recién tocada. */
   private drawGlow(seconds: number): void {
     const g = this.glow;
@@ -345,12 +440,26 @@ export class RoomScene {
     this.lampOn = lampOn;
 
     // Ventana.
+    this.skyBase.clear();
+    drawSky(this.skyBase, this.window, day, view.weather, seconds, 'base');
+    // De noche aparece la imagen del cielo estrellado, de a poco según la hora.
+    this.night.alpha = Math.min(1, (1 - day) * 1.15) * (view.weather === 'clear' ? 1 : view.weather === 'cloudy' ? 0.7 : 0.45);
+    this.night.visible = this.night.alpha > 0.01;
+    this.night.scale.set(Math.max((this.window.width * PX) / this.night.texture.width, (this.window.height * PX) / this.night.texture.height));
     this.sky.clear();
-    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds);
+    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds, 'front');
+    this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.
     const tint = lerpColor(NIGHT_TINT, 0xffffff, light);
     this.room.tint = tint;
+    // Brisa: las plantas y la cortina se hamacan apenas (más con la ventana abierta).
+    const breeze = (state.room.windowOpen ? 1.8 : 0.9) * (view.weather === 'storm' ? 1.2 : 1);
+    for (const item of this.swaying) {
+      item.sprite.tint = tint;
+      const swing = Math.sin(seconds * 0.45 + item.phase) * 0.75 + Math.sin(seconds * 0.27 + item.phase * 1.9) * 0.25;
+      item.sprite.rotation = (Math.min(2, breeze * item.amount) * swing * Math.PI) / 180;
+    }
 
     // Vapor y plato.
     const tone = (c: number): number => lerpColor(lerpColor(c, NIGHT, 0.62), c, light);

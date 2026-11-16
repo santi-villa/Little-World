@@ -1,16 +1,68 @@
 {
-  "_doc": "Habitaciones: fondo, vista inicial de la cámara y zonas tocables (en píxeles de la imagen de 1280x720). rect: [x, y, ancho, alto], o \"tank\" / \"cat\" para seguir a la pecera o al gato. action: tank-view, pet-cat, panel, toggle-window, toggle-lamp. zoom (opcional): acercamiento al tocarla; fill: qué parte de la pantalla ocupa (pecera). Las zonas se prueban en orden: la primera que contiene el toque gana.",
+  "_doc": "Habitaciones: fondo, vista inicial de la cámara y zonas tocables (en píxeles del fondo dormitorio.png, de 1280x720). rect: [x, y, ancho, alto], o \"tank\" / \"cat\" para seguir a la pecera o al gato. action: tank-view, pet-cat, panel, toggle-window, toggle-lamp. zoom (opcional): acercamiento al tocarla; fill: qué parte de la pantalla ocupa (pecera). Las zonas se prueban en orden: la primera que contiene el toque gana.",
   "rooms": {
     "dormitorio": {
       "background": "dormitorio",
-      "camera": { "x": 690, "y": 400, "zoom": 1.5 },
+      "camera": {
+        "x": 660,
+        "y": 380,
+        "zoom": 1.5
+      },
       "zones": [
-        { "id": "cat", "rect": "cat", "action": "pet-cat", "zoom": 2.2 },
-        { "id": "tank", "rect": "tank", "action": "tank-view", "fill": 0.85 },
-        { "id": "lamp", "rect": [383, 304, 70, 146], "action": "toggle-lamp" },
-        { "id": "notebook", "rect": [474, 430, 76, 40], "action": "panel", "panel": "notebook" },
-        { "id": "library", "rect": [96, 166, 232, 444], "action": "panel", "panel": "library" },
-        { "id": "window", "rect": [384, 54, 556, 364], "action": "toggle-window" }
+        {
+          "id": "cat",
+          "rect": "cat",
+          "action": "pet-cat",
+          "zoom": 2.2
+        },
+        {
+          "id": "tank",
+          "rect": "tank",
+          "action": "tank-view",
+          "fill": 0.85
+        },
+        {
+          "id": "lamp",
+          "rect": [
+            381,
+            309,
+            66,
+            141
+          ],
+          "action": "toggle-lamp"
+        },
+        {
+          "id": "notebook",
+          "rect": [
+            478,
+            438,
+            66,
+            36
+          ],
+          "action": "panel",
+          "panel": "notebook"
+        },
+        {
+          "id": "library",
+          "rect": [
+            93,
+            167,
+            254,
+            447
+          ],
+          "action": "panel",
+          "panel": "library"
+        },
+        {
+          "id": "window",
+          "rect": [
+            379,
+            52,
+            563,
+            379
+          ],
+          "action": "toggle-window"
+        }
       ]
     }
   }
