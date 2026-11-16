@@ -40,3 +40,21 @@ mirarla en el juego con cada modelo de `tanks.json` y ajustar posiciones y color
 - La redonda (`shape: "round"`) se dibuja como caja, igual que antes.
 - Plantas, madera y piedras son fijas: todavía no salen del estado de la simulación.
 - El termómetro se muestra siempre (no hay equipo "termómetro" en la simulación).
+
+## Dormitorio y gato
+
+`render/scene/`: `room-scene.ts` (capas), `room-decor.ts` (muebles, plantas,
+vapor, luces aditivas), `window-view.ts` (cielo y climas) y `cat-view.ts` (gato).
+
+**Sin revisar en pantalla**: se escribió sin capturas (solo compilación). Falta
+mirarlo en el juego con cada clima y hora (selector en el panel de debug) y
+ajustar posiciones y colores.
+
+- El selector de hora del debug es solo visual (ventana, oscuridad, lámpara):
+  no cambia la hora de la simulación ni la luz de la pecera.
+- La lámpara se prende sola cuando hay poca luz; no es un objeto interactivo todavía.
+- Con la pecera más grande (100 cm) tapa casi toda la ventana y el lugar del
+  gato en el alféizar queda pegado a ella.
+- Faltan de la sección 5 de DESIGN.md: pájaros, viento/cortina, colores del
+  amanecer reales y sonido.
+- Gato: faltan poses propias de lavarse y jugar (hoy usan sentado y caminando).
