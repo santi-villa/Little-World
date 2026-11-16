@@ -182,7 +182,7 @@ export class FishLayer {
         const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
         c = lerpColor(c, NIGHT_TINT, fade);
       }
-      return lerpColor(c, WATER_TINT, 0.5 * far);
+      return lerpColor(c, WATER_TINT, 0.3 * far);
     };
     const main = tint(hex(sp.color));
     const accent = tint(hex(sp.accent));

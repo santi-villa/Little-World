@@ -16,6 +16,10 @@ const U = 2;
 const W = GAME_WIDTH / U;
 const H = GAME_HEIGHT / U;
 const INK = 0xf4e9c8;
+/** Barra de acciones de la vista de pecera: alto en unidades de 2 px. */
+const BAR = 44;
+/** Alto de la barra de acciones, en píxeles de la pantalla (la cámara deja la pecera arriba). */
+export const CARE_BAR_HEIGHT = BAR * U;
 const BOX = 0x0a0d18;
 
 export type CareId = keyof typeof texts.scene.care;
@@ -115,23 +119,20 @@ export class SceneUi {
       this.button(g, t.back, W - 8 - textWidth(t.back) - 8, 6, { kind: 'back' }, 'back');
       // Indicación para salir deslizando, que se apaga sola.
       if (focusAge < 4) {
-        drawPixelText(g, t.swipeHint, Math.round((W - textWidth(t.swipeHint)) / 2), H - 9, INK, 1);
+        const w = textWidth(t.swipeHint) + 8;
+        const x = Math.round((W - w) / 2);
+        g.rect(x, 6, w, 11).fill({ color: BOX, alpha: 0.55 });
+        drawPixelText(g, t.swipeHint, x + 4, 9, INK, 1);
       }
     }
 
-    if (mode === 'tank') {
-      const visible = CARE.filter((care) => !care.when || care.when(state));
-      const width = Math.max(...visible.map((care) => textWidth(t.care[care.id]))) + 8;
-      visible.forEach((care, i) => {
-        this.button(g, t.care[care.id], W - 8 - width, 30 + i * 16, { kind: 'care', id: care.id, action: care.action(state) }, care.id, width);
-      });
-    }
+    if (mode === 'tank') this.careBar(g, state);
 
     if (this.toast && seconds < this.toast.until) {
       const text = this.toast.text;
       const w = textWidth(text) + 10;
       const x = Math.round((W - w) / 2);
-      const y = H - 28;
+      const y = mode === 'tank' ? H - BAR - 16 : H - 28;
       g.rect(x, y, w, 11).fill({ color: BOX, alpha: 0.7 });
       drawPixelText(g, text, x + 5, y + 3, INK, 1);
     } else {
@@ -151,6 +152,39 @@ export class SceneUi {
       lines.forEach((line, i) => drawPixelText(g, line, x + 12, y + 10 + i * 8, i === 0 ? 0xffd98a : INK, 1));
       drawPixelText(g, t.panels.close, x + 12, y + h - 12, 0xa9b6d8, 1);
     }
+  }
+
+  /**
+   * Barra de acciones abajo, debajo de la pecera: botones grandes para el dedo,
+   * con letra doble (y en dos renglones si no entra).
+   */
+  private careBar(g: Graphics, state: SimState): void {
+    const t = texts.scene;
+    const visible = CARE.filter((care) => !care.when || care.when(state));
+    const top = H - BAR;
+    g.rect(0, top, W, BAR).fill({ color: BOX, alpha: 0.6 });
+    g.rect(0, top, W, 1).fill({ color: INK, alpha: 0.15 });
+    const gap = 4;
+    const margin = 6;
+    const w = Math.floor((W - margin * 2 - gap * (visible.length - 1)) / visible.length);
+    const h = BAR - 10;
+    visible.forEach((care, i) => {
+      const x = margin + i * (w + gap);
+      const y = top + 5;
+      const lit = this.pressed && this.pressed.id === care.id && this.seconds < this.pressed.until;
+      g.rect(x, y, w, h).fill({ color: lit ? 0x3a6a78 : 0x1e2a3a, alpha: 0.92 });
+      g.rect(x, y, w, 1).fill({ color: INK, alpha: 0.25 });
+      g.rect(x, y + h - 1, w, 1).fill({ color: 0x000000, alpha: 0.3 });
+      // Letra doble; si no entra en un renglón, una palabra por renglón.
+      const label = t.care[care.id];
+      const lines = textWidth(label, 2) <= w - 6 ? [label] : label.split(' ');
+      const lineH = 12;
+      const y0 = y + Math.round((h - lines.length * lineH + 2) / 2);
+      lines.forEach((line, k) => {
+        drawPixelText(g, line, x + Math.round((w - textWidth(line, 2)) / 2), y0 + k * lineH, INK, 2);
+      });
+      this.buttons.push({ x, y, w, h, hit: { kind: 'care', id: care.id, action: care.action(state) } });
+    });
   }
 
   private button(g: Graphics, label: string, x: number, y: number, hit: UiHit, id: string, width?: number): void {

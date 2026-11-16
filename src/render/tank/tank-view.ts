@@ -61,8 +61,8 @@ const GLASS_BACK = 'vidrio-fondo';
 const EQUIP = 0x23272f;
 const EQUIP_HI = 0x3d4450;
 const NIGHT = 0x081420;
-/** Distancia de la superficie del agua a la tapa, como fracción del alto del hueco. */
-const SURFACE_GAP = 0.035;
+/** Distancia de la superficie del agua a la tapa, en píxeles (con la pecera llena). */
+const SURFACE_GAP = 3;
 /** Filas de la malla de cada planta (más filas, curva más suave). */
 const PLANT_ROWS = 8;
 
@@ -215,7 +215,7 @@ export class TankView {
     const { x: left, y: top, width, height } = inner;
     const bottom = top + height;
     // El agua llena el hueco; la evaporación la baja de a poco.
-    const fullTop = top + Math.max(2, Math.round(height * SURFACE_GAP));
+    const fullTop = top + SURFACE_GAP;
     const waterHeight = Math.round((bottom - fullTop) * clamp(derived.waterLevel, 0, 1));
     const sandH = clamp(Math.round(height * 0.18), 16, 40);
     return {
@@ -250,6 +250,8 @@ export class TankView {
     // Lo de adentro (arena, plantas, peces) se recorta al hueco del vidrio.
     this.waterMask.rect(geo.left, geo.top, geo.width, geo.height).fill(0xffffff);
     const { left: x, width: w, waterTop: top, waterHeight: h } = geo;
+    // El aire entre la tapa y el agua: la sombra de la tapa (no se ve la habitación a través).
+    g.rect(x, geo.top, w, Math.max(0, top - geo.top)).fill(lit ? 0x7d92a0 : 0x1c222c);
     if (h <= 0) return;
     const bands = clamp(Math.round(h / 12), 4, 16);
     for (let i = 0; i < bands; i++) {

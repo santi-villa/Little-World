@@ -24,7 +24,7 @@ import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
 import { Hud } from '../ui/hud';
-import { SceneUi, type UiMode } from '../ui/scene-ui';
+import { CARE_BAR_HEIGHT, SceneUi, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
@@ -276,13 +276,13 @@ export class RoomScene {
     }
   }
 
+  /** La pecera de cerca: ocupa `fill` de la pantalla, arriba de la barra de acciones. */
   private tankFocus(fill: number): CameraView {
     const t = this.tank.bounds;
-    return {
-      x: t.x + t.width / 2,
-      y: t.y + t.height / 2,
-      zoom: Math.min((fill * GAME_WIDTH) / t.width, (fill * GAME_HEIGHT) / t.height),
-    };
+    const free = GAME_HEIGHT - CARE_BAR_HEIGHT;
+    const zoom = Math.min((fill * GAME_WIDTH) / t.width, (0.94 * free) / t.height);
+    // Centrada en el espacio libre (la barra tapa la parte de abajo de la pantalla).
+    return { x: t.x + t.width / 2, y: t.y + t.height / 2 + CARE_BAR_HEIGHT / 2 / zoom, zoom };
   }
 
   private catFocus(): CameraView {
