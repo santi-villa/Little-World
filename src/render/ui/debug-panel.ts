@@ -4,6 +4,7 @@
  * y se puede ocultar con el botón DEBUG.
  */
 
+import { scenePreview } from '../scene/scene-layout';
 import { DEFAULT_SPEED, SPEEDS, type Game, type SpeedId } from '../../game';
 import {
   DEFAULT_TANK_ID,
@@ -423,7 +424,19 @@ export class DebugPanel {
     this.weather.addEventListener('change', () =>
       this.game.setWeather(this.weather.value as Weather),
     );
-    cat.append(catTable, this.buttons(CAT_BUTTONS), this.weather);
+    // Hora de la escena, para probar día y noche sin esperar (solo cambia lo que se ve).
+    const hour = el('select', 'debug-speed');
+    hour.setAttribute('aria-label', T.hourLabel);
+    for (const h of [-1, 0, 3, 6, 7, 9, 12, 15, 18, 19, 20, 21, 23]) {
+      const node = el('option', undefined, `${T.hourLabel}: ${h < 0 ? T.hourReal : `${h}:00`}`);
+      node.value = String(h);
+      hour.append(node);
+    }
+    hour.addEventListener('change', () => {
+      const h = Number(hour.value);
+      scenePreview.hour = h < 0 ? null : h;
+    });
+    cat.append(catTable, this.buttons(CAT_BUTTONS), this.weather, hour);
 
     // --- Acciones y ajustes ---
     this.section('actions').append(this.buttons(ACTION_BUTTONS));

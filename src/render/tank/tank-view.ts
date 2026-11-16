@@ -47,6 +47,8 @@ export class TankView {
   private readonly glass = new Graphics();
   readonly fish = new FishLayer();
   private readonly batch = new Batch();
+  /** Para las capas fijas: respeta el orden de dibujo. */
+  private readonly ordered = new Batch(true);
   private rect: TankRect = tankRect(30, 30);
   private glassKey = '';
   private backKey = '';
@@ -193,7 +195,7 @@ export class TankView {
     if (key === this.backKey) return;
     this.backKey = key;
     const g = this.back;
-    const b = this.batch;
+    const b = this.ordered;
     g.clear();
 
     // Filtro de mochila: la caja asoma por detrás, arriba a la derecha.
