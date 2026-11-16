@@ -5,14 +5,19 @@
  * 2x2 para acompañar el grano del arte.
  */
 export const PX = 2;
+/**
+ * El gato va con píxeles de 3x3: así hecho un bollito ocupa unos dos tercios de
+ * su cama redonda de la imagen, como el gato de la referencia.
+ */
+export const CAT_PX = 3;
 
 /** Altura a la que apoyan las patas en el piso (sobre la alfombra). */
 export const GROUND_Y = 688;
 /** Rango del piso por donde pasea el gato. */
 export const FLOOR_X = { min: 330, max: 900 };
 
-/** La cama redonda del gato, sobre la alfombra. */
-export const BED = { x: 870, y: 668 };
+/** El hueco de la cama redonda del gato (donde apoya), sobre la alfombra. */
+export const BED = { x: 852, y: 662 };
 export const SUNBEAM = { x: 580, y: 694 };
 export const BOWL = { x: 250, y: 694 };
 /** El alféizar, entre la taza y el frasco. */

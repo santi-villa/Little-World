@@ -1,8 +1,8 @@
-/** Textos mínimos de la escena (arriba a la izquierda), con la fuente de píxeles. */
+/** Textos mínimos de la escena (arriba a la izquierda), con la fuente de píxeles y fondo semitransparente. */
 
 import { Container, Graphics } from 'pixi.js';
 import type { SimState } from '../../sim';
-import { drawPixelText } from './pixel-font';
+import { drawPixelText, textWidth } from './pixel-font';
 import { clockParts, fill, texts } from './texts';
 
 export class Hud {
@@ -29,10 +29,16 @@ export class Hud {
 
     const g = this.graphics;
     g.clear();
-    drawPixelText(g, texts.title, 9, 9, 0x0a0d18, 2);
-    drawPixelText(g, texts.title, 8, 8, 0xf4e9c8, 2);
-    drawPixelText(g, clock, 8, 24, 0xa9b6d8, 1);
-    if (alerts) drawPixelText(g, alerts, 8, 44, 0xff6b5e, 1);
-    drawPixelText(g, temperature, 8, 34, 0xf4e9c8, 1);
+    // Una tarjetita con fondo semitransparente, para que se lea sobre los cuadros.
+    const lines: { text: string; color: number }[] = [
+      { text: clock, color: 0xf4e9c8 },
+      { text: temperature, color: 0xa9d8e8 },
+    ];
+    if (alerts) lines.push({ text: alerts, color: 0xff6b5e });
+    const width = Math.max(...lines.map((line) => textWidth(line.text))) + 6;
+    const height = lines.length * 7 + 4;
+    g.rect(3, 3, width, height).fill({ color: 0x0a0d18, alpha: 0.55 });
+    g.rect(3, 3, width, 1).fill({ color: 0xf4e9c8, alpha: 0.12 });
+    lines.forEach((line, i) => drawPixelText(g, line.text, 6, 6 + i * 7, line.color, 1));
   }
 }

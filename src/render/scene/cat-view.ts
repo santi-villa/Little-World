@@ -13,7 +13,7 @@ import { TANK_BASE_Y, type TankRect } from '../tank/tank-layout';
 import { drawPixelText, textWidth } from '../ui/pixel-font';
 import { texts } from '../ui/texts';
 import { GAME_WIDTH } from '../viewport';
-import { BED, BOWL, FLOOR_X, GROUND_Y, PX, SUNBEAM, WINDOWSILL } from './scene-layout';
+import { BED, BOWL, CAT_PX, FLOOR_X, GROUND_Y, SUNBEAM, WINDOWSILL } from './scene-layout';
 
 const FUR = 0xe08a3c;
 const FUR_LIGHT = 0xf2a858;
@@ -40,14 +40,15 @@ export class CatView {
   private wanderUntil = 0;
 
   constructor() {
-    // Se dibuja en píxeles gordos (PX): las posiciones son de la escena, el dibujo va a la mitad.
-    this.graphics.scale.set(PX);
+    // Se dibuja en píxeles gordos (CAT_PX), a la escala de la cama de la imagen:
+    // las posiciones son de la escena y el dibujo va dividido por CAT_PX.
+    this.graphics.scale.set(CAT_PX);
     this.container.addChild(this.graphics);
   }
 
   /** ¿El punto (en píxeles de la escena) toca al gato? */
   hit(sceneX: number, sceneY: number): boolean {
-    return Math.abs(sceneX - this.x) <= 36 && sceneY <= this.y + 8 && sceneY >= this.y - 60;
+    return Math.abs(sceneX - this.x) <= 16 * CAT_PX && sceneY <= this.y + 4 * CAT_PX && sceneY >= this.y - 30 * CAT_PX;
   }
 
   private spotPosition(
@@ -64,11 +65,11 @@ export class CatView {
       case 'tank_lid':
         return { x: tank.x + Math.round(tank.width / 2), y: tank.y + 6 };
       case 'tank_front':
-        return { x: tank.x - 34, y: TANK_BASE_Y, facing: 1 };
+        return { x: tank.x - 14 * CAT_PX, y: TANK_BASE_Y, facing: 1 };
       case 'windowsill':
         return { ...WINDOWSILL, facing: 1 };
       case 'bowl':
-        return { x: BOWL.x + 44, y: GROUND_Y, facing: -1 };
+        return { x: BOWL.x + 20 * CAT_PX, y: GROUND_Y, facing: -1 };
       case 'away':
         return { x: GAME_WIDTH + 120, y: GROUND_Y };
       case 'floor':
@@ -124,8 +125,8 @@ export class CatView {
     if (this.x > GAME_WIDTH + 60) return;
     const dim = (color: number): number => lerpColor(lerpColor(color, NIGHT, 0.55), color, daylight);
     const b = this.batch;
-    const x = Math.round(this.x / PX);
-    const y = Math.round(this.y / PX);
+    const x = Math.round(this.x / CAT_PX);
+    const y = Math.round(this.y / CAT_PX);
     const d = this.facing;
     const purring = cat.behavior === 'purr';
     const watching = cat.behavior === 'watch_fish';
@@ -279,7 +280,7 @@ export class CatView {
     const belly = dim(CREAM);
     if (pose === 'tap') {
       // La pata contra el vidrio.
-      const reach = Math.max(6, Math.abs(Math.round(tank.x / PX) - x) - 2);
+      const reach = Math.max(6, Math.abs(Math.round(tank.x / CAT_PX) - x) - 2);
       const jab = Math.floor(seconds * 6) % 2;
       g.rect(d > 0 ? x + 4 : x - 4 - reach + jab, y - 12, reach - jab, 2).fill(fur);
       g.rect(d > 0 ? x + 2 + reach - jab : x - 4 - reach + jab, y - 13, 2, 4).fill(belly);
