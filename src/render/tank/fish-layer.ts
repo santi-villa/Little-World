@@ -12,6 +12,10 @@ import { getSpecies, sizeFactor, defaultConfig, type SimState, type Species } fr
 import { FishMotion, type FishBody, type MotionAnimal } from '../motion/fish-motion';
 import { lerpColor, scatter } from '../pixel-utils';
 import type { TankRect } from './tank-layout';
+import { FISH_SPRITES, SpritePainter } from './sprites';
+
+/** Vueltas de sprite por segundo: un giro completo tarda ~0,45 s. */
+const TURN_SPEED = 4.5;
 
 const WATER_TINT = 0x2f7f8c;
 const NIGHT_TINT = 0x0a1420;
@@ -32,6 +36,10 @@ export class FishLayer {
   private scare: { x: number; y: number; until: number } | null = null;
   private area: TankRect = { x: 0, y: 0, width: 1, height: 1 };
   private pxPerCm = 1;
+  private dt = 0;
+  private readonly painter = new SpritePainter();
+  /** Estado de animación por animal: fase del coletazo y giro (-1 izquierda .. 1 derecha). */
+  private readonly anim = new Map<number, { wag: number; turn: number }>();
 
   /** Golpe en el vidrio, en píxeles de la escena: los peces huyen de ese punto. */
   scareAt(sceneX: number, sceneY: number): void {
@@ -106,6 +114,9 @@ export class FishLayer {
       catAtGlass: cat === 'watch_fish' || cat === 'tap_glass',
     });
 
+    this.dt = Math.min(0.1, Math.max(0, dtSeconds));
+    for (const id of this.anim.keys()) if (!this.motion.bodies.has(id)) this.anim.delete(id);
+
     this.drawFood(state, area, pxPerCm, seconds);
 
     // De atrás hacia adelante.
@@ -122,6 +133,7 @@ export class FishLayer {
         state_?.finDamage ?? 0,
         state_?.mood === 'sick',
         state_?.intent === 'rest',
+        state_?.sex ?? 'male',
       );
     }
   }
@@ -154,6 +166,7 @@ export class FishLayer {
     finDamage: number,
     sick: boolean,
     resting: boolean,
+    sex: 'male' | 'female',
   ): void {
     const g = this.graphics;
     const sp = animal.species;
@@ -177,6 +190,44 @@ export class FishLayer {
     const cy = Math.round(this.area.y + body.y * this.pxPerCm);
     const len = Math.max(3, Math.round(animal.sizeCm * this.pxPerCm * scale));
     const dir = body.facing;
+
+    // Especies con sprite propio; el resto sigue con el placeholder de abajo.
+    const sprite = FISH_SPRITES[sp.id];
+    if (sprite) {
+      let a = this.anim.get(animal.id);
+      if (!a) {
+        a = { wag: body.phase, turn: body.facing };
+        this.anim.set(animal.id, a);
+      }
+      const speed = Math.sqrt(body.vx * body.vx + body.vy * body.vy);
+      const swim = animal.alive ? Math.min(1, speed / Math.max(0.1, sp.swim.speedCmS)) : 0;
+      if (animal.alive) {
+        a.wag += this.dt * (sprite.tempo ?? 1) * (1.8 + 9 * swim);
+        const d = body.facing - a.turn;
+        const step = this.dt * TURN_SPEED;
+        a.turn += Math.abs(d) <= step ? d : Math.sign(d) * step;
+      }
+      // Giro suave: el sprite se acorta, se da vuelta y se vuelve a estirar.
+      const ease = Math.sin((a.turn * Math.PI) / 2);
+      const turn = (a.turn >= 0 ? 1 : -1) * Math.max(0.3, Math.abs(ease));
+      const spriteLen = Math.max(sprite.minLen ?? 6, Math.round(animal.sizeCm * this.pxPerCm * scale));
+      const painter = this.painter;
+      painter.begin(spriteLen, turn, (sprite.wave ?? 0.07) * spriteLen * (0.3 + 0.7 * swim), a.wag, !animal.alive);
+      sprite.draw(painter, {
+        len: spriteLen,
+        seconds,
+        wag: a.wag,
+        swim,
+        seed: animal.id,
+        sex,
+        finDamage,
+        resting,
+        alive: animal.alive,
+        night: !lightOn,
+      });
+      painter.flush(g, cx, cy, tint);
+      return;
+    }
 
     if (sp.category === 'snail') {
       const size = Math.max(2, Math.round(len * 0.8));
