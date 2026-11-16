@@ -11,10 +11,11 @@ export const PX = 2;
 
 /**
  * Escala del gato: sus animaciones vienen con 1 píxel de PNG por píxel del
- * dibujo. A 3, cada píxel del gato mide 3 de la escena (el fondo tiene ~4) y
- * hecho un bollito ocupa unos dos tercios de su almohadón.
+ * dibujo (la grilla nativa de los videos). Va a 2, entero: cada píxel del gato
+ * mide 2x2 de la escena (el fondo tiene ~4, o sea dos píxeles del gato por
+ * cada uno del fondo) y hecho un bollito ocupa unos cuatro quintos de su almohadón.
  */
-export const CAT_SCALE = 3;
+export const CAT_SCALE = 2;
 
 /** Altura a la que apoyan las patas en el piso (sobre la alfombra). */
 export const GROUND_Y = 702;

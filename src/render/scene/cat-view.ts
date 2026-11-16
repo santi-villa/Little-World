@@ -82,6 +82,30 @@ function loadClip(name: string): Clip {
   return { frames, fps: entry.fps ?? 12, anchor: { x: a.x / entry.frameWidth, y: a.y / entry.frameHeight } };
 }
 
+/** Corazón de 5x4 píxeles. */
+const HEART = ['.#.#.', '#####', '.###.', '..#..'];
+
+/**
+ * Tres corazoncitos que suben desde la cabeza del gato, se mecen un poco y se
+ * desvanecen; cada uno con su desfase. Coordenadas en píxeles de 2.
+ */
+function drawHearts(g: Graphics, cx: number, top: number, seconds: number, daylight: number): void {
+  const color = lerpColor(0x8a4a6a, 0xff6b8a, daylight);
+  const shine = lerpColor(0x9a7a8a, 0xffd0dc, daylight);
+  for (let k = 0; k < 3; k++) {
+    const life = 1.8;
+    const t = ((seconds + k * 0.6) % life) / life;
+    const x = cx - 2 + (k - 1) * 6 + Math.round(Math.sin(seconds * 2.2 + k * 2) * 1.5);
+    const y = top - Math.round(t * 14);
+    const alpha = t < 0.2 ? t / 0.2 : 1 - (t - 0.2) / 0.8;
+    HEART.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) if (row[c] === '#') g.rect(x + c, y + r, 1, 1);
+    });
+    g.fill({ color, alpha });
+    g.rect(x + 1, y + 1, 1, 1).fill({ color: shine, alpha });
+  }
+}
+
 /** Camino más corto de poses (lista de transiciones). */
 function route(from: Pose, to: Pose): (typeof TRANSITIONS)[number][] {
   if (from === to) return [];
@@ -317,12 +341,14 @@ export class CatView {
     const sprite = this.sprite;
     sprite.texture = clip.frames[frame] ?? clip.frames[0] ?? Texture.EMPTY;
     sprite.anchor.set(clip.anchor.x, clip.anchor.y);
+    sprite.texture.source.scaleMode = 'nearest';
     sprite.scale.set(this.facing * CAT_SCALE, CAT_SCALE);
-    sprite.position.set(Math.round(this.x), Math.round(this.y));
+    // En píxeles enteros del dibujo del gato (múltiplos de su escala): no se deforma al moverse.
+    sprite.position.set(Math.round(this.x / CAT_SCALE) * CAT_SCALE, Math.round(this.y / CAT_SCALE) * CAT_SCALE);
     sprite.visible = this.x <= GAME_WIDTH + 60;
     sprite.tint = lerpColor(0x4a5272, 0xffffff, daylight);
 
-    // Globito y zetas: lo que "dice" (letra de 2 px, nunca más gorda que el fondo).
+    // Zetas, corazoncitos y globito: en píxeles de 2 (los mismos que el gato).
     const g = this.graphics;
     g.clear();
     if (!sprite.visible) return;
@@ -334,8 +360,13 @@ export class CatView {
       drawPixelText(g, 'z', cx + this.facing * 24, top - 4 - drift, ink, 1);
       return;
     }
-    const say = cat.behavior === 'purr' ? texts.cat.purr : cat.behavior === 'beg_food' ? texts.cat.hungry : '';
-    if (say && Math.floor(seconds * 2) % 3 !== 0) {
+    // Ronroneando o recién acariciado: corazoncitos que suben y se desvanecen.
+    if (cat.behavior === 'purr' || seconds - this.pettedAt < PET_SECONDS) {
+      drawHearts(g, cx, top - 2, seconds, daylight);
+      return;
+    }
+    if (cat.behavior === 'beg_food' && Math.floor(seconds * 2) % 3 !== 0) {
+      const say = texts.cat.hungry;
       drawPixelText(g, say, cx - Math.round(textWidth(say) / 2), top - 10, ink, 1);
     }
   }
