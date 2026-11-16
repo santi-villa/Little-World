@@ -6,6 +6,9 @@
  */
 
 import { betta } from './betta';
+import { cherryShrimp } from './cherry-shrimp';
+import { corydoras } from './corydoras';
+import { guppy } from './guppy';
 import { neonTetra } from './neon';
 import type { FishSprite } from './painter';
 
@@ -14,4 +17,7 @@ export { SpritePainter, type FishSprite, type SpritePose } from './painter';
 export const FISH_SPRITES: Partial<Record<string, FishSprite>> = {
   betta,
   neon_tetra: neonTetra,
+  guppy,
+  corydoras_paleatus: corydoras,
+  cherry_shrimp: cherryShrimp,
 };
