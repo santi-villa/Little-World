@@ -6,20 +6,11 @@
 
 import type { Graphics } from 'pixi.js';
 import type { TankRect } from '../tank/tank-layout';
-import { BOWL, DESK, LAMP, MUG, PX, SUNBEAM } from './scene-layout';
+import { DESK, LAMP, MUG, PX, SUNBEAM } from './scene-layout';
 
-/** Vapor y plato del gato. `g` está escalado por PX: se dibuja en píxeles gordos. */
-export function drawRoomAnim(g: Graphics, tone: (c: number) => number, t: number, bowl: number): void {
-  // Plato del gato.
-  const bx = Math.round(BOWL.x / PX);
-  const by = Math.round(BOWL.y / PX);
-  g.rect(bx - 9, by - 4, 18, 5).fill(tone(0x4a6a88));
-  g.rect(bx - 10, by - 5, 20, 2).fill(tone(0x6f8fb0));
-  g.rect(bx - 7, by, 14, 1).fill(tone(0x3a5670));
-  if (bowl > 0) {
-    const food = Math.max(2, Math.round(14 * bowl));
-    g.rect(bx - Math.floor(food / 2), by - 7, food, 2).fill(tone(0xa8703a));
-  }
+/** Vapor de la taza. `g` está escalado por PX: se dibuja en píxeles gordos. */
+export function drawRoomAnim(g: Graphics, t: number): void {
+  // El plato del gato no se dibuja hasta que haya arte del plato.
 
   // Vapor: tres hilitos que suben ondulando y se deshacen.
   const mx = Math.round(MUG.x / PX);

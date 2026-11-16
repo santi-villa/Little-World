@@ -35,7 +35,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
 import { drawLights, drawRoomAnim } from './room-fx';
 import { inRect, roomData, zoneRect, type RoomZone } from './room-zones';
-import { BIRD_PERCH, CURTAINS, CURTAIN_ROD, HANGING, PX, scenePreview } from './scene-layout';
+import { BIRD_PERCH, CURTAINS, CURTAIN_TOP, HANGING, PX, scenePreview } from './scene-layout';
 import { drawSky } from './window-view';
 
 /** Lo que la escena necesita además del estado de la simulación. */
@@ -48,7 +48,6 @@ type Point = { x: number; y: number };
 const ROOM_ID = 'dormitorio';
 /** Tinte de la habitación de noche (multiplica la imagen). */
 const NIGHT_TINT = 0x3a4472;
-const NIGHT = 0x0a0f22;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
 /** Cuánto hay que mover el dedo para que deje de ser un toque (píxeles de pantalla). */
@@ -138,9 +137,8 @@ export class RoomScene {
       this.swaying.push({ sprite, phase, amount });
     };
     for (const c of CURTAINS) {
-      const w = (tex(c.asset).width * c.scale) / 2;
-      const x = c.side === 'left' ? CURTAIN_ROD.left + w + 4 : CURTAIN_ROD.right - w - 4;
-      hang(c.asset, Math.round(x), CURTAIN_ROD.y + 2, c.scale, c.phase, 0.8);
+      const half = Math.round((tex(c.asset).width * c.scale) / 2);
+      hang(c.asset, c.side === 'left' ? c.edge - half : c.edge + half, CURTAIN_TOP, c.scale, c.phase, 0.8);
     }
     for (const p of HANGING) hang(p.asset, p.x, p.y, p.scale, p.phase, 1);
     this.anim.scale.set(PX);
@@ -445,7 +443,6 @@ export class RoomScene {
     // De noche aparece la imagen del cielo estrellado, de a poco según la hora.
     this.night.alpha = Math.min(1, (1 - day) * 1.15) * (view.weather === 'clear' ? 1 : view.weather === 'cloudy' ? 0.7 : 0.45);
     this.night.visible = this.night.alpha > 0.01;
-    this.night.scale.set(Math.max((this.window.width * PX) / this.night.texture.width, (this.window.height * PX) / this.night.texture.height));
     this.sky.clear();
     const bolt = drawSky(this.sky, this.window, day, view.weather, seconds, 'front');
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
@@ -461,10 +458,9 @@ export class RoomScene {
       item.sprite.rotation = (Math.min(2, breeze * item.amount) * swing * Math.PI) / 180;
     }
 
-    // Vapor y plato.
-    const tone = (c: number): number => lerpColor(lerpColor(c, NIGHT, 0.62), c, light);
+    // Vapor de la taza.
     this.anim.clear();
-    drawRoomAnim(this.anim, tone, seconds, state.cat.bowl);
+    drawRoomAnim(this.anim, seconds);
 
     // Luces.
     const sun = view.weather === 'clear' && day > 0.5 ? day : 0;

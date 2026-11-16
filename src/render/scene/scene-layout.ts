@@ -38,27 +38,35 @@ export const DESK = { left: 330, right: 984, top: 433, front: 469 };
 
 /** La barra de la cortina (de punta a punta) y su altura. */
 export const CURTAIN_ROD = { left: 347, right: 977, y: 34 };
+/** Donde empiezan los paños: apenas debajo de la barra. */
+export const CURTAIN_TOP = 41;
 
 /**
  * Plantas colgantes y cortinas: dónde se agarran (el pivote, arriba al centro)
- * y a qué escala. La escala deja el píxel del dibujo más chico que el del fondo.
+ * y a qué escala. Las imágenes vienen a la grilla del dibujo o a su tamaño
+ * final, así que la escala es siempre entera (nunca se achican al dibujar: eso
+ * saltea filas y hace rayas).
  */
 export const HANGING = [
   // Colgando del techo a los lados de la ventana.
-  { asset: 'colgante-macrame', x: 368, y: 0, scale: 0.6, phase: 0 },
-  { asset: 'colgante-potus', x: 1012, y: 0, scale: 0.62, phase: 1.7 },
+  { asset: 'colgante-macrame', x: 360, y: 0, scale: 2, phase: 0 },
+  { asset: 'colgante-potus', x: 1044, y: 0, scale: 2, phase: 1.7 },
   // Sobre la biblioteca, cayendo por el costado.
-  { asset: 'potus-1', x: 302, y: 105, scale: 0.62, phase: 3.1 },
+  { asset: 'potus-1', x: 290, y: 104, scale: 2, phase: 3.1 },
   // Sobre el estante de la derecha.
-  { asset: 'potus-2', x: 1196, y: 72, scale: 0.62, phase: 4.4 },
+  { asset: 'potus-2', x: 1196, y: 70, scale: 2, phase: 4.4 },
   // Enredadera colgando de la barra de la cortina.
-  { asset: 'enredadera', x: 830, y: 30, scale: 0.8, phase: 2.3 },
+  { asset: 'enredadera', x: 830, y: 32, scale: 2, phase: 2.3 },
 ] as const;
 
-/** Los dos paños de la cortina, colgados de la barra (arriba de la lámpara). */
+/**
+ * Los dos paños de la cortina, colgados justo debajo de la barra (que se ve
+ * entera) y a los costados: el borde de cada paño llega al borde del vidrio,
+ * sin taparlo. `edge` es el borde de adentro del paño.
+ */
 export const CURTAINS = [
-  { asset: 'cortina-izquierda', side: 'left', scale: 0.78, phase: 0.6 },
-  { asset: 'cortina-derecha', side: 'right', scale: 0.78, phase: 2.9 },
+  { asset: 'cortina-izquierda', edge: 413, side: 'left', scale: 1, phase: 0.6 },
+  { asset: 'cortina-derecha', edge: 909, side: 'right', scale: 1, phase: 2.9 },
 ] as const;
 
 /** El pájaro se posa en el alféizar de afuera, en el vidrio de abajo a la izquierda. */
