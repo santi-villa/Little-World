@@ -53,16 +53,16 @@ describe('escalado pixel perfect', () => {
   }
 
   it('casos conocidos', () => {
-    expect(computeLayout(844, 390, 3).scale).toBe(3); // 2532x1170 físicos
-    expect(computeLayout(1920, 1080, 1).scale).toBe(3);
-    expect(computeLayout(2560, 1440, 1).scale).toBe(4);
-    expect(computeLayout(640, 360, 1).scale).toBe(1);
+    expect(computeLayout(844, 390, 3).scale).toBe(1); // 2532x1170 físicos
+    expect(computeLayout(1920, 1080, 1).scale).toBe(1);
+    expect(computeLayout(2560, 1440, 1).scale).toBe(2);
+    expect(computeLayout(640, 360, 1).scale).toBeCloseTo(0.5, 6);
   });
 
   it('si no entra ni a 1x, se achica para verse entera', () => {
     const layout = computeLayout(480, 270, 1);
     expect(layout.integer).toBe(false);
-    expect(layout.scale).toBeCloseTo(0.75, 6);
+    expect(layout.scale).toBeCloseTo(0.375, 6);
     expect(layout.cssWidth).toBeLessThanOrEqual(480);
     expect(layout.cssHeight).toBeLessThanOrEqual(270);
   });
