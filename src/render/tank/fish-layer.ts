@@ -38,6 +38,9 @@ function hex(color: string): number {
 }
 
 export class FishLayer {
+  private devPanel?:import('../motion/betta-debug').BettaDebug;
+  constructor(){if(import.meta.env.DEV)void import('../motion/betta-debug').then(({BettaDebug})=>{this.devPanel=new BettaDebug();});}
+
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
   bettaStyle:'code'|'image'|'flat'='code';
@@ -272,6 +275,7 @@ export class FishLayer {
       const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
       const motion=this.motion.bettas.get(animal.id);
       fish.update(body,motion,cx,cy,len,this.dt,lightOn,animal.alive);
+      if(import.meta.env.DEV)this.devPanel?.draw(this.foodGraphics,body,motion,cx,cy,this.pxPerCm);
       if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
       return;
     }

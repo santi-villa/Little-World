@@ -11,7 +11,6 @@ export class BettaDynamics {
  private cycle=0;private goalAt=0;
  update(b:FishBody,a:MotionAnimal,dt:number,input:MotionInput,time:number,random:()=>number):void{
   const c=bettaParameters,L=Math.max(c.epsilon,a.sizeCm*c.bodyFraction),bounds=input.bounds;
-  if(time>=this.goalAt){b.goalX=L+(bounds.width-2*L)*random();b.goalY=bounds.height*(c.zoneTop+(c.zoneBottom-c.zoneTop)*random());this.goalAt=time+c.goalMinSeconds+random()*(c.goalMaxSeconds-c.goalMinSeconds);}
   this.sizeCm=a.sizeCm;
   if(!this.nextBreath)this.nextBreath=time+c.breatheMinSeconds+random()*(c.breatheMaxSeconds-c.breatheMinSeconds);
   const scared=a.intent==='flee'||!!input.scare||!!(input.hand&&input.hand.age<c.handRecentSeconds&&input.hand.speed>c.handShadowSpeed);
@@ -33,6 +32,7 @@ export class BettaDynamics {
    const features=[...(input.habitat?.refuges??[]),...(input.habitat?.leaves??[])];
    if(time>=this.goalAt&&features.length&&random()<c.investigateChance){const feature=features[Math.floor(random()*features.length)]!;this.mode='investigate';this.modeUntil=time+c.investigateSeconds;b.goalX=feature.x*bounds.width;b.goalY=feature.y*bounds.height;this.goalAt=this.modeUntil;}
   }
+  if(this.mode==='wander'&&time>=this.goalAt){b.goalX=L+(bounds.width-2*L)*random();b.goalY=bounds.height*(c.zoneTop+(c.zoneBottom-c.zoneTop)*random());this.goalAt=time+c.goalMinSeconds+random()*(c.goalMaxSeconds-c.goalMinSeconds);}
   if(this.mode!=='wander')this.goalAt=Math.max(this.goalAt,time+c.goalMinSeconds);
   this.cycle+=dt;
   const period=c.burstSeconds+c.glideSeconds+c.floatSeconds,at=this.cycle%period;
