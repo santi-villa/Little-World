@@ -23,6 +23,9 @@ export interface AssetEntry {
   /** Píxeles del PNG por píxel del dibujo (para dibujar todo con el mismo tamaño de píxel). */
   artPx?: number;
   /** Cuadro de animación: nombre de la animación (gato-caminar) y número de cuadro (desde 1). */
+  /** Cursor: la versión 2x y el punto activo (punta del dedo o de la herramienta). */
+  file2x?: string;
+  hotspot?: { x: number; y: number };
   anim?: string;
   frame?: number;
   /** Animación en tira (videos del gato): cuadros, su tamaño, velocidad y punto de apoyo. */

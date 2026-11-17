@@ -544,5 +544,58 @@
     "offline": "Conectate a internet para actualizar el juego.",
     "downloadError": "No se pudo descargar el juego. Intentá nuevamente con conexión.",
     "saveError": "No se pudo guardar; volvé a intentar actualizar"
+  },
+  "ui": {
+    "zones": {
+      "cat": "El gato",
+      "tank": "Acuario",
+      "lamp": "Lámpara",
+      "notebook": "Cuaderno",
+      "library": "Biblioteca",
+      "window": "Ventana"
+    },
+    "hudDay": "Día {day} · {time}",
+    "hudWeather": "Afuera: {weather}. Tocá para ver el clima.",
+    "water": {
+      "ok": "El agua está bien. Tocá para ver el detalle.",
+      "check": "Conviene revisar el agua. Tocá para ver el detalle.",
+      "danger": "El agua está en peligro. Tocá para ver el detalle."
+    },
+    "trayLabel": "Bandeja de herramientas",
+    "tools": {
+      "food": "Comida",
+      "sponge": "Esponja",
+      "bucket": "Balde (cambio de agua)",
+      "kit": "Kit de test",
+      "filter": "Filtro",
+      "observe": "Lupa",
+      "tap": "Golpecito"
+    },
+    "drop": "Soltar",
+    "openLid": "Abrir tapa",
+    "closeLid": "Cerrar tapa",
+    "toolHints": {
+      "food": "Abrí la tapa y tocá el agua para dar una pizca.",
+      "sponge": "Arrastrá la esponja sobre el vidrio.",
+      "bucket": "Tocá la pecera para cambiar parte del agua.",
+      "kit": "Tocá la pecera para medir el agua.",
+      "filter": "Tocá la pecera para revisar el filtro.",
+      "observe": "Tocá un pez para conocerlo.",
+      "tap": "Un golpe asusta: no es una caricia."
+    },
+    "cannot": {
+      "lidClosed": "La tapa está cerrada: abrila primero.",
+      "fed": "Ya hay comida en el agua. Esperá a que coma.",
+      "filterClean": "El filtro está bien: no hace falta limpiarlo ahora.",
+      "glassClean": "El vidrio está limpio."
+    },
+    "bucketConfirm": "¿Cambiar el 25% del agua ({liters} L)? El agua nueva va acondicionada y a la misma temperatura.",
+    "filterConfirm": "¿Limpiar el filtro con agua de la pecera? Así no se pierden las bacterias buenas.",
+    "yes": "Sí, hacerlo",
+    "no": "Mejor no",
+    "waterChanged": "Listo: cambiaste el 25% del agua.",
+    "filterCleaned": "Listo: filtro limpio.",
+    "pinch": "Una pizca. Mirá cómo come.",
+    "knock": "Los golpes asustan a los peces."
   }
 }

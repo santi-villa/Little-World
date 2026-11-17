@@ -4,6 +4,11 @@ import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
 import { loadAssets } from './render/assets';
 import { RoomScene } from './render/scene/room-scene';
+import { enableTips, follow, longPress, setCursor } from './render/ui/cursor';
+import { HudPaper } from './render/ui/hud-paper';
+import { initUiArt } from './render/ui/paper-ui';
+import { uiInsets } from './render/ui/scene-ui';
+import { ToolTray } from './render/ui/tool-tray';
 import { WelcomePanel } from './render/ui/welcome';
 import { DebugPanel } from './render/ui/debug-panel';
 import { fill, texts } from './render/ui/texts';
@@ -13,6 +18,7 @@ import { deleteSave, readSave, writeSave } from './save/storage';
 import { MINUTES_PER_DAY, defaultConfig, derive } from './sim';
 import { BuenosAiresWeather } from './world/weather';
 import './styles.css';
+import './ui.css';
 
 /** Autoguardado cada 1 minuto (además de al pasar a segundo plano). */
 const AUTOSAVE_MS = 60_000;
@@ -175,23 +181,35 @@ async function boot(): Promise<void> {
   };
 
   await loadAssets();
-  const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom(), tool => scene.selectTool(tool), () => scene.toggleLid());
+  // UI de papel y madera: arte en variables CSS, cursores y nombres al tocar largo.
+  initUiArt();
+  enableTips();
+  const tray = new ToolTray((tool) => scene.selectTool(tool), () => scene.toggleLid());
+  const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom(), (tool) => {
+    const why = scene.selectTool(tool);
+    if (why) tray.reject(tool, why);
+  }, () => scene.toggleLid());
+  const hud = new HudPaper(() => tools.open('weather'), () => tools.open('status'));
   const scene = new RoomScene((action) => void game.act(action), (page, animalId) => {
     if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
-    if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor') tools.open(page);
+    if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
   });
+  scene.onReject = (tool, reason) => tray.reject(tool, reason);
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
   scene.update(game.state, derive(game.state), performance.now() / 1000,
     { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default' });
   tools.setBusy(true);
+  // Mientras se recupera el acuario, el cursor es el reloj de arena.
+  document.body.classList.add('busy');
   const recovering = document.createElement('div');
   recovering.className = 'recovery-status'; recovering.setAttribute('role', 'status');
   recovering.textContent = texts.careUi.recuperando_acuario;
   if (lastTimestamp > 0 && Date.now() - lastTimestamp >= 20_000) document.body.append(recovering);
   await initialRecovery;
   tools.setBusy(false); recovering.remove();
+  document.body.classList.remove('busy');
 
   const panel = new DebugPanel(game, document.body, {
     saveStatus,
@@ -219,14 +237,46 @@ async function boot(): Promise<void> {
       y: ((event.clientY - rect.top) / rect.height) * GAME_HEIGHT,
     };
   };
+  // Cursor según lo que hay debajo; con el dedo, la herramienta va pegada al
+  // dedo mientras se arrastra y un toque largo dice qué es lo que se toca.
+  let cancelLong: (() => void) | null = null;
+  let pressStart: { x: number; y: number } | null = null;
+  const toolUnderFinger = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
+    const tool = scene.activeTool;
+    follow(tool === 'hand' ? null : scene.cursorAt(toScene(event)), event.clientX, event.clientY);
+  };
   canvas.addEventListener('pointerdown', (event) => {
     canvas.setPointerCapture?.(event.pointerId);
-    scene.pointerDown(toScene(event));
+    const p = toScene(event);
+    scene.pointerDown(p);
+    setCursor(scene.cursorAt(p));
+    toolUnderFinger(event);
+    pressStart = { x: event.clientX, y: event.clientY };
+    cancelLong?.();
+    cancelLong = longPress(() => scene.describe(p), () => scene.cancelPress());
   });
-  canvas.addEventListener('pointermove', (event) => scene.pointerMove(toScene(event)));
-  canvas.addEventListener('pointerup', (event) => scene.pointerUp(toScene(event)));
+  canvas.addEventListener('pointermove', (event) => {
+    const p = toScene(event);
+    scene.pointerMove(p);
+    setCursor(scene.cursorAt(p));
+    if (pressStart) toolUnderFinger(event);
+    if (pressStart && Math.hypot(event.clientX - pressStart.x, event.clientY - pressStart.y) > 10) {
+      cancelLong?.();
+      cancelLong = null;
+    }
+  });
+  const release = (event: PointerEvent, cancelled = false): void => {
+    cancelLong?.();
+    cancelLong = null;
+    pressStart = null;
+    scene.pointerUp(toScene(event), cancelled);
+    setCursor(scene.cursorAt(toScene(event)));
+    follow(null, 0, 0);
+  };
+  canvas.addEventListener('pointerup', (event) => release(event));
   canvas.addEventListener('pointerleave', () => scene.pointerLeave());
-  canvas.addEventListener('pointercancel', (event) => scene.pointerUp(toScene(event), true));
+  canvas.addEventListener('pointercancel', (event) => release(event, true));
 
   let lastFrame = performance.now();
   app.ticker.add(() => {
@@ -235,6 +285,15 @@ async function boot(): Promise<void> {
     lastFrame = frame;
     if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
     tools.update();
+    hud.update(game.state, game.weather, derive(game.state).hour);
+    tray.update(scene.activeTool, game.state.tank.hasLid);
+    // La cámara deja la pecera arriba de la bandeja: su alto, en píxeles del juego.
+    const trayHeight = tray.height;
+    if (trayHeight > 0) {
+      const scale = canvas.getBoundingClientRect().height / GAME_HEIGHT;
+      uiInsets.bottom = Math.round((trayHeight + 12) / Math.max(0.01, scale));
+      document.body.style.setProperty('--tray-height', `${trayHeight}px`);
+    }
     // Después de una acción del jugador se guarda enseguida.
     if (game.saveSoon) {
       game.saveSoon = false;

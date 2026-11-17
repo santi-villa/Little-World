@@ -1,4 +1,6 @@
-import { pinchGrams, strokeSamples, type HandTool } from '../hand-tools';
+import { cannotUse, pinchGrams, strokeSamples, type HandTool } from '../hand-tools';
+import { confirmPaper, type CursorState } from '../ui/paper-ui';
+import { fill } from '../ui/texts';
 import { ambientTint } from '../art-direction';
 import decorData from '../../data/tank-decor.json';
 import type { OutsideView } from '../../world/weather';
@@ -32,7 +34,7 @@ import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
-import { CARE_BAR_HEIGHT, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
+import { careBarHeight, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
@@ -97,7 +99,9 @@ export class RoomScene {
   private readonly ui = new SceneUi();
   /** Los vidrios de la ventana, en píxeles gordos. */
   private readonly window: { x: number; y: number; width: number; height: number };
-  private handTool:HandTool='observe';
+  private handTool:HandTool='hand';
+  /** Si una herramienta no se puede usar: la bandeja la sacude y explica por qué. */
+  onReject:(tool:HandTool,reason:string)=>void=()=>undefined;
   private hand:{x:number;y:number;at:number;speed:number}|null=null;
   private state:SimState|null=null;
   private lastTap=-100;
@@ -118,7 +122,7 @@ export class RoomScene {
   private seconds = 0;
 
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
-  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | CareId, animalId?: number) => void) {
+  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | 'status' | CareId, animalId?: number) => void) {
     const hole = asset(this.data.background)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
     this.window = {
       x: Math.floor(hole.x / PX),
@@ -168,7 +172,7 @@ export class RoomScene {
       this.flash,
       this.glow,
     );
-    this.container.addChild(this.world, this.ui.container);
+    this.container.addChild(this.world);
     this.roomView = { ...this.data.camera };
     this.camera.goTo(this.roomView, true);
   }
@@ -313,20 +317,27 @@ export class RoomScene {
       if(this.handTool==='food'){
         // A click above the surface chooses where the hand drops its pinch.
         if(w.x>=r.x && w.x<=r.x+r.width && w.y>=this.tank.bounds.y-35 && w.y<=r.y+r.height){
-          if(state.tank.hasLid){this.ui.say(texts.hand.openFirst);return;}
+          const why=cannotUse('food',state);
+          if(why){this.onReject('food',texts.ui.cannot[why]);return;}
           const grams=pinchGrams(state);
-          if(grams<=.0001){this.ui.say(texts.hand.wait);return;}
           this.act({type:'feed',grams,x:Math.max(0,Math.min(1,(w.x-r.x)/r.width))});
-          this.ui.say(texts.hand.pinch);
+          this.ui.say(texts.ui.pinch);
         }
         return;
       }
       if(inRect(r,w.x,w.y)){
         if(this.handTool==='tap'){
           if(this.seconds-this.lastTap<1)return;
-          this.lastTap=this.seconds;this.act({type:'tapGlass'});this.tank.scareAt(w.x,w.y);this.ui.say(texts.hand.knock);
-        } else if(this.handTool==='observe'){
+          this.lastTap=this.seconds;this.act({type:'tapGlass'});this.tank.scareAt(w.x,w.y);this.ui.say(texts.ui.knock);
+        } else if(this.handTool==='observe'||this.handTool==='hand'){
           const id=this.tank.fishAt(w.x,w.y);if(id!==null)this.tools('fish',id);
+        } else if(this.handTool==='kit'){
+          this.tools('status');
+        } else if(this.handTool==='bucket'){
+          void this.confirmCare('bucket');
+        } else if(this.handTool==='filter'){
+          const why=cannotUse('filter',state);
+          if(why)this.onReject('filter',texts.ui.cannot[why]);else void this.confirmCare('filter');
         }
       }
       return;
@@ -368,10 +379,72 @@ export class RoomScene {
     }
   }
 
-  selectTool(tool:HandTool):void {
-    this.showTank();this.handTool=tool;
-    this.ui.say(tool==='food'?texts.hand.foodHint:tool==='sponge'?texts.hand.spongeHint:tool==='tap'?texts.hand.tapHint:texts.hand.observeHint);
+  /**
+   * Agarra una herramienta (o la suelta con 'hand'). Si no se puede usar ahora,
+   * no se agarra y devuelve el motivo (la bandeja la sacude y lo explica).
+   */
+  selectTool(tool:HandTool):string|null {
+    if(this.mode!=='tank')this.showTank();
+    if(tool==='hand'||tool===this.handTool){this.handTool='hand';return null;}
+    const why=this.state?cannotUse(tool,this.state):null;
+    // La comida con la tapa cerrada se puede agarrar igual: el aviso dice qué falta.
+    if(why&&!(tool==='food'&&why==='lidClosed'))return texts.ui.cannot[why];
+    this.handTool=tool;
+    this.ui.say(why?texts.ui.cannot[why]:texts.ui.toolHints[tool]);
+    return null;
   }
+  get activeTool():HandTool{return this.handTool;}
+
+  /** Cambio de agua o limpieza de filtro: acciones importantes, con confirmación. */
+  private async confirmCare(kind:'bucket'|'filter'):Promise<void>{
+    const state=this.state;if(!state)return;
+    const text=kind==='bucket'?fill(texts.ui.bucketConfirm,{liters:(state.tank.waterLiters*0.25).toFixed(1)}):texts.ui.filterConfirm;
+    if(!(await confirmPaper(text,texts.ui.yes,texts.ui.no)))return;
+    const now=this.state;if(!now)return;
+    if(kind==='bucket'){
+      this.act({type:'waterChange',fraction:0.25,conditioned:true,vacuum:true,temperatureC:now.water.temperatureC});
+      this.ui.say(texts.ui.waterChanged);
+    }else{
+      this.act({type:'cleanFilter',method:'tankWater'});
+      this.ui.say(texts.ui.filterCleaned);
+    }
+  }
+
+  /** Qué cursor corresponde en ese punto de la pantalla. */
+  cursorAt(p:Point):CursorState {
+    if(this.gesture?.dragging && this.mode==='room')return 'grab';
+    if(this.mode==='tank'){
+      const tool={food:'pinch',sponge:'sponge',observe:'lens',tap:'tap',bucket:'bucket',kit:'point',filter:'point'} as const;
+      if(this.handTool!=='hand')return tool[this.handTool];
+    }
+    const w=this.camera.toWorld(p.x,p.y);
+    if(this.cat.hit(w.x,w.y))return 'pet';
+    if(this.mode==='tank')return this.tank.fishAt(w.x,w.y)!==null?'point':'open';
+    if(this.mode==='room'){
+      const live={tank:this.tank.bounds,cat:this.cat.rect};
+      if(this.data.zones.some(z=>inRect(zoneRect(z,live),w.x,w.y)))return 'point';
+    }
+    return 'open';
+  }
+
+  /** El nombre de lo que hay en ese punto (toque largo o hover). */
+  describe(p:Point):string|null {
+    const w=this.camera.toWorld(p.x,p.y);
+    if(this.mode==='tank'){
+      const id=this.tank.fishAt(w.x,w.y);
+      const animal=id===null?undefined:this.state?.animals.find(a=>a.id===id);
+      if(animal)return animal.name||texts.ui.zones.tank;
+      if(this.handTool!=='hand')return texts.ui.tools[this.handTool];
+      return null;
+    }
+    if(this.cat.hit(w.x,w.y))return texts.ui.zones.cat;
+    const live={tank:this.tank.bounds,cat:this.cat.rect};
+    const zone=this.data.zones.find(z=>inRect(zoneRect(z,live),w.x,w.y));
+    return zone?(texts.ui.zones as Record<string,string>)[zone.id]??null:null;
+  }
+
+  /** Un toque largo mostró el nombre: soltar ya no cuenta como toque. */
+  cancelPress():void{this.gesture=null;this.camera.dragging=false;}
   toggleLid():void {if(this.state){this.act({type:'setLid',hasLid:!this.state.tank.hasLid});}}
   showRoom(): void { this.exitFocus(); }
 
@@ -380,10 +453,11 @@ export class RoomScene {
   /** La pecera de cerca: ocupa `fill` de la pantalla, arriba de la barra de acciones. */
   private tankFocus(fill: number): CameraView {
     const t = this.tank.bounds;
-    const free = GAME_HEIGHT - CARE_BAR_HEIGHT;
+    const bar = careBarHeight();
+    const free = GAME_HEIGHT - bar;
     const zoom = Math.min((fill * GAME_WIDTH) / t.width, (0.94 * free) / t.height);
-    // Centrada en el espacio libre (la barra tapa la parte de abajo de la pantalla).
-    return { x: t.x + t.width / 2, y: t.y + t.height / 2 + CARE_BAR_HEIGHT / 2 / zoom, zoom };
+    // Centrada en el espacio libre (la bandeja tapa la parte de abajo de la pantalla).
+    return { x: t.x + t.width / 2, y: t.y + t.height / 2 + bar / 2 / zoom, zoom };
   }
 
   private catFocus(): CameraView {
@@ -409,7 +483,7 @@ export class RoomScene {
 
   private exitFocus(): void {
     if (this.mode === 'room') return;
-    this.mode = 'room';this.handTool='observe';this.pointerLeave();
+    this.mode = 'room';this.handTool='hand';this.pointerLeave();
     this.camera.goTo(this.roomView);
   }
 

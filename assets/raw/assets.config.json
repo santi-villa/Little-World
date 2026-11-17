@@ -565,7 +565,23 @@
         ]
       ],
       "scale": 0.1667,
-      "kernel": "mitchell"
+      "kernel": "mitchell",
+      "tapes": {
+        "ui-papel": [
+          26,
+          0,
+          67,
+          14,
+          6
+        ],
+        "ui-nota": [
+          20,
+          0,
+          47,
+          10,
+          4
+        ]
+      }
     },
     "ui/objetos-cuarto": {
       "names": [

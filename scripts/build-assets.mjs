@@ -290,6 +290,7 @@ async function processSprites(path, rel, cfg) {
     const name = cfg.names?.[i] ?? (pieces.length === 1 ? stem : `${stem}-${i + 1}`);
     const file = join(dir, `${name}.png`);
     const size = await savePng(img, pieces[i], scale, join(OUT, file), cfg.kernel);
+    if (cfg.tapes?.[name]) await splitTape(name, file, cfg.tapes[name], rel, dir);
     const extra = { kind: isPlant ? 'plant' : 'sprite', artPx: artPxOf(cfg, img.width, scale) };
     // Dónde se agarra (cuelga) o apoya, en fracción del ancho y del alto.
     if (cfg.pivot) extra.pivot = cfg.pivot;
@@ -297,6 +298,44 @@ async function processSprites(path, rel, cfg) {
     register(name, file, size, rel, extra);
   }
   return pieces.length;
+}
+
+/**
+ * Papeles con cinta: la cinta (en el centro del borde de arriba) se separa en su
+ * propia imagen y debajo se completa el borde, así el papel se puede estirar por
+ * el medio (9-slice) sin estirar la cinta. `box` = [x0, y0, x1, y1, filaDelBorde]
+ * en px de la imagen ya achicada.
+ */
+async function splitTape(name, file, [x0, y0, x1, y1, edgeRow], rel, dir) {
+  const { data, info } = await sharp(join(OUT, file)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width;
+  const at = (x, y) => (y * W + x) * 4;
+  // La cinta, tal cual.
+  const tw = x1 - x0;
+  const th = y1 - y0;
+  const tape = Buffer.alloc(tw * th * 4);
+  for (let y = 0; y < th; y++) data.copy(tape, y * tw * 4, at(x0, y0 + y), at(x0, y0 + y) + tw * 4);
+  // El papel sin cinta: arriba del borde, transparente; el borde, contorno; abajo, papel.
+  const outline = data.subarray(at(2, edgeRow + 8), at(2, edgeRow + 8) + 4);
+  for (let x = x0; x < x1; x++) {
+    for (let y = y0; y < y1; y++) {
+      const i = at(x, y);
+      if (y < edgeRow) data.fill(0, i, i + 4);
+      else if (y === edgeRow) {
+        // Mismo color que el contorno del costado.
+        data[i] = outline[0];
+        data[i + 1] = outline[1];
+        data[i + 2] = outline[2];
+        data[i + 3] = 255;
+      } else data.copy(data, i, at(x, y1 + 2), at(x, y1 + 2) + 4);
+    }
+  }
+  const bodyFile = join(dir, `${name}-cuerpo.png`);
+  const tapeFile = join(dir, `${name}-cinta.png`);
+  await sharp(data, { raw: { width: W, height: info.height, channels: 4 } }).png().toFile(join(OUT, bodyFile));
+  await sharp(tape, { raw: { width: tw, height: th, channels: 4 } }).png().toFile(join(OUT, tapeFile));
+  register(`${name}-cuerpo`, bodyFile, { width: W, height: info.height }, rel, { kind: 'ui', artPx: 1 });
+  register(`${name}-cinta`, tapeFile, { width: tw, height: th }, rel, { kind: 'ui', artPx: 1, at: { x: x0, y: y0 } });
 }
 
 /**

@@ -10,10 +10,14 @@ export function versionedArt():Plugin {
   load(id){
    if(id!=='\0versioned-art')return;
    const root=resolve('public/assets'),manifest=JSON.parse(readFileSync(resolve(root,'manifest.json'),'utf8'));
-   for(const entry of Object.values(manifest.assets) as {file:string}[]){
-    const source=readFileSync(resolve(root,entry.file));const digest=createHash('sha256').update(source).digest('hex').slice(0,20);
-    if(production){const fileName=`art/${digest}-${basename(entry.file)}`;this.emitFile({type:'asset',fileName,source});entry.file=fileName;}
-    else entry.file=`assets/${entry.file}?v=${digest}`;
+   for(const entry of Object.values(manifest.assets) as {file:string;file2x?:string}[]){
+    // Also version the 2x cursor images.
+    for(const key of ['file','file2x'] as const){
+     const file=entry[key];if(!file)continue;
+     const source=readFileSync(resolve(root,file));const digest=createHash('sha256').update(source).digest('hex').slice(0,20);
+     if(production){const fileName=`art/${digest}-${basename(file)}`;this.emitFile({type:'asset',fileName,source});entry[key]=fileName;}
+     else entry[key]=`assets/${file}?v=${digest}`;
+    }
    }
    return `export default ${JSON.stringify(manifest.assets)};`;
   }

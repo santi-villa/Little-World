@@ -790,6 +790,26 @@
       "kind": "sprite",
       "artPx": 1
     },
+    "ui-papel-cuerpo": {
+      "file": "ui/ui-papel-cuerpo.png",
+      "width": 89,
+      "height": 97,
+      "source": "ui/marcos-ui",
+      "kind": "ui",
+      "artPx": 1
+    },
+    "ui-papel-cinta": {
+      "file": "ui/ui-papel-cinta.png",
+      "width": 41,
+      "height": 14,
+      "source": "ui/marcos-ui",
+      "kind": "ui",
+      "artPx": 1,
+      "at": {
+        "x": 26,
+        "y": 0
+      }
+    },
     "ui-papel": {
       "file": "ui/ui-papel.png",
       "width": 89,
@@ -797,6 +817,26 @@
       "source": "ui/marcos-ui",
       "kind": "sprite",
       "artPx": 1
+    },
+    "ui-nota-cuerpo": {
+      "file": "ui/ui-nota-cuerpo.png",
+      "width": 62,
+      "height": 46,
+      "source": "ui/marcos-ui",
+      "kind": "ui",
+      "artPx": 1
+    },
+    "ui-nota-cinta": {
+      "file": "ui/ui-nota-cinta.png",
+      "width": 27,
+      "height": 10,
+      "source": "ui/marcos-ui",
+      "kind": "ui",
+      "artPx": 1,
+      "at": {
+        "x": 20,
+        "y": 0
+      }
     },
     "ui-nota": {
       "file": "ui/ui-nota.png",

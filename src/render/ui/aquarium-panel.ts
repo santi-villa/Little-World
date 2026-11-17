@@ -9,6 +9,7 @@ import type { Game } from '../../game';
 import { advice, suggestedFoodG } from '../../care';
 import { defaultConfig, findSpecies, type SimAction } from '../../sim';
 import { fill, formatClock, texts } from './texts';
+import { showNote } from './paper-ui';
 import type { CareId } from './scene-ui';
 
 const careText = allTexts.careUi;
@@ -30,12 +31,9 @@ export class AquariumPanel {
   private weatherKey = '';
   private page: Page | null = null;
   private lastKey = '';
-  private readonly handStatus=document.createElement('output');
-  private readonly lidButton:HTMLButtonElement;
-  private readonly toolButtons:HTMLButtonElement[]=[];
   private selectedAnimal: number | null = null;
   private opener: Element | null = null;
-  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void, private readonly chooseTool:(tool:HandTool)=>void, toggleLid:()=>void) {
+  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void, private readonly chooseTool:(tool:HandTool)=>void, _toggleLid?:()=>void) {
     const nav = this.navigation;
     nav.className = 'aquarium-nav'; nav.setAttribute('aria-label', careText.herramientas_del_acuario);
     this.statusButton = button(careText.agua, () => this.open('status'));
@@ -43,17 +41,14 @@ export class AquariumPanel {
     const tankFocus = button(careText.acuario, focusTank); tankFocus.className = 'tank-focus';
     this.statusButton.classList.add('water-tool');
     const notebook=button(careText.cuaderno,()=>this.open('diary'));
-    nav.append(returnRoom,tankFocus,this.statusButton,notebook);
+    // El estado del agua está en la gotita del HUD; acá quedan los caminos a la habitación y al cuaderno.
+    nav.append(returnRoom,tankFocus,notebook);
     const contemplate=button(careText.contemplar,()=>{
       showRoom(); document.body.classList.add('contemplating'); reveal.hidden=false; reveal.focus();
     });
     const reveal=button(careText.mostrar_controles,()=>{document.body.classList.remove('contemplating');reveal.hidden=true;contemplate.focus();});
     reveal.className='reveal-controls';reveal.hidden=true;document.body.append(reveal);nav.append(contemplate);
-    const handBar=document.createElement('nav');handBar.className='hand-toolbar';handBar.setAttribute('aria-label',texts.hand.label);
-    for(const [tool,label]of [['observe',texts.hand.observe],['food',texts.hand.food],['sponge',texts.hand.sponge],['tap',texts.hand.tap]] as const){
-      const control=button(label,()=>this.chooseTool(tool));control.dataset.tool=tool;this.toolButtons.push(control);handBar.append(control);
-    }
-    this.lidButton=button(texts.hand.openLid,toggleLid);handBar.append(this.lidButton,this.handStatus);document.body.append(handBar);
+    // Las herramientas y la tapa están en la bandeja de madera (tool-tray.ts).
     this.weatherButton = button(careText.buenos_aires, () => this.open('weather'));
     this.weatherButton.className = 'outside-chip';
     this.dialog.className = 'aquarium-dialog';
@@ -63,7 +58,8 @@ export class AquariumPanel {
     tabs.append(button(careText.diario,()=>this.open('diary')),button(careText.peces,()=>this.open('fish')),button(careText.guia,()=>this.open('guide')),button(careText.decorar,()=>this.open('decor')));
     this.dialog.append(this.heading, tabs, this.body, close);
     this.dialog.addEventListener('close', () => { this.page = null; if (this.opener instanceof HTMLElement) this.opener.focus(); });
-    document.body.append(nav, this.weatherButton, this.dialog);
+    // El clima se abre desde el papelito del HUD (hud-paper.ts).
+    document.body.append(nav, this.dialog);
     // Let the room be the first screen; the guide is available from the toolbar.
   }
   openAnimal(id:number):void {
@@ -86,11 +82,6 @@ export class AquariumPanel {
     this.game.dirty = true; this.game.saveSoon = true; this.render();
   }
   update(): void {
-    const handText=fill(texts.hand.status,{algae:Math.round(this.game.state.algae.glass*100),food:(this.game.state.food.surfaceG+this.game.state.food.sinkingG).toFixed(3)});
-    if(this.handStatus.textContent!==handText)this.handStatus.textContent=handText;
-    const lidText=this.game.state.tank.hasLid?texts.hand.openLid:texts.hand.closeLid;
-    if(this.lidButton.textContent!==lidText)this.lidButton.textContent=lidText;
-    for(const control of this.toolButtons){const selected=String(control.dataset.tool===document.body.dataset.handTool);if(control.getAttribute('aria-pressed')!==selected)control.setAttribute('aria-pressed',selected);}
 
     const view = this.climate.view();
     const local = buenosAiresDate(view.nowMs);
@@ -236,9 +227,7 @@ export class AquariumPanel {
       if(id==='feed') {
         if(this.game.player.tutorial===2){this.game.player.tutorial=3;this.game.dirty=true;this.game.saveSoon=true;}
         this.close();this.focusTank();
-        const feedback=document.createElement('div');feedback.className='care-feedback';feedback.setAttribute('role','status');
-        feedback.textContent=careText.una_porcion_pequena_mira_como_se;
-        document.body.append(feedback);window.setTimeout(()=>feedback.remove(),6500);return;
+        showNote(careText.una_porcion_pequena_mira_como_se,6500);return;
       }
       this.page = 'status'; this.status(); this.paragraph(careText.cuidado_realizado_observa_como_responden_el);
     });
