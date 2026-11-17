@@ -178,10 +178,10 @@ export class BettaDynamics {
       b.heading += turn;
       const speed = Math.hypot(b.vx, b.vy),
         cap =
-          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS),
+          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS)*(a.condition??1),
         thrust =
           this.stroke === 'burst' && speed < cap
-            ? (this.mode === 'startle' ? c.burstThrust : c.thrust) * L
+            ? (this.mode === 'startle' ? c.burstThrust : c.thrust) * L*(a.condition??1)
             : 0;
       const wall = containment(b, bounds, L * c.wallLengths, c.wallForce * L);
       let fx = Math.cos(b.heading) * thrust + wall.x,
@@ -207,7 +207,7 @@ export class BettaDynamics {
         b.vy *= Math.exp(-c.glideDrag * h);
       }
       const v = Math.hypot(b.vx, b.vy),
-        limit = L * c.burstLengthsS;
+        limit = L * c.burstLengthsS*(a.condition??1);
       if (v > limit) {
         b.vx *= limit / v;
         b.vy *= limit / v;

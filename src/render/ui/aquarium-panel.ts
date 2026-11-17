@@ -1,3 +1,4 @@
+import {tankAppearance} from '../tank/tank-layout';
 import {showRoomStudy} from '../scene/room-study';
 import type { HandTool } from '../hand-tools';
 import { favoriteCorner } from '../motion/fish-motion';
@@ -136,6 +137,10 @@ export class AquariumPanel {
   }
   private decorate(): void {
     this.title(careText.un_paisaje_para_tu_acuario);
+    const glassLabel=document.createElement('label'),glass=document.createElement('select');glassLabel.textContent=texts.aquariumVisual.glass+' ';glass.setAttribute('aria-label',texts.aquariumVisual.glass);
+    for(const [value,label]of [['model',texts.aquariumVisual.model],['round',texts.aquariumVisual.round]]){const option=document.createElement('option');option.value=value!;option.textContent=label!;glass.append(option);}glass.value=tankAppearance.shape;
+    glass.onchange=()=>{tankAppearance.shape=glass.value as 'model'|'round';try{localStorage.setItem('lw-tank-glass',glass.value);}catch{/* Optional visual preference. */}};glassLabel.append(glass);this.body.append(glassLabel);this.paragraph(texts.aquariumVisual.glassNote);
+
     this.body.append(button(texts.roomStudy.button,()=>{this.close();void showRoomStudy();}));
     this.paragraph(careText.elegi_una_composicion_con_las_plantas);
     const descriptions={default:careText.arena_clara_una_rama_baja_y,garden:careText.vegetacion_en_varios_planos_hojas_anchas,stones:careText.rocas_agrupadas_grava_oscura_y_verdes};
@@ -238,12 +243,7 @@ export class AquariumPanel {
   }
   private fish(): void {
     this.title(careText.conoce_a_tus_peces);
-    const styleLabel=document.createElement('label');styleLabel.textContent=texts.fishArt.label+' ';
-    const style=document.createElement('select');style.setAttribute('aria-label',texts.fishArt.label);
-    for(const [value,label]of [['code',texts.fishArt.code],['image',texts.fishArt.image],['flat',texts.fishArt.flat]]){const option=document.createElement('option');option.value=value!;option.textContent=label!;style.append(option);}
-    style.value=this.game.player.bettaStyle??'code';style.addEventListener('change',()=>{this.game.player.bettaStyle=style.value as 'code'|'image'|'flat';this.game.dirty=true;this.game.saveSoon=true;});
-    styleLabel.append(style);this.body.append(styleLabel);
-
+    if(this.game.state.animals.some(a=>!a.alive))this.body.append(button(texts.aquariumVisual.remove,()=>{this.game.act({type:'removeDead'});this.render();}));
     if (!this.game.state.animals.length) this.paragraph(careText.todavia_no_hay_animales_en_esta);
     for (const a of this.game.state.animals) {
       const card = document.createElement('section');card.dataset.animalId=String(a.id);

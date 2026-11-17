@@ -296,3 +296,11 @@ El workflow ejecuta pruebas con el contrato anterior de FishMotion (por ejemplo,
 ## Betta procedural restaurado
 
 El betta activo vuelve al modelo 2.5D hecho con código, conectado a la física con peso, respiración, comida y flare. El sprite PNG articulado queda archivado y fuera del render activo. Pendiente revisión visual del acople entre el modelo procedural y las nuevas fases; sin tests ni capturas por la instrucción vigente del usuario.
+
+## Catálogo vivo y plantas PNG
+
+Implementados: plantas originales en mallas ondulantes; todos los peces procedurales con perfiles/patrones por especie; mayor saturación y contraste; partículas de comida y burbujas más visibles; profundidad visual continua con orientación y oclusión; reducción de actividad por enfermedad/salud; crecimiento visual por edad guardada durante 14 días simulados. Se conserva el crecimiento biológico original, sin modificar balance químico.
+
+El vidrio redondo ahora aparece en bowl_8 y puede elegirse como apariencia en Cuaderno → Decorar, sin reiniciar la partida. Los peces muertos flotan y permanecen hasta retirarlos con el botón de Peces. La depredación conserva su comportamiento previo (una presa comida no deja un pez flotando).
+
+Pendiente: revisión visual de recorte de la redonda y mallas de cada planta, especialmente en móviles físicos. La profundidad es 2.5D visual, no volumen físico con colisiones tridimensionales. No se ejecutan tests ni se toman capturas por la instrucción vigente. Ajustes visuales en aquarium-visual.json y fish-appearance.json.

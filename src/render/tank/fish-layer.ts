@@ -1,11 +1,11 @@
+import visual from '../../data/aquarium-visual.json';
 import {bettaParameters as cBetta} from '../motion/betta-dynamics';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
-import { FlatBetta } from './flat-betta';
 import { CodeBetta } from './code-betta';
 import { Container } from 'pixi.js';
 import type { HandInput } from '../motion/hand';
 import { drawPixelText, textWidth } from '../ui/pixel-font';
-import { ART, fishPigment } from '../art-direction';
+import { ART } from '../art-direction';
 /**
  * Animales y comida dentro del agua, dibujados con formas simples de colores
  * (placeholders hasta que haya sprites). El movimiento sale de FishMotion;
@@ -42,7 +42,7 @@ export class FishLayer {
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
   bettaStyle:'code'|'image'|'flat'='code';
-  private readonly codedBettas=new Map<number,CodeBetta|FlatBetta>();
+  private readonly codedBettas=new Map<number,CodeBetta>();
   private lastStyle='';
   readonly artBack=new Container();
   readonly artFront=new Container();
@@ -132,6 +132,8 @@ export class FishLayer {
         boldness: animal.personality.boldness,
         activity: animal.personality.activity,
         feedingTrust: animal.feedingTrust,
+        condition:Math.max(visual.healthFloor,Math.min(1,animal.health/100))*(animal.mood==='sick'?visual.sickActivity:1),
+        visualSizeCm:sp.adultSizeCm*(visual.juvenileFraction+(1-visual.juvenileFraction)*Math.min(1,Math.max(0,animal.ageDays-defaultConfig.fish.newAnimalAgeDays)/visual.growthDays)),
       };
     });
     if (this.scare && this.motion.seconds > this.scare.until) this.scare = null;
@@ -139,6 +141,7 @@ export class FishLayer {
     this.motion.update(Math.min(0.1, Math.max(0, dtSeconds)), {
       bounds,
       bettaPrototype: true,
+      renderDepth:true,
       animals,
       food: {
         surface: state.food.surfaceG > 1e-4,
@@ -197,23 +200,23 @@ export class FishLayer {
     const spread = Math.max(5, pxPerCm * 2);
     let floating=0;
     for(const [batchIndex,batch]of this.batches.entries()){
-      const count=Math.min(16,Math.ceil(batch.grams*200));floating+=count;
+      const count=Math.min(16,Math.ceil(batch.grams*visual.foodParticlesPerGram));floating+=count;
       for(let i=0;i<count;i++){
         const x=Math.round(area.x+batch.x*pxPerCm+(scatter(i+batchIndex*19,21)-.5)*2*spread);
         if(x<area.x||x>area.x+area.width-2)continue;
         const age=seconds-batch.at-i*.035;
         const y=area.y-12+12*Math.min(1,Math.max(0,age)/.7)**2;
-        g.rect(x,y+Math.sin(seconds*1.7+i)*.5,2,1);
+        g.roundRect(x,y+Math.sin(seconds*1.7+i)*.5,visual.foodPixels,visual.foodPixels*.7,.6);
       }
     }
-    const sinking = Math.min(40, Math.ceil(state.food.sinkingG * 200));
+    const sinking = Math.min(40, Math.ceil(state.food.sinkingG * visual.foodParticlesPerGram));
     for (let i = 0; i < sinking; i++) {
       const x = Math.round(x0 + (scatter(i, 22) - 0.5) * 2 * spread);
       if (x < area.x || x > area.x + area.width - 2) continue;
       const fall = (scatter(i, 23) + seconds * (0.05 + 0.04 * scatter(i, 24))) % 1;
-      g.rect(x, area.y + fall * (area.height - 2), 1, 1);
+      g.roundRect(x, area.y + fall * (area.height - 2),visual.foodPixels*.8,visual.foodPixels*.6,.5);
     }
-    if (floating + sinking > 0) g.fill(ART.food);
+    if (floating + sinking > 0) g.fill({color:0xe9b96d,alpha:1}).stroke({color:0x624127,width:.4});
   }
 
   private drawAnimal(
@@ -230,9 +233,9 @@ export class FishLayer {
     const sp = animal.species;
     // Plano: 0 lejos (chico y azulado) .. 2 cerca.
     const far = (2 - body.plane) / 2;
-    const scale = 1 - 0.22 * far;
+    const scale = 1 - visual.depthScale * far;
     const tint = (color: number): number => {
-      let c = fishPigment(color);
+      let c = color;
       if (!animal.alive) c = DEAD_COLOR;
       else if (sick) c = lerpColor(c, 0xe8e8e8, 0.35);
       // De noche los colores se apagan (los neones, más).
@@ -240,19 +243,19 @@ export class FishLayer {
         const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
         c = lerpColor(c, NIGHT_TINT, fade);
       }
-      return lerpColor(c, WATER_TINT, 0.13 * far);
+      return lerpColor(c, WATER_TINT, visual.depthTint * far);
     };
     const main = tint(hex(sp.color));
     const accent = tint(hex(sp.accent));
-    const len = Math.max(sp.category==='fish'?12:3, animal.sizeCm * this.pxPerCm * scale);
+    const len = Math.max(sp.category==='fish'?visual.minimumFishPixels:3, (animal.visualSizeCm??animal.sizeCm) * this.pxPerCm * scale);
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;
     const halfLen = Math.min(len / 2, area.width / 2);
     const cx = (
-      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x + body.x * this.pxPerCm))
+      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x+area.width/2+(body.x*this.pxPerCm-area.width/2)*(1-far*visual.depthScale*.25)))
     );
     const cy = (
-      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm))
+      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm-far*area.height*.07))
     );
     this.positions.set(animal.id,{x:cx,y:cy,radius:Math.max(8,len*0.8)});
     const nibbling = animal.alive && animal.intent === 'eat' &&
@@ -265,22 +268,22 @@ export class FishLayer {
     const dir = body.facing;
 
     if(sp.id==='betta'){
-      let fish=this.codedBettas.get(animal.id);if(!(fish instanceof CodeBetta)){fish?.destroy();fish=new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
+      let fish=this.codedBettas.get(animal.id);if(!fish){fish=new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
       const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
       const motion=this.motion.bettas.get(animal.id);
       fish.container.visible=true;
-      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,motion);fish.container.tint=tint(0xffffff);
+      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,motion,animal.condition);fish.container.tint=tint(0xffffff);
       if(import.meta.env.DEV)this.devPanel?.draw(this.foodGraphics,body,motion,cx,cy,this.pxPerCm);
       if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
       return;
     }
-    if((sp.category==='fish' && this.bettaStyle==='code') || (sp.id==='betta' && this.bettaStyle==='flat')){
+    if(sp.category==='fish'){
       let fish=this.codedBettas.get(animal.id);
-      if(!fish){fish=this.bettaStyle==='flat'?new FlatBetta(animal.id,body.facing):new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
+      if(!fish){fish=new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
       const parent=body.plane<1.2?this.artBack:this.artFront;
       if(fish.container.parent!==parent)parent.addChild(fish.container);
       fish.container.visible=true;
-      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage);fish.container.tint=tint(0xffffff);return;
+      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,undefined,animal.condition);fish.container.tint=tint(0xffffff);return;
     }
 
     // Especies con sprite propio; el resto sigue con el placeholder de abajo.

@@ -625,5 +625,12 @@
       "Confianza",
       "Aletas sanas"
     ]
+  },
+  "aquariumVisual": {
+    "glass": "Forma del vidrio",
+    "model": "Según el modelo de la partida",
+    "round": "Vidrio redondo",
+    "glassNote": "La apariencia del vidrio no cambia la capacidad ni los habitantes de tu pecera.",
+    "remove": "Retirar animales muertos"
   }
 }

@@ -70,3 +70,6 @@ export const GLASS_ART = { width: 378, height: 249, inner: { x: 13, y: 69, width
 export function tankRect(lengthCm: number, _heightCm?: number): TankRect {
   return tankFrame(lengthCm, GLASS_ART).outer;
 }
+
+/** Optional glass appearance; leaves the simulation model and inhabitants intact. */
+export const tankAppearance:{shape:"model"|"round"}={shape:"model"};

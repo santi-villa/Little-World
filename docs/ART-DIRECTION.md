@@ -72,3 +72,13 @@ La habitación geométrica del cuaderno es un estudio de volumen, sombras de con
 El cuerpo cobrizo del betta contrasta con el agua azul verdosa; se reduce el tinte por profundidad y las motas frontales. Las masas de plantas quedan principalmente atrás y a los lados, con un corredor central y objetos bajos más pequeños. Mantener tamaño simulado separado del mínimo visual necesario para leer un animal pequeño.
 
 La observación individual usa iconos con anillos y cámara continua; el cuaderno se reserva al detalle. Contemplar limpia la pantalla conservando el pez seguido. Referencias externas solicitadas: se intentaron consultar Wikipedia/Aquascaping, Tropica/Inspiration y 2Hr Aquarist; el acceso HTTP fue bloqueado (403), por lo que esta iteración no se presenta como una comparación fotográfica verificada.
+
+## Plantas de imagen, profundidad y especies
+
+Las plantas vuelven a los PNG del catálogo, con malla de 4×16 vértices, raíz anclada e interpolación de los resortes entre segmentos; no hay sustitución por plantas dibujadas con código. Se conserva el impulso del betta. El agua muestra pared trasera, laterales y plano inferior; los peces recorren continuamente el eje visual de profundidad, con perspectiva de tamaño, altura, orientación y oclusión entre plantas.
+
+Todos los peces usan el modelo procedural con perfiles por especie en `fish-appearance.json`: alturas, colas y patrones (neón/cardenal, rayas del danio, bandas de barbos/escalar/kuhli, cuña de rasbora, manchas, espada y doble cola de goldfish). Se reduce el velo y tinte del agua para conservar pigmentos. Son modelos estilizados, no reproducciones anatómicas completas.
+
+Crecimiento visual: `aquarium-visual.json` permite 14 días simulados desde la edad de llegada para pasar de 35% a 100% del largo adulto. Se deriva de la edad guardada, no de abrir/cerrar el navegador. El tamaño químico/biológico original de la simulación no cambia. Enfermedad y salud reducen aceleración, avance y coletazo. Los peces muertos permanecen panza arriba, flotando, hasta Retirar animales muertos; no se agregan eliminaciones automáticas.
+
+La redonda usa `redonda-1` y un recorte elíptico del contenido. El modelo bowl_8 la activa automáticamente. Cuaderno → Decorar permite elegir también vidrio redondo como apariencia guardada localmente, conservando capacidad, cuidados y habitantes; no convierte la partida en otro modelo ni agrega peces a una pecera pequeña.

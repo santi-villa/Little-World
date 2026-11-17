@@ -1,3 +1,4 @@
+import visual from '../../data/aquarium-visual.json';
 import {BettaDynamics} from './betta-dynamics';
 import {resolveHabitat,habitatTarget,type Habitat} from './habitat';
 import { interestedInHand, type HandInput } from './hand';
@@ -50,11 +51,14 @@ export interface MotionAnimal {
   boldness: number;
   activity: number;
   feedingTrust?: number;
+  condition?:number;
+  visualSizeCm?:number;
 }
 
 export interface MotionInput {
   /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
   bettaPrototype?: boolean;
+  renderDepth?:boolean;
   habitat?:Habitat;
   hand?: HandInput | null;
   /** Agua: ancho y profundidad en cm. */
@@ -82,6 +86,7 @@ export interface FishBody extends Body {
   phase: number;
   pauseUntil?: number;
   slowSeconds?: number;
+  depthAt?:number;
 }
 
 interface SchoolGoal {
@@ -232,12 +237,17 @@ export class FishMotion {
       const body = this.bodies.get(animal.id) as FishBody;
       const sp = animal.species;
       const limits = limitsFor(sp);
+      const condition=animal.condition??1;limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const depth = bounds.height;
 
+      if(input.renderDepth&&animal.alive){
+        if(this.time>=(body.depthAt??0)){body.targetPlane=animal.intent==='eat'?2:animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
+        body.plane+=(body.targetPlane-body.plane)*(1-Math.exp(-dt*visual.depthTravelSpeed));
+      }
       if (!animal.alive) {
         // Los peces muertos flotan; caracoles y gambas quedan en el fondo.
         const targetY = sp.category === 'fish' ? 0 : depth;
-        const v = arrive(body, body.x, targetY, 1.5, 4);
+        const v = arrive(body, body.x, targetY, input.renderDepth?visual.floatSpeed:1.5, 4);
         integrate(body, v.x, v.y, { maxSpeed: 1.5, maxAccel: 2, maxTurn: 10 }, dt, bounds);
         continue;
       }

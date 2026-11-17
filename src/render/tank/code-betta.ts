@@ -1,3 +1,4 @@
+import appearance from '../../data/fish-appearance.json';
 import {bettaParameters as cBetta,type BettaDynamics} from '../motion/betta-dynamics';
 import { Container, Graphics } from 'pixi.js';
 import { newBettaPose, advanceBettaPose } from '../motion/betta-pose';
@@ -5,7 +6,6 @@ import { projectFish, smoothAngle, type Point3 } from '../motion/volume';
 import type { FishBody } from '../motion/fish-motion';
 import { lerpColor } from '../pixel-utils';
 import type { Species } from '../../sim';
-import { fishPigment } from '../art-direction';
 interface Face {
   points: Point3[];
   color: number;
@@ -18,6 +18,7 @@ export class CodeBetta {
   private readonly pose;
   private yaw: number;
   private pitch = 0;
+  private previousPlane:number|undefined;private depthAngle=0;
   private animationSeconds=0;private finLag=0;private finVelocity=0;private previousSpeed=0;
   private readonly species?: Species;
   constructor(seed: number, facing: number, species?: Species) {
@@ -39,6 +40,7 @@ export class CodeBetta {
     lit: boolean,
     damage: number,
     motion?: BettaDynamics,
+    condition=1,
   ): void {
     const p = this.pose;
     if(!motion)advanceBettaPose(
@@ -55,15 +57,16 @@ export class CodeBetta {
     if(alive)this.animationSeconds+=h;
     if(motion&&alive){
       p.phase=motion.phase;p.pitch=motion.mode==='food'?-cBetta.foodPitchDeg*Math.PI/180:motion.pitch;
-      p.effort+=((motion.stroke==='burst'?1:0)-p.effort)*(1-Math.exp(-h*cBetta.pitchEase));
+      p.effort+=((motion.stroke==='burst'?condition:0)-p.effort)*(1-Math.exp(-h*cBetta.pitchEase));
       const speed=Math.hypot(body.vx,body.vy),target=-(speed-this.previousSpeed)*cBetta.finAccelerationLag;
       let remaining=h;while(remaining>0){const step=Math.min(remaining,cBetta.stepSeconds);remaining-=step;this.finVelocity+=(cBetta.finSpring*(target-this.finLag)-cBetta.finDamping*this.finVelocity)*step;this.finLag+=this.finVelocity*step;}this.previousSpeed=speed;
     }
 
+    if(alive){const velocity=(body.plane-(this.previousPlane??body.plane))/Math.max(.016,h);this.depthAngle+=(Math.atan(velocity)*.7-this.depthAngle)*(1-Math.exp(-h*3));}this.previousPlane=body.plane;
     if (alive) {
       this.yaw = smoothAngle(
         this.yaw,
-        body.facing < 0 ? Math.PI : 0,
+        (body.facing < 0 ? Math.PI : 0)+this.depthAngle,
         h,
         intent === 'flee' ? 5 : 3,
       );
@@ -74,6 +77,7 @@ export class CodeBetta {
         4,
       );
     }
+    if(!alive)this.pitch=smoothAngle(this.pitch,0,h,4);
     this.container.position.set(x, y+(motion?.bob??0)*length/Math.max(cBetta.epsilon,motion?.sizeCm??1));
     this.container.scale.set(length / 104, (length / 104) * (alive ? 1 : -1));
     this.container.tint = alive ? (lit ? 0xffffff : 0x7694ad) : 0xa0a0a0;
@@ -84,14 +88,15 @@ export class CodeBetta {
       betta = !sp || sp.id === 'betta',
       tall = sp?.traits.includes('tall'),
       eel = sp?.traits.includes('eel_like');
-    const bodyHeight = tall ? 2.1 : eel ? 0.48 : betta ? 1 : 0.78;
+    const profile=sp?appearance[sp.id as keyof typeof appearance]:undefined;
+    const bodyHeight = profile?.height??(tall ? 2.1 : eel ? 0.48 : betta ? 1 : 0.78);
     const main = betta
       ? 0xb95c48
-      : fishPigment(Number.parseInt(sp!.color.slice(1), 16));
+      : Number.parseInt(sp!.color.slice(1), 16);
     const accent = betta
       ? 0x5866a1
-      : fishPigment(Number.parseInt(sp!.accent.slice(1), 16));
-    const dark = lerpColor(main, 0x152e36, 0.55),
+      : Number.parseInt(sp!.accent.slice(1), 16);
+    const dark = lerpColor(main, 0x152e36, 0.35),
       light = lerpColor(main, 0xd6dfc5, 0.32);
     const point = (px: number, py: number, pz = 0): Point3 => ({
       x: px,
@@ -144,7 +149,7 @@ export class CodeBetta {
       rim.push(
         point(
           -27 + Math.cos(a) * (betta ? 38 : 30) * fin,
-          Math.sin(a) * (betta ? 28 : sp?.longFins ? 23 : 13) * fin + 2,
+          Math.sin(a) * (betta ? 28 : sp?.longFins ? 23 : 13) * fin*(profile?.tail??1) + 2,
           (Math.sin(t - i * 0.19) * (2 + 5 * p.effort)*(motion?p.effort:1)+this.finLag),
         ),
       );
@@ -247,7 +252,7 @@ export class CodeBetta {
     }
     if (!betta)
       for (const side of [-1, 1]) {
-        const neon = sp?.id === 'neon_tetra';
+        const neon = profile?.pattern==='neon';
         const stripe = Array.from({ length: 7 }, (_, i) => {
           const x = -18 + i * 7;
           return point(x, -1, side * (6.4 - Math.abs(x) * 0.04));
@@ -281,6 +286,18 @@ export class CodeBetta {
             );
           }
       }
+    if(!betta&&profile)for(const side of [-1,1]){
+      if(profile.pattern==='bars')for(const x of [-17,-5,8,20])face([point(x-2,-7,side*6),point(x+2,-7,side*6),point(x+3,8,side*6),point(x-1,8,side*6)],0x233443,.9);
+      if(profile.pattern==='lines')for(const y of [-5,0,5])face([point(-22,y,side*6),point(23,y,side*6),point(23,y+1.3,side*6),point(-22,y+1.3,side*6)],accent,.95);
+      if(profile.pattern==='wedge')face([point(-24,0,side*6),point(1,-6,side*7),point(1,8,side*7)],0x263343);
+      if(profile.pattern==='spots')for(let i=0;i<9;i++){const x=-17+(i%3)*12,y=-5+Math.floor(i/3)*5;face([point(x-1,y-1,side*7),point(x+1,y-1,side*7),point(x+1,y+1,side*7),point(x-1,y+1,side*7)],accent,.85);}
+      if(profile.pattern==='gold'){
+        face([point(-22,1,side*7),point(15,1,side*7),point(10,8,side*6),point(-19,6,side*6)],0xffd5a0,.85);
+        face([point(-27,0,side*3),point(-59,-18,side*8+Math.sin(t)*3),point(-48,2,side*7),point(-61,19,side*8),point(-27,4,side*3)],accent,.8);
+      }
+      if(sp?.id.includes('cory')||sp?.id==='ancistrus')for(const by of [2,5])face([point(31,by,side*2),point(38,by+4+Math.sin(t)*.5,side*3),point(36,by+3,side*3)],0xd3c7a4,.85);
+      if(profile.pattern==='sword')face([point(-27,5),point(-76,23,Math.sin(t)*3),point(-44,9)],accent,.9);
+    }
     const projected = faces.map((f) => ({
       ...f,
       points: f.points.map((q) =>
