@@ -292,3 +292,7 @@ Validación final del prototipo: se ejecutó una sola vez `npm run build`, compl
 ## Compatibilidad de publicación del prototipo
 
 El workflow ejecuta pruebas con el contrato anterior de FishMotion (por ejemplo, descanso del betta arriba); el prototipo cambia ese comportamiento. Se separan con la opción explícita `bettaPrototype`, activada desde FishLayer en el juego. Se conserva el paso de pruebas de CI y no se modifican las pruebas. Pendiente confirmar el resultado del workflow: el acceso a los registros de GitHub Actions desde este entorno devolvió Forbidden. No se ejecutaron tests locales por la instrucción del usuario.
+
+## Betta procedural restaurado
+
+El betta activo vuelve al modelo 2.5D hecho con código, conectado a la física con peso, respiración, comida y flare. El sprite PNG articulado queda archivado y fuera del render activo. Pendiente revisión visual del acople entre el modelo procedural y las nuevas fases; sin tests ni capturas por la instrucción vigente del usuario.

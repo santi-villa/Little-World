@@ -10,13 +10,14 @@ export function projectFish(
   pitch: number,
   phase = 0,
   effort = 0,
+  flex = 1,
 ): Point3 {
   const tail = Math.max(0, Math.min(1, (-p.x + 5) / 65));
-  const bend = Math.sin(phase - tail * 3.8) * tail * tail * (1 + effort * 7);
+  const bend = Math.sin(phase - tail * 3.8) * tail * tail * (1 + effort * 7)*flex;
   const z = p.z + bend;
   // A small vertical component and membrane sweep keep the stroke readable side-on.
   const py =
-    p.y + Math.sin(phase - tail * 3.8) * tail * tail * (0.5 + effort * 3.5);
+    p.y + Math.sin(phase - tail * 3.8) * tail * tail * (0.5 + effort * 3.5)*flex;
   const rx = p.x * Math.cos(yaw) + z * Math.sin(yaw),
     rz = -p.x * Math.sin(yaw) + z * Math.cos(yaw);
   return {

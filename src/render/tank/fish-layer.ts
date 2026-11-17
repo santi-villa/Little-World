@@ -1,10 +1,8 @@
 import {bettaParameters as cBetta} from '../motion/betta-dynamics';
-import {ArticulatedBetta} from './articulated-betta';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { FlatBetta } from './flat-betta';
 import { CodeBetta } from './code-betta';
-import { Container, MeshPlane } from 'pixi.js';
-import { tex } from '../assets';
+import { Container } from 'pixi.js';
 import type { HandInput } from '../motion/hand';
 import { drawPixelText, textWidth } from '../ui/pixel-font';
 import { ART, fishPigment } from '../art-direction';
@@ -45,11 +43,9 @@ export class FishLayer {
   readonly foreground = new Graphics();
   bettaStyle:'code'|'image'|'flat'='code';
   private readonly codedBettas=new Map<number,CodeBetta|FlatBetta>();
-  private readonly articulated=new Map<number,ArticulatedBetta>();
   private lastStyle='';
   readonly artBack=new Container();
   readonly artFront=new Container();
-  private readonly bettas=new Map<number,{mesh:MeshPlane;rest:Float32Array;turn:number}>();
   habitat:Habitat=emptyHabitat();
   hand:HandInput|null=null;
   readonly foodGraphics = new Graphics();
@@ -158,11 +154,8 @@ export class FishLayer {
 
     if(this.lastStyle!==this.bettaStyle){for(const fish of this.codedBettas.values())fish.destroy();this.codedBettas.clear();this.lastStyle=this.bettaStyle;}
     const ids=new Set(animals.filter(a=>a.species.category==='fish').map(a=>a.id));
-    for(const [id,fish]of this.articulated)if(!ids.has(id)){fish.destroy();this.articulated.delete(id);}
-    for(const [id,entry]of this.bettas)if(!ids.has(id)){entry.mesh.destroy();this.bettas.delete(id);}
     for(const [id,fish]of this.codedBettas)if(!ids.has(id)){fish.destroy();this.codedBettas.delete(id);}
     for(const fish of this.codedBettas.values())fish.container.visible=false;
-    for(const entry of this.bettas.values())entry.mesh.visible=false;
     this.dt = Math.min(0.1, Math.max(0, dtSeconds));
     for (const id of this.anim.keys()) if (!this.motion.bodies.has(id)) this.anim.delete(id);
 
@@ -272,10 +265,11 @@ export class FishLayer {
     const dir = body.facing;
 
     if(sp.id==='betta'){
-      let fish=this.articulated.get(animal.id);if(!fish){fish=new ArticulatedBetta(animal.id,body.facing);this.articulated.set(animal.id,fish);}
+      let fish=this.codedBettas.get(animal.id);if(!(fish instanceof CodeBetta)){fish?.destroy();fish=new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
       const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
       const motion=this.motion.bettas.get(animal.id);
-      fish.update(body,motion,cx,cy,len,this.dt,lightOn,animal.alive);
+      fish.container.visible=true;
+      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,motion);fish.container.tint=tint(0xffffff);
       if(import.meta.env.DEV)this.devPanel?.draw(this.foodGraphics,body,motion,cx,cy,this.pxPerCm);
       if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
       return;
@@ -287,24 +281,6 @@ export class FishLayer {
       if(fish.container.parent!==parent)parent.addChild(fish.container);
       fish.container.visible=true;
       fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage);fish.container.tint=tint(0xffffff);return;
-    }
-    if(sp.id==='betta'){
-      let entry=this.bettas.get(animal.id);
-      if(!entry){const mesh=new MeshPlane({texture:tex('betta'),verticesX:12,verticesY:4});const rest=(mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array).slice();entry={mesh,rest,turn:body.facing};this.bettas.set(animal.id,entry);}
-      const mesh=entry.mesh,texture=mesh.texture;mesh.visible=true;
-      const parent=body.plane<1.2?this.artBack:this.artFront;
-      if(mesh.parent!==parent)parent.addChild(mesh);
-      mesh.pivot.set(texture.width*.5,texture.height*.5);
-      const k=len/texture.width;
-      const turnDelta=body.facing-entry.turn;
-      entry.turn+=Math.sign(turnDelta)*Math.min(Math.abs(turnDelta),this.dt*TURN_SPEED);
-      const turn=(entry.turn<0?-1:1)*Math.max(.35,Math.abs(Math.sin(entry.turn*Math.PI/2)));
-      mesh.scale.set(turn*k,animal.alive?k:-k);mesh.position.set(cx,cy);
-      mesh.tint=lightOn?0xffffff:0x687c98;mesh.alpha=1;
-      const attribute=mesh.geometry.getAttribute('aPosition'),positions=attribute.buffer.data as Float32Array;
-      for(let i=0;i<positions.length;i+=2){const x=entry.rest[i]!,y=entry.rest[i+1]!,tail=Math.max(0,1-x/(texture.width*.65));
-        positions[i]=x;positions[i+1]=y+(animal.alive?Math.sin(seconds*3.1+body.phase+x*.018)*texture.height*.025*tail*tail:0);}
-      attribute.buffer.update();return;
     }
 
     // Especies con sprite propio; el resto sigue con el placeholder de abajo.

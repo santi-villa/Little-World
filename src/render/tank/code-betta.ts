@@ -1,3 +1,4 @@
+import {bettaParameters as cBetta,type BettaDynamics} from '../motion/betta-dynamics';
 import { Container, Graphics } from 'pixi.js';
 import { newBettaPose, advanceBettaPose } from '../motion/betta-pose';
 import { projectFish, smoothAngle, type Point3 } from '../motion/volume';
@@ -17,6 +18,7 @@ export class CodeBetta {
   private readonly pose;
   private yaw: number;
   private pitch = 0;
+  private animationSeconds=0;private finLag=0;private finVelocity=0;private previousSpeed=0;
   private readonly species?: Species;
   constructor(seed: number, facing: number, species?: Species) {
     this.container.label='fish-'+seed;
@@ -36,9 +38,10 @@ export class CodeBetta {
     alive: boolean,
     lit: boolean,
     damage: number,
+    motion?: BettaDynamics,
   ): void {
     const p = this.pose;
-    advanceBettaPose(
+    if(!motion)advanceBettaPose(
       p,
       dt,
       body.vx,
@@ -49,6 +52,14 @@ export class CodeBetta {
       alive,
     );
     const h = Math.min(0.1, Math.max(0, dt));
+    if(alive)this.animationSeconds+=h;
+    if(motion&&alive){
+      p.phase=motion.phase;p.pitch=motion.mode==='food'?-cBetta.foodPitchDeg*Math.PI/180:motion.pitch;
+      p.effort+=((motion.stroke==='burst'?1:0)-p.effort)*(1-Math.exp(-h*cBetta.pitchEase));
+      const speed=Math.hypot(body.vx,body.vy),target=-(speed-this.previousSpeed)*cBetta.finAccelerationLag;
+      let remaining=h;while(remaining>0){const step=Math.min(remaining,cBetta.stepSeconds);remaining-=step;this.finVelocity+=(cBetta.finSpring*(target-this.finLag)-cBetta.finDamping*this.finVelocity)*step;this.finLag+=this.finVelocity*step;}this.previousSpeed=speed;
+    }
+
     if (alive) {
       this.yaw = smoothAngle(
         this.yaw,
@@ -63,12 +74,12 @@ export class CodeBetta {
         4,
       );
     }
-    this.container.position.set(x, y);
+    this.container.position.set(x, y+(motion?.bob??0)*length/Math.max(cBetta.epsilon,motion?.sizeCm??1));
     this.container.scale.set(length / 104, (length / 104) * (alive ? 1 : -1));
     this.container.tint = alive ? (lit ? 0xffffff : 0x7694ad) : 0xa0a0a0;
     const faces: Face[] = [],
       t = p.phase,
-      fin = 1 - 0.5 * damage;
+      fin = (1 - 0.5 * damage)*(motion?.mode==='flare'?cBetta.flareScale:1);
     const sp = this.species,
       betta = !sp || sp.id === 'betta',
       tall = sp?.traits.includes('tall'),
@@ -134,7 +145,7 @@ export class CodeBetta {
         point(
           -27 + Math.cos(a) * (betta ? 38 : 30) * fin,
           Math.sin(a) * (betta ? 28 : sp?.longFins ? 23 : 13) * fin + 2,
-          Math.sin(t - i * 0.19) * (2 + 5 * p.effort),
+          (Math.sin(t - i * 0.19) * (2 + 5 * p.effort)*(motion?p.effort:1)+this.finLag),
         ),
       );
     }
@@ -174,7 +185,7 @@ export class CodeBetta {
     // Pectorals, eyes and gills live on both sides and are depth sorted with the body.
     for (const side of [-1, 1]) {
       const z = side * 6.2,
-        flap = Math.sin(t * 2.7 + side) * 4;
+        flap = Math.sin(this.animationSeconds*cBetta.pectoralHz*Math.PI*2 + side) * 4;
       face(
         [
           point(12, 0, z),
@@ -273,7 +284,7 @@ export class CodeBetta {
     const projected = faces.map((f) => ({
       ...f,
       points: f.points.map((q) =>
-        projectFish(q, this.yaw, this.pitch, t, p.effort),
+        projectFish(q, this.yaw, this.pitch, t, p.effort,motion?p.effort:1),
       ),
     }));
     projected.sort(

@@ -17,3 +17,7 @@ En desarrollo: D o mantener dos segundos la esquina superior izquierda. El panel
 Para extenderlo: separar parámetros y estrategia por especie conservando la misma interfaz de cuerpo/entrada; cardumen aporta objetivos de cohesión/alineación, especies de fondo aportan contacto con sustrato y velocidades bajas. No aplicar el perfil del betta globalmente. Primero revisar visualmente dimensiones, cortes, tiempos y retorno de plantas; esta entrega no ejecutó tests ni tomó capturas por instrucción del usuario.
 
 La opción explícita conserva las comprobaciones del motor anterior sin cambiar sus expectativas ni desactivar el paso Tests de CI. Esas comprobaciones no validan la nueva física optativa: sigue pendiente revisarla por separado, respetando la instrucción de no escribir ni ejecutar tests en esta entrega.
+
+## Render activo: regreso al pez procedural
+
+Por preferencia del usuario, el betta activo vuelve a CodeBetta: geometría con volumen y aletas articuladas, sin texturas PNG. La pose recibe fase de coletazo, pitch, balanceo, esfuerzo y flare de BettaDynamics. La cola conserva resorte de retardo; el planeo reduce la flexión y las pectorales siguen aleteando al flotar. Las otras especies mantienen el render previo. ArticulatedBetta y su variante PNG quedan como experimento fuera de la ruta activa del juego. Esta decisión sustituye la sección anterior sobre recortes del sprite como render principal.
