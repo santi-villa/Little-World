@@ -625,6 +625,9 @@
       ],
       "scale": 0.1667,
       "kernel": "mitchell"
+    },
+    "animales/betta": {
+      "articulatedWidth": 52
     }
   },
   "video": {

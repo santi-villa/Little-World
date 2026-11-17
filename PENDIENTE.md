@@ -276,3 +276,7 @@ Falta:
 - Un clic sigue al pez; iconos con anillos de salud/estrés/hambre/confianza/aletas. Doble clic o Más información abre ficha. Ver acuario sale del seguimiento.
 - Contemplar conserva la cámara, oculta los controles y permite restaurarlos con toque/Escape. Audio ambiental pendiente de la pista del usuario.
 - No se pudo verificar la comparación solicitada con fotos externas: las tres fuentes consultadas devolvieron bloqueo HTTP 403.
+
+## Betta con peso: arte articulado
+
+PNG dividido por recortes rígidos en cuerpo, parte trasera y cola. Falta arte en capas independientes de dorsal, anal, pectorales y opérculos para tela/flare anatómicamente fiel. El prototipo usa resorte en la cola y pectoral esquemática. La variante nativa de 52 px se hornea con nearest desde el PNG existente; se escala a enteros y no conserva todo el detalle del original de 519 px. Los giros usan compresión horizontal transitoria antes del espejado; esa transición es la excepción al escalado entero. Revisar visualmente las uniones y la pérdida de detalle: no se hicieron capturas por pedido del usuario.

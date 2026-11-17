@@ -290,6 +290,11 @@ async function processSprites(path, rel, cfg) {
     const name = cfg.names?.[i] ?? (pieces.length === 1 ? stem : `${stem}-${i + 1}`);
     const file = join(dir, `${name}.png`);
     const size = await savePng(img, pieces[i], scale, join(OUT, file), cfg.kernel);
+    if(cfg.articulatedWidth){
+      const articulatedFile=join(dir,`${name}-articulated.png`);
+      const native=await sharp(join(OUT,file)).resize({width:cfg.articulatedWidth,kernel:'nearest'}).png().toFile(join(OUT,articulatedFile));
+      register(`${name}-articulated`,articulatedFile,native,rel,{kind:'sprite',artPx:1});
+    }
     if (cfg.tapes?.[name]) await splitTape(name, file, cfg.tapes[name], rel, dir);
     const extra = { kind: isPlant ? 'plant' : 'sprite', artPx: artPxOf(cfg, img.width, scale) };
     // Dónde se agarra (cuelga) o apoya, en fracción del ancho y del alto.

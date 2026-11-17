@@ -1,3 +1,4 @@
+import {ArticulatedBetta} from './articulated-betta';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { FlatBetta } from './flat-betta';
 import { CodeBetta } from './code-betta';
@@ -40,6 +41,7 @@ export class FishLayer {
   readonly foreground = new Graphics();
   bettaStyle:'code'|'image'|'flat'='code';
   private readonly codedBettas=new Map<number,CodeBetta|FlatBetta>();
+  private readonly articulated=new Map<number,ArticulatedBetta>();
   private lastStyle='';
   readonly artBack=new Container();
   readonly artFront=new Container();
@@ -151,6 +153,7 @@ export class FishLayer {
 
     if(this.lastStyle!==this.bettaStyle){for(const fish of this.codedBettas.values())fish.destroy();this.codedBettas.clear();this.lastStyle=this.bettaStyle;}
     const ids=new Set(animals.filter(a=>a.species.category==='fish').map(a=>a.id));
+    for(const [id,fish]of this.articulated)if(!ids.has(id)){fish.destroy();this.articulated.delete(id);}
     for(const [id,entry]of this.bettas)if(!ids.has(id)){entry.mesh.destroy();this.bettas.delete(id);}
     for(const [id,fish]of this.codedBettas)if(!ids.has(id)){fish.destroy();this.codedBettas.delete(id);}
     for(const fish of this.codedBettas.values())fish.container.visible=false;
@@ -263,6 +266,11 @@ export class FishLayer {
     }
     const dir = body.facing;
 
+    if(sp.id==='betta'){
+      let fish=this.articulated.get(animal.id);if(!fish){fish=new ArticulatedBetta(animal.id,body.facing);this.articulated.set(animal.id,fish);}
+      const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
+      fish.update(body,this.motion.bettas.get(animal.id),cx,cy,len,this.dt,lightOn,animal.alive);return;
+    }
     if((sp.category==='fish' && this.bettaStyle==='code') || (sp.id==='betta' && this.bettaStyle==='flat')){
       let fish=this.codedBettas.get(animal.id);
       if(!fish){fish=this.bettaStyle==='flat'?new FlatBetta(animal.id,body.facing):new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}

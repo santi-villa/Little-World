@@ -1319,6 +1319,14 @@
         "y": 64
       },
       "sitting": 70.8
+    },
+    "betta-articulated": {
+      "file": "animales/betta-articulated.png",
+      "width": 52,
+      "height": 34,
+      "source": "animales/betta",
+      "kind": "sprite",
+      "artPx": 1
     }
   }
 }
