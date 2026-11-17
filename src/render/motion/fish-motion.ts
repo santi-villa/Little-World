@@ -53,6 +53,8 @@ export interface MotionAnimal {
 }
 
 export interface MotionInput {
+  /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
+  bettaPrototype?: boolean;
   habitat?:Habitat;
   hand?: HandInput | null;
   /** Agua: ancho y profundidad en cm. */
@@ -240,7 +242,7 @@ export class FishMotion {
         continue;
       }
 
-      if(sp.id==='betta'){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,input,this.time,r);continue;}
+      if(sp.id==='betta' && input.bettaPrototype){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,input,this.time,r);continue;}
 
       const crawler = sp.category !== 'fish';
       const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);

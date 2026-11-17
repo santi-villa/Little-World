@@ -142,6 +142,7 @@ export class FishLayer {
     const cat = state.cat.behavior;
     this.motion.update(Math.min(0.1, Math.max(0, dtSeconds)), {
       bounds,
+      bettaPrototype: true,
       animals,
       food: {
         surface: state.food.surfaceG > 1e-4,

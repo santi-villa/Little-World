@@ -1,6 +1,6 @@
 # Prototipo de betta con peso
 
-Solo el betta utiliza `BettaDynamics`; las demás especies mantienen sus rutas anteriores. Las unidades son cm y segundos, convertidas a coordenadas de arte por FishLayer como antes. `src/sim` no cambia. Flotación, aire, flare y picoteo son visuales y no sustituyen cuidados ni consumo real de alimento.
+El juego activa `MotionInput.bettaPrototype: true` en FishLayer. Sin esa opción, FishMotion conserva el contrato anterior para consumidores existentes y comparaciones del motor. Solo el betta del juego utiliza `BettaDynamics`; las demás especies mantienen sus rutas anteriores. Las unidades son cm y segundos, convertidas a coordenadas de arte por FishLayer como antes. `src/sim` no cambia. Flotación, aire, flare y picoteo son visuales y no sustituyen cuidados ni consumo real de alimento.
 
 `src/data/motion-betta.json` centraliza masa, arrastre cuadrático, amortiguación exponencial del planeo, velocidad angular, fuerza, duraciones y proporciones. La velocidad de crucero se expresa en largos del cuerpo por segundo (longitud física × bodyFraction). La ráfaga de sobresalto dura burstSeconds y admite burstLengthsS; luego pierde velocidad gradualmente. Flotar no agrega gravedad ni fuerza ascendente. El balanceo es una pose pequeña alrededor del centro físico, no velocidad acumulada.
 
@@ -15,3 +15,5 @@ El PNG no separa las aletas del cuerpo. Se necesita arte en capas, con pivotes y
 En desarrollo: D o mantener dos segundos la esquina superior izquierda. El panel muestra estado, velocidad, rumbo y objetivo; los vectores muestran fuerza y destino con longitud acotada. Sliders modifican los parámetros en memoria; Copiar JSON exporta el objeto para pegarlo en el archivo. Producción elimina el import dinámico y no crea listeners ni panel. No se guardan esos ajustes automáticamente.
 
 Para extenderlo: separar parámetros y estrategia por especie conservando la misma interfaz de cuerpo/entrada; cardumen aporta objetivos de cohesión/alineación, especies de fondo aportan contacto con sustrato y velocidades bajas. No aplicar el perfil del betta globalmente. Primero revisar visualmente dimensiones, cortes, tiempos y retorno de plantas; esta entrega no ejecutó tests ni tomó capturas por instrucción del usuario.
+
+La opción explícita conserva las comprobaciones del motor anterior sin cambiar sus expectativas ni desactivar el paso Tests de CI. Esas comprobaciones no validan la nueva física optativa: sigue pendiente revisarla por separado, respetando la instrucción de no escribir ni ejecutar tests en esta entrega.
