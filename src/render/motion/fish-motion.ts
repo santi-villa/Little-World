@@ -140,6 +140,8 @@ export class FishMotion {
     this.random = mulberry(seed);
   }
 
+  flareBetta(id:number):void{this.bettas.get(id)?.triggerFlare(this.time);}
+
   get seconds(): number {
     return this.time;
   }

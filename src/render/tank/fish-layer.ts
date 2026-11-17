@@ -1,3 +1,4 @@
+import {bettaParameters as cBetta} from '../motion/betta-dynamics';
 import {ArticulatedBetta} from './articulated-betta';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { FlatBetta } from './flat-betta';
@@ -269,7 +270,10 @@ export class FishLayer {
     if(sp.id==='betta'){
       let fish=this.articulated.get(animal.id);if(!fish){fish=new ArticulatedBetta(animal.id,body.facing);this.articulated.set(animal.id,fish);}
       const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
-      fish.update(body,this.motion.bettas.get(animal.id),cx,cy,len,this.dt,lightOn,animal.alive);return;
+      const motion=this.motion.bettas.get(animal.id);
+      fish.update(body,motion,cx,cy,len,this.dt,lightOn,animal.alive);
+      if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
+      return;
     }
     if((sp.category==='fish' && this.bettaStyle==='code') || (sp.id==='betta' && this.bettaStyle==='flat')){
       let fish=this.codedBettas.get(animal.id);

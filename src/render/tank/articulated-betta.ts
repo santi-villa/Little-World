@@ -12,16 +12,18 @@ export class ArticulatedBetta {
   const piece=(from:number,to:number)=>{const t=new Texture({source:texture.source,frame:new Rectangle(from,0,to-from,H)});this.owned.push(t);const s=new Sprite(t);s.pivot.set(to-from,H*c.spriteHeight);return s;};
   this.head.addChild(piece(cuts[2]!,cuts[3]!));this.rear.addChild(piece(cuts[1]!,cuts[2]!));this.tail.addChild(piece(cuts[0]!,cuts[1]!));
   this.rear.x=-(cuts[3]!-cuts[2]!)+c.overlapPixels;this.tail.x=-(cuts[2]!-cuts[1]!)+c.overlapPixels;
+  this.head.x=W*c.spriteHeight;
   this.container.addChild(this.head);this.head.addChild(this.rear,this.pectorals);this.rear.addChild(this.tail);
  }
  update(b:FishBody,m:BettaDynamics|undefined,x:number,y:number,len:number,dt:number,lit:boolean,alive:boolean):void{
   const texture=tex('betta-articulated'),k=Math.max(1,Math.round(len/texture.width)),target=b.facing;
   this.turn+=(target-this.turn)*(1-Math.exp(-dt*c.turnEase));const flip=this.turn<0?-1:1;
-  this.container.position.set(Math.round(x+texture.width*k*c.spriteHeight*flip),Math.round(y+(m?.bob??0)*len));
+  this.container.position.set(Math.round(x),Math.round(y+(m?.bob??0)*len/Math.max(c.epsilon,m?.sizeCm??1)));
   this.container.scale.set(k*flip*Math.max(c.turnMinWidth,Math.abs(this.turn)),alive?k:-k);
   this.container.tint=lit?0xffffff:0x8994a3;
   if(alive){const speed=Math.hypot(b.vx,b.vy),pitch=m?.pitch??0,phase=m?.phase??0;
-   this.head.rotation=pitch*flip;
+   this.head.rotation=(m?.mode==='food'?-c.foodPitchDeg*Math.PI/180:pitch)*flip;
+   this.tail.scale.y=m?.mode==='flare'?c.flareScale:1;
    const curve=angleDiff(b.heading,Math.atan2(b.vy,b.vx))*c.turnCurveDeg/180;
    const amplitude=c.tailAmplitudeDeg*Math.PI/180*(m?.stroke==='burst'?1:0);
    const rearTarget=Math.sin(phase-c.jointLagSeconds)*amplitude+curve;
