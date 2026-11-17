@@ -1,3 +1,4 @@
+import bundledEntries from 'virtual:versioned-art';
 /**
  * Carga del arte generado por `npm run assets` (public/assets/): el manifest
  * y todas sus texturas. Hay que esperar a `loadAssets()` antes de armar la escena.
@@ -50,13 +51,12 @@ let entries: Record<string, AssetEntry> = {};
 const textures = new Map<string, Texture>();
 
 export async function loadAssets(): Promise<void> {
-  const base = `${import.meta.env.BASE_URL}assets/`;
-  const response = await fetch(`${base}manifest.json`);
-  if (!response.ok) throw new Error('Falta public/assets/manifest.json: corré "npm run assets".');
-  entries = ((await response.json()) as { assets: Record<string, AssetEntry> }).assets;
+  const base = import.meta.env.BASE_URL;
+  entries = bundledEntries;
   await Promise.all(
     Object.entries(entries).map(async ([name, entry]) => {
       const texture = await Assets.load<Texture>(base + entry.file);
+      if(texture.width!==entry.width || texture.height!==entry.height)throw new Error('La imagen no coincide con esta versión: '+name);
       texture.source.scaleMode = 'nearest';
       textures.set(name, texture);
     }),

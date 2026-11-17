@@ -1,3 +1,4 @@
+import { versionedArt } from './scripts/versioned-art';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
@@ -11,8 +12,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
   },
   plugins: [
+    versionedArt(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['icons/favicon-32.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Little World',
@@ -39,9 +42,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         // json incluido: manifest.json de los assets tiene que venir de la misma versión que sus PNG.
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
         cleanupOutdatedCaches: true,
+        globIgnores: ['assets/**/*.png', 'assets/manifest.json'],
       },
     }),
   ],

@@ -466,3 +466,5 @@ body.contemplating .hand-toolbar { display:none; }
 @media(max-width:720px){.hand-toolbar{right:5px;top:66px;gap:3px}.hand-toolbar button{min-width:72px;min-height:36px;font-size:10px;padding:6px}}
 .hand-toolbar output { max-width:100px; padding:6px; background:#202722dd; color:#e5dcc4; font-size:10px; line-height:1.6; border-radius:4px; }
 @media(max-width:720px){.hand-toolbar{width:72px}.hand-toolbar button,.hand-toolbar output{width:72px;max-width:72px;min-width:0}.hand-toolbar output{font-size:9px}}
+.repair-app { position:fixed; right:10px; top:40px; z-index:22; min-height:24px; max-width:240px; padding:6px 10px; background:#202722d9; color:#dbd5c1; border:1px solid #87735466; border-radius:4px; font:inherit; font-size:10px; }
+body.contemplating .repair-app { display:none; }

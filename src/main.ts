@@ -1,3 +1,4 @@
+import { beforeAppUpdate, startAppUpdates } from './app-update';
 import { AquariumPanel } from './render/ui/aquarium-panel';
 import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
@@ -154,6 +155,16 @@ async function boot(): Promise<void> {
       saving = false;
     }
   };
+
+  beforeAppUpdate(async()=>{
+    await initialRecovery;
+    // Wait for an in-flight save before requesting a final snapshot.
+    while(saving)await new Promise(resolve=>window.setTimeout(resolve,25));
+    game.dirty=true;
+    await save();
+    if(game.dirty||!savingWorks)throw new Error('No se pudo confirmar el guardado');
+  });
+  startAppUpdates();
 
   const saveStatus = (): string => {
     if (!savingWorks) return texts.save.unavailable;

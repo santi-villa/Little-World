@@ -537,5 +537,12 @@
     "spongeHint": "ARRASTRA LA ESPONJA SOBRE EL VIDRIO",
     "tapHint": "UN GOLPE ASUSTA, NO ES UNA CARICIA",
     "observeHint": "ACERCA LA MANO DESPACIO"
+  },
+  "appUpdate": {
+    "label": "Actualizar juego",
+    "title": "Reparar archivos de la app sin borrar tu partida",
+    "offline": "Conectate a internet para actualizar el juego.",
+    "downloadError": "No se pudo descargar el juego. Intentá nuevamente con conexión.",
+    "saveError": "No se pudo guardar; volvé a intentar actualizar"
   }
 }

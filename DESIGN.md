@@ -942,3 +942,9 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - Mano lenta y peces despiertos, confiados o atrevidos: curiosidad en ventanas breves con descansos. Comer, descansar, esconderse, respirar en superficie y huir tienen prioridad. Una mano brusca puede producir retirada visual en peces tímidos; Golpecito sí aumenta susto/estrés mediante la acción existente. No se da comida ni se cambia confianza por mover el cursor.
 - El betta ahora usa el asset detallado existente `animales/betta.png`, con filtrado nearest, giro progresivo y una malla que mueve solo la cola/aletas. Se retira el sprite procedural de baja resolución de su ruta de render, sin borrar el catálogo de sprites de otras especies.
 - La limpieza manual se registra sin llenar el diario con una entrada por movimiento. Las acciones de agua y filtro conservan sus diálogos de preparación; aún no son gestos de vertido/sifón libre.
+
+### Actualizaciones coherentes de la PWA
+
+El código incluye su propio manifiesto de arte y cada PNG se publica bajo `art/<sha256>-nombre.png`. Cambiar un archivo cambia su URL: no se combinan dimensiones de un manifiesto nuevo con texturas viejas. El precache incluye solo las rutas versionadas, no los PNG originales bajo assets/.
+
+La app registra el service worker sin reutilizar su caché HTTP, busca actualizaciones al volver y cada 30 minutos, y guarda antes de recargar al cambiar de controlador. La primera instalación no recarga. Actualizar juego comprueba conectividad, guarda, elimina solo entradas del scope de esta app y desregistra solo su worker antes de navegar al HTML fresco. Nunca borra IndexedDB, ajustes ni partidas. Si falla el guardado o la descarga, no inicia la reparación.

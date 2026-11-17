@@ -152,7 +152,7 @@ export class AquariumPanel {
       const names=new Set(preset.items.filter(i=>'plant' in i).map(i=>`${'plant' in i?i.plant:''}-${'stage' in i?i.stage:1}`));
       for(const name of [...names].slice(0,4)){
         const file=asset(name)?.file;if(!file)continue;
-        const img=document.createElement('img');img.src=`${import.meta.env.BASE_URL}assets/${file}`;img.alt='';preview.append(img);
+        const img=document.createElement('img');img.src=`${import.meta.env.BASE_URL}${file}`;img.alt='';preview.append(img);
       }
       card.append(preview);this.paragraph(descriptions[id],card);
       const selected=(this.game.player.decorId??'default')===id;
