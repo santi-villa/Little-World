@@ -9,6 +9,9 @@ export class PlantMotion {
     this.offsets = Array(segments).fill(0);
     this.velocity = Array(segments).fill(0);
   }
+  receiveImpulse(height:number,strength:number):void {
+    for(let i=1;i<this.segments;i++){const u=i/(this.segments-1);this.velocity[i]!+=strength*Math.max(0,1-Math.abs(u-height));}
+  }
   update(
     dt: number,
     time: number,

@@ -17,6 +17,7 @@ export class LivingPlant {
       (_, i) => new PlantMotion(9, seed + i * 1.7),
     );
   }
+  receiveImpulse(height:number,strength:number):void{for(const stem of this.stems)stem.receiveImpulse(height,strength);}
   update(
     seconds: number,
     dt: number,

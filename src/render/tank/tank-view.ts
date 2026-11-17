@@ -1,3 +1,4 @@
+import {bettaParameters as bettaConfig} from '../motion/betta-dynamics';
 import {PlantMotion} from '../motion/plant-motion';
 import {LivingPlant} from './living-plant';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
@@ -129,6 +130,7 @@ export class TankView {
   private readonly frontPlants = new Container();
   private readonly contactShadows = new Graphics();
   private living:LivingPlant[]=[];
+  private plantImpulseAt=new Map<string,number>();
   private habitat:Habitat=emptyHabitat();
   private plants: Plant[] = [];
   private readonly mid = new Graphics();
@@ -215,6 +217,12 @@ export class TankView {
     const flow = state.filter.flowLph > 0 ? Math.min(1, derived.effectiveFlowLph / state.filter.flowLph) : 0;
     const visitors=[...this.fish.motion.bodies.values()].map(b=>({x:geo.left+b.x*pxPerCm,y:geo.waterTop+2+b.y*pxPerCm,vx:b.vx}));
     this.swayPlants(seconds,flow,Math.max(0,seconds-this.lastSeconds),visitors);
+    // One brief wake per encounter, rather than forcing the whole plant every frame.
+    for(const animal of state.animals){if(animal.speciesId!=='betta'||!animal.alive)continue;const body=this.fish.motion.bodies.get(animal.id);if(!body)continue;
+      const x=geo.left+body.x*pxPerCm,y=geo.waterTop+2+body.y*pxPerCm,range=bettaConfig.plantRangeLengths*bettaConfig.bodyFraction*(this.fish.motion.bettas.get(animal.id)?.sizeCm??0)*pxPerCm;
+      const candidates=[...this.living.map((p,index)=>({key:'living'+index,x:p.container.x,y:p.container.y,h:p.height,w:p.width,impulse:(u:number,v:number)=>p.receiveImpulse(u,v)})),...this.plants.map((p,index)=>({key:'mesh'+index,x:p.mesh.x+(p.mesh.scale.x<0?-1:1)*p.mesh.width/2,y:p.mesh.y+p.mesh.height,h:p.mesh.height,w:p.mesh.width,impulse:(u:number,v:number)=>p.motion.receiveImpulse(u,v)}))];
+      for(const p of candidates){const u=(p.y-y)/Math.max(1,p.h),d=Math.abs(x-p.x),key=animal.id+':'+p.key;if(u<0||u>1||d>range+p.w/2){this.plantImpulseAt.delete(key);continue;}if(!this.plantImpulseAt.has(key)){p.impulse(u,body.vx*bettaConfig.plantImpulse);this.plantImpulseAt.set(key,seconds);}}
+    }
     for(const plant of this.living){plant.update(seconds,Math.max(0,seconds-this.lastSeconds),flow,visitors);plant.container.tint=tint;}
     this.fish.habitat=this.habitat;
 
@@ -412,7 +420,7 @@ export class TankView {
     for (const child of this.rearPlants.removeChildren()) child.destroy();
     for (const child of this.frontPlants.removeChildren()) child.destroy();
     this.contactShadows.clear();
-    this.plants = [];this.living=[];this.habitat=emptyHabitat();
+    this.plants = [];this.plantImpulseAt.clear();this.living=[];this.habitat=emptyHabitat();
     for (const [index, item] of this.decor.items.entries()) {
       const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
       if (!asset(name)) continue;
