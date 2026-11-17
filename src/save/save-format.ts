@@ -1,3 +1,4 @@
+import { GLASS_CELLS } from '../sim/glass';
 /**
  * Formato de guardado, con versión.
  *
@@ -91,6 +92,9 @@ function validSim(value: unknown): value is SimState {
     !CAT_BEHAVIORS.includes(sim.cat.behavior) ||
     !['bed','sunbeam','tank_lid','tank_front','windowsill','bowl','floor','away'].includes(sim.cat.spot) ||
     !sim.alerts.every(id => ALERT_IDS.includes(id))) return false;
+  if(sim.food.x!==undefined && (typeof sim.food.x!=='number'||!Number.isFinite(sim.food.x)||sim.food.x<0||sim.food.x>1))return false;
+  const cells=sim.algae.glassCells;
+  if(cells!==undefined && (!Array.isArray(cells)||cells.length!==GLASS_CELLS||!cells.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1)))return false;
   const ids = new Set<number>();
   for (const animal of value.animals) {
     if (!isRecord(animal)) return false;

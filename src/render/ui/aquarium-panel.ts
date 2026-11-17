@@ -1,3 +1,4 @@
+import type { HandTool } from '../hand-tools';
 import { favoriteCorner } from '../motion/fish-motion';
 import decorData from '../../data/tank-decor.json';
 import { asset } from '../assets';
@@ -29,9 +30,12 @@ export class AquariumPanel {
   private weatherKey = '';
   private page: Page | null = null;
   private lastKey = '';
+  private readonly handStatus=document.createElement('output');
+  private readonly lidButton:HTMLButtonElement;
+  private readonly toolButtons:HTMLButtonElement[]=[];
   private selectedAnimal: number | null = null;
   private opener: Element | null = null;
-  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void) {
+  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void, private readonly chooseTool:(tool:HandTool)=>void, toggleLid:()=>void) {
     const nav = this.navigation;
     nav.className = 'aquarium-nav'; nav.setAttribute('aria-label', careText.herramientas_del_acuario);
     this.statusButton = button(careText.agua, () => this.open('status'));
@@ -45,6 +49,11 @@ export class AquariumPanel {
     });
     const reveal=button(careText.mostrar_controles,()=>{document.body.classList.remove('contemplating');reveal.hidden=true;contemplate.focus();});
     reveal.className='reveal-controls';reveal.hidden=true;document.body.append(reveal);nav.append(contemplate);
+    const handBar=document.createElement('nav');handBar.className='hand-toolbar';handBar.setAttribute('aria-label',texts.hand.label);
+    for(const [tool,label]of [['observe',texts.hand.observe],['food',texts.hand.food],['sponge',texts.hand.sponge],['tap',texts.hand.tap]] as const){
+      const control=button(label,()=>this.chooseTool(tool));control.dataset.tool=tool;this.toolButtons.push(control);handBar.append(control);
+    }
+    this.lidButton=button(texts.hand.openLid,toggleLid);handBar.append(this.lidButton,this.handStatus);document.body.append(handBar);
     this.weatherButton = button(careText.buenos_aires, () => this.open('weather'));
     this.weatherButton.className = 'outside-chip';
     this.dialog.className = 'aquarium-dialog';
@@ -77,6 +86,12 @@ export class AquariumPanel {
     this.game.dirty = true; this.game.saveSoon = true; this.render();
   }
   update(): void {
+    const handText=fill(texts.hand.status,{algae:Math.round(this.game.state.algae.glass*100),food:(this.game.state.food.surfaceG+this.game.state.food.sinkingG).toFixed(3)});
+    if(this.handStatus.textContent!==handText)this.handStatus.textContent=handText;
+    const lidText=this.game.state.tank.hasLid?texts.hand.openLid:texts.hand.closeLid;
+    if(this.lidButton.textContent!==lidText)this.lidButton.textContent=lidText;
+    for(const control of this.toolButtons){const selected=String(control.dataset.tool===document.body.dataset.handTool);if(control.getAttribute('aria-pressed')!==selected)control.setAttribute('aria-pressed',selected);}
+
     const view = this.climate.view();
     const local = buenosAiresDate(view.nowMs);
     const seasonLabel = { spring: careText.primavera, summer: careText.verano, autumn: careText.otono, winter: careText.invierno }[view.season];
@@ -167,6 +182,8 @@ export class AquariumPanel {
       button(careText.revisar_filtro, () => this.care('cleanFilter')));
   }
   care(id: CareId): void {
+    if(['feed','cleanGlass'].includes(id)){this.close();this.chooseTool(id==='feed'?'food':'sponge');return;}
+
     if (!this.dialog.open) { this.opener = document.activeElement; this.dialog.showModal(); }
     this.page = null;
     const s = this.game.state;

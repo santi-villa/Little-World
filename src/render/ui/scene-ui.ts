@@ -104,7 +104,7 @@ export class SceneUi {
       const bw = textWidth(t.back, 2) + 16;
       this.button(g, t.back, 6, 30, { kind: 'back' }, 'back', bw, 2);
       // Indicación para salir deslizando, que se apaga sola.
-      if (focusAge < 4) {
+      if (focusAge < 4 && !this.toast) {
         const w = textWidth(t.swipeHint) + 8;
         const x = Math.round((W - w) / 2);
         const hintY = mode === 'tank' ? H - BAR - 14 : 6;

@@ -132,7 +132,7 @@ export function cloneState(state: SimState): SimState {
     heater: { ...state.heater },
     light: { ...state.light },
     room: { ...state.room },
-    algae: { ...state.algae },
+    algae: { ...state.algae, ...(state.algae.glassCells ? {glassCells:state.algae.glassCells.slice()} : {}) },
     bioload: { ...state.bioload },
     cycle: { ...state.cycle },
     animals: state.animals.map(cloneAnimal),

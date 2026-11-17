@@ -454,3 +454,15 @@ body[data-view='room'] .water-tool:not(.has-alerts) { display:none; }
 body.contemplating .aquarium-nav,body.contemplating .outside-chip,body.contemplating .debug-toggle,body.contemplating .debug-panel { display:none; }
 body.contemplating canvas { pointer-events:none; }
 @media(max-width:720px){.care-feedback{bottom:68px;font-size:10px;}}
+.hand-toolbar { display:none; position:fixed; right:10px; top:110px; z-index:9; flex-direction:column; gap:5px; }
+body[data-view='tank'] .hand-toolbar { display:flex; }
+.hand-toolbar button { min-height:42px; min-width:94px; border:1px solid #8d95755c; border-radius:4px; background:#242d28e8; color:#eee4ca; font:inherit; font-size:11px; padding:8px; }
+.hand-toolbar button[aria-pressed='true'] { background:#526447; border-color:#e1c28c; }
+body[data-hand-tool='sponge'][data-view='tank'] canvas { cursor:crosshair; }
+body[data-hand-tool='food'][data-view='tank'] canvas { cursor:copy; }
+body[data-hand-tool='tap'][data-view='tank'] canvas { cursor:pointer; }
+body[data-hand-tool='observe'][data-view='tank'] canvas { cursor:grab; }
+body.contemplating .hand-toolbar { display:none; }
+@media(max-width:720px){.hand-toolbar{right:5px;top:66px;gap:3px}.hand-toolbar button{min-width:72px;min-height:36px;font-size:10px;padding:6px}}
+.hand-toolbar output { max-width:100px; padding:6px; background:#202722dd; color:#e5dcc4; font-size:10px; line-height:1.6; border-radius:4px; }
+@media(max-width:720px){.hand-toolbar{width:72px}.hand-toolbar button,.hand-toolbar output{width:72px;max-width:72px;min-width:0}.hand-toolbar output{font-size:9px}}

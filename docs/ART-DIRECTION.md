@@ -29,3 +29,7 @@ Primero las plantas con raíces/halos y las rocas más contrastadas. Después el
 Revisarlo en habitación completa, pecera de cerca, noche y celular horizontal. Su silueta debe ser legible, el tamaño coherente, la base apoyada y la iluminación compatible. El filtrado nearest conserva bordes, pero no corrige una grilla o un dibujo incoherentes.
 
 Los ajustes del motor reducen las diferencias actuales; no sustituyen esa edición de los PNG. No se regeneraron ni repintaron imágenes en esta iteración.
+
+## Corrección del betta
+
+Se comprobó que el asset detallado `public/assets/animales/betta.png` ya existía. Ahora se usa directamente en una malla con filtrado nearest, movimiento restringido a las aletas y giro progresivo. La diferencia de calidad venía de la ruta procedural de muy pocos píxeles, no de ese PNG. Se conserva el tamaño físico del animal: acercar la cámara muestra su detalle sin convertirlo en un pez desproporcionado.

@@ -519,5 +519,23 @@
     "consultando": "Consultando…",
     "izquierda": "izquierda",
     "derecha": "derecha"
+  },
+  "hand": {
+    "label": "Tu mano en el acuario",
+    "observe": "Mano",
+    "food": "Comida",
+    "sponge": "Esponja",
+    "tap": "Golpecito",
+    "openLid": "Abrir tapa",
+    "closeLid": "Cerrar tapa",
+    "status": "Algas: {algae}% · Comida: {food} g",
+    "openFirst": "ABRI LA TAPA PRIMERO",
+    "wait": "YA HAY COMIDA, ESPERA",
+    "pinch": "UNA PIZCA. OBSERVA COMO COME",
+    "knock": "LOS GOLPES ASUSTAN A LOS PECES",
+    "foodHint": "ABRI LA TAPA Y ELEGI DONDE DAR LA PIZCA",
+    "spongeHint": "ARRASTRA LA ESPONJA SOBRE EL VIDRIO",
+    "tapHint": "UN GOLPE ASUSTA, NO ES UNA CARICIA",
+    "observeHint": "ACERCA LA MANO DESPACIO"
   }
 }

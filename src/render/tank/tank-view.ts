@@ -1,3 +1,5 @@
+import { GLASS_COLS, GLASS_ROWS } from '../../sim/glass';
+import type { HandInput } from '../motion/hand';
 import { ambientTint, ART } from '../art-direction';
 /**
  * La pecera. Refleja el estado de la simulación: tamaño del modelo, nivel del
@@ -34,7 +36,7 @@ import { ambientTint, ART } from '../art-direction';
  * adelante venga del estado de la simulación.
  */
 
-import { Container, Graphics, MeshPlane, Sprite, TilingSprite } from 'pixi.js';
+import { Container, Graphics, MeshPlane, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import decorData from '../../data/tank-decor.json';
 import type { DerivedValues, SimState } from '../../sim';
 import { asset, tex } from '../assets';
@@ -127,8 +129,12 @@ export class TankView {
   private readonly fx = new Graphics();
   private readonly waterMask = new Graphics();
   private readonly ledOff = new Graphics();
+  private readonly lidSprite=new Sprite();
+  private readonly glassMask=new Graphics();
+  private lidTextureKey='';
   private readonly glass = new Sprite(tex(GLASS));
   private decor: TankDecor = decorData.default;
+  private waterArea:TankRect={x:0,y:0,width:1,height:1};
   private inner: TankRect = { x: 0, y: 0, width: 1, height: 1 };
   private outer: TankRect = this.inner;
   private decorKey = '';
@@ -138,9 +144,9 @@ export class TankView {
   private lastSeconds = 0;
 
   constructor() {
-    this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.hardscape, this.plantLayer, this.fish.foreground, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
+    this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.fish.artBack, this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
     this.inside.mask = this.waterMask;
-    this.art.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
+    this.art.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.glassMask, this.lidSprite, this.ledOff);
     this.container.addChild(this.art);
   }
 
@@ -149,6 +155,8 @@ export class TankView {
     return this.outer;
   }
 
+  get waterBounds():TankRect { const k=this.art.scale.x;return {x:this.art.x+this.waterArea.x*k,y:this.art.y+this.waterArea.y*k,width:this.waterArea.width*k,height:this.waterArea.height*k}; }
+  setHand(hand:HandInput|null):void {this.fish.hand=hand;}
   fishAt(x:number,y:number):number|null { return this.fish.hit((x-this.art.x)/this.art.scale.x,(y-this.art.y)/this.art.scale.y); }
 
   /** Cambia la decoración (más adelante va a salir del estado de la simulación). */
@@ -173,6 +181,15 @@ export class TankView {
   update(state: SimState, derived: DerivedValues, seconds: number): void {
     const lit = derived.lightOn;
     const geo = this.layout(state, derived);
+    this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.waterHeight-geo.sandH-4)};
+    const tex=this.glass.texture;
+    const cut=Math.max(1,this.inner.y-3);
+    const lidKey=`${tex.uid}:${cut}`;
+    if(this.lidTextureKey!==lidKey){this.lidTextureKey=lidKey;this.lidSprite.texture=new Texture({source:tex.source,frame:new Rectangle(0,0,tex.width,cut)});}
+    this.glassMask.clear();
+    if(!state.tank.hasLid){this.glassMask.rect(0,cut,tex.width,tex.height-cut).fill(0xffffff);this.glass.mask=this.glassMask;}
+    else this.glass.mask=null;
+    this.lidSprite.visible=!state.tank.hasLid;this.lidSprite.position.set(0,-26);this.lidSprite.rotation=-0.035;
     const pxPerCm = this.inner.width / state.tank.lengthCm;
     const tannins = state.water.tannins;
 
@@ -542,11 +559,14 @@ export class TankView {
     if (glints > 0) g.fill({ color: 0xffffff, alpha: lit ? 0.7 : 0.25 });
 
     // Capa de algas en el vidrio.
-    const algaeSpecks = Math.round(Math.min(1, state.algae.glass) * width * 1.6);
+    const algaeSpecks = Math.round(width * 1.6);
     const algaeArea = Math.max(1, waterHeight - sandH - 4);
     for (let i = 0; i < algaeSpecks; i++) {
-      g.rect(left + Math.floor(scatter(i, 7) * (width - 2)), waterTop + 2 + Math.floor(scatter(i, 8) * algaeArea), 2, 2);
+      const u=scatter(i,7),v=scatter(i,8);
+      const cell=Math.min(GLASS_ROWS-1,Math.floor(v*GLASS_ROWS))*GLASS_COLS+Math.min(GLASS_COLS-1,Math.floor(u*GLASS_COLS));
+      const coverage=state.algae.glassCells?.[cell]??state.algae.glass;
+      if(scatter(i,72)<coverage)g.rect(left+Math.floor(u*(width-2)),waterTop+2+Math.floor(v*algaeArea),2,2);
     }
-    if (algaeSpecks > 0) g.fill({ color: shade(0x3fae4a), alpha: 0.8 });
+    g.fill({color:shade(0x3fae4a),alpha:0.8});
   }
 }

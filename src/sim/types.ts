@@ -110,6 +110,7 @@ export interface RoomState {
 
 /** Algas, como cobertura de 0 a 1. */
 export interface AlgaeState {
+  glassCells?: number[];
   glass: number;
   decor: number;
 }
@@ -194,6 +195,7 @@ export interface AnimalState {
 
 /** Comida en el agua. Lo que llega al fondo pasa a organics.foodG. */
 export interface FoodState {
+  x?: number;
   /** Flotando en la superficie, gramos. */
   surfaceG: number;
   /** Hundiéndose a media agua, gramos. */
@@ -352,7 +354,7 @@ export interface StepResult {
 }
 
 export type SimAction =
-  | { type: 'feed'; grams: number }
+  | { type: 'feed'; grams: number; x?: number }
   | {
       type: 'waterChange';
       fraction: number;
@@ -367,6 +369,7 @@ export type SimAction =
   | { type: 'replaceFilterMedia' }
   | { type: 'addConditioner' }
   | { type: 'cleanGlass' }
+  | { type: 'scrubGlass'; x: number; y: number; radius: number; strength: number }
   | { type: 'addSeededMedia' }
   | { type: 'doseAmmonia'; ppm: number }
   | { type: 'setHeater'; enabled?: boolean; watts?: number; setpointC?: number }

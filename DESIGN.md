@@ -931,3 +931,14 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - Barra simplificada: Acuario y Cuaderno; Agua aparece por avisos o de cerca. Diario, fichas, guía y decoración se agrupan en el cuaderno. El cuaderno físico y la biblioteca conservan sus funciones. Modo Contemplar con botón HTML para recuperar controles.
 - Resumen de ausencia con un próximo paso priorizado (retirar muertos, revisar agua, dar porción pequeña u observar). No recomendar compensar días de comida ni afirmar que todos están contentos si tienen hambre.
 - Escenario de referencia: betta inicial, semilla 42, exterior fijo de 23 °C. A 1 y 3 días sigue sano; a 7 días está vivo pero con hambre máxima y salud aproximada de 81%. No hay alimentación automática ni inmunidad fuera de línea.
+
+### La mano del jugador: alimentación, vidrio y curiosidad
+
+- Cerca del acuario hay herramientas Mano, Comida, Esponja y Golpecito, además de abrir/cerrar tapa. El modo elegido es explícito: pasar el mouse no equivale a golpear el vidrio.
+- Comida se aplica haciendo clic en la zona elegida con la tapa abierta. Cada clic da una pizca de hasta 0,004 g, limitada por la porción sugerida y el alimento ya disponible. Los granos visuales conservan sus lugares de caída por tandas. El modelo químico mantiene la comida agregada y un punto de búsqueda actual, sin simular cada grano como un cuerpo físico.
+- La tapa abierta se refleja visualmente y utiliza `tank.hasLid`, por lo que también cambia evaporación/intercambio térmico según la simulación existente. No hay saltos de peces implementados.
+- Esponja exige arrastrar: interpola los trazos y elimina película en celdas locales de una grilla 12×8. Las celdas opcionales se guardan en `algae.glassCells`; el promedio sigue siendo `algae.glass`. Crecimiento/decadencia conservan el patrón. Las partidas v3 previas sin esas propiedades siguen cargando.
+- `food.x` es opcional y conserva el punto de la última pizca. Sin él, las llamadas antiguas conservan el comportamiento anterior.
+- Mano lenta y peces despiertos, confiados o atrevidos: curiosidad en ventanas breves con descansos. Comer, descansar, esconderse, respirar en superficie y huir tienen prioridad. Una mano brusca puede producir retirada visual en peces tímidos; Golpecito sí aumenta susto/estrés mediante la acción existente. No se da comida ni se cambia confianza por mover el cursor.
+- El betta ahora usa el asset detallado existente `animales/betta.png`, con filtrado nearest, giro progresivo y una malla que mueve solo la cola/aletas. Se retira el sprite procedural de baja resolución de su ruta de render, sin borrar el catálogo de sprites de otras especies.
+- La limpieza manual se registra sin llenar el diario con una entrada por movimiento. Las acciones de agua y filtro conservan sus diálogos de preparación; aún no son gestos de vertido/sifón libre.

@@ -1,3 +1,4 @@
+import { interestedInHand, type HandInput } from './hand';
 /**
  * Movimiento de los animales de la pecera.
  *
@@ -50,6 +51,7 @@ export interface MotionAnimal {
 }
 
 export interface MotionInput {
+  hand?: HandInput | null;
   /** Agua: ancho y profundidad en cm. */
   bounds: Bounds;
   animals: readonly MotionAnimal[];
@@ -347,6 +349,12 @@ export class FishMotion {
         if (Math.sin(this.time * 0.08 + body.phase) > 0.65) body.targetPlane = PLANE_NEAR;
       }
 
+      if(input.hand && input.hand.age<.5 && input.hand.speed>80 && animal.boldness<.65 && !['eat','gasp','flee'].includes(animal.intent)){
+        desired=flee(body,input.hand.x,input.hand.y,cruise,bounds.width*.4);body.targetPlane=PLANE_FAR;
+      }
+      if(interestedInHand(animal.id,this.time,animal.feedingTrust??0,animal.boldness,animal.fright,animal.intent,input.hand)){
+        const hand=input.hand!;desired=arrive(body,hand.x,Math.max(depth*0.08,Math.min(depth*.9,hand.y)),cruise*0.65,4);body.targetPlane=PLANE_NEAR;
+      }
       // Boids: los que van en grupo se juntan y se alinean, más apretados si
       // son de cardumen y todavía más ante un susto.
       if (style !== 'none' && mates.length > 1 && animal.intent !== 'hide' && animal.intent !== 'rest') {

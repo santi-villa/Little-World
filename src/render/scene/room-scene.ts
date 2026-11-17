@@ -1,3 +1,4 @@
+import { pinchGrams, strokeSamples, type HandTool } from '../hand-tools';
 import { ambientTint } from '../art-direction';
 import decorData from '../../data/tank-decor.json';
 import type { OutsideView } from '../../world/weather';
@@ -26,7 +27,7 @@ import type { OutsideView } from '../../world/weather';
  */
 
 import { Container, Graphics, Sprite } from 'pixi.js';
-import type { DerivedValues, SimAction, SimState, Weather } from '../../sim';
+import { defaultConfig, type DerivedValues, type SimAction, type SimState, type Weather } from '../../sim';
 import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
@@ -90,11 +91,16 @@ export class RoomScene {
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
   private readonly glow = new Graphics();
+  private readonly handOverlay=new Graphics();
   private readonly tank = new TankView();
   private readonly cat = new CatView();
   private readonly ui = new SceneUi();
   /** Los vidrios de la ventana, en píxeles gordos. */
   private readonly window: { x: number; y: number; width: number; height: number };
+  private handTool:HandTool='observe';
+  private hand:{x:number;y:number;at:number;speed:number}|null=null;
+  private state:SimState|null=null;
+  private lastTap=-100;
   private mode: UiMode = 'room';
   /** Vista de la habitación a la que se vuelve al salir de una vista de cerca. */
   private roomView: CameraView;
@@ -156,6 +162,7 @@ export class RoomScene {
       decor,
       this.anim,
       this.tank.container,
+      this.handOverlay,
       this.cat.container,
       this.lights,
       this.flash,
@@ -167,6 +174,7 @@ export class RoomScene {
   }
 
   update(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): void {
+    this.state=state;
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
     this.seconds = seconds;
@@ -176,7 +184,21 @@ export class RoomScene {
       this.tank.setDecor(decorId === 'garden' ? decorData.garden : decorId === 'stones' ? decorData.stones : decorData.default);
     }
     if (document.body.dataset.view !== this.mode) document.body.dataset.view = this.mode;
+    const hand=this.hand;
+    this.tank.setHand(this.mode==='tank' && hand ? {x:hand.x*state.tank.lengthCm,y:hand.y*(this.tank.waterBounds.height/Math.max(1,this.tank.waterBounds.width))*state.tank.lengthCm,speed:hand.speed,age:seconds-hand.at}:null);
+    document.body.dataset.handTool=this.handTool;
     this.tank.update(state, derived, seconds);
+    this.handOverlay.clear();
+    if(this.mode==='tank' && hand && seconds-hand.at<2){
+      const r=this.tank.waterBounds,cx=r.x+hand.x*r.width,cy=r.y+hand.y*r.height;
+      if(this.handTool==='sponge'){
+        this.handOverlay.rect(Math.round(cx-8),Math.round(cy-5),16,10).fill(0xd9c48c);
+        this.handOverlay.rect(Math.round(cx-8),Math.round(cy+3),16,3).fill(0x607858);
+        this.handOverlay.rect(Math.round(cx-5),Math.round(cy-3),10,2).fill(0xeee1ad);
+      }else if(this.handTool==='food'){
+        this.handOverlay.rect(Math.round(cx-2),Math.round(r.y-3),4,1).fill({color:0xf0d59c,alpha:.8});
+      }
+    }
     const light = this.drawRoom(state, derived, seconds, view);
     this.cat.update(
       Math.max(light, derived.lightOn ? 0.6 : 0.3), seconds,
@@ -202,9 +224,29 @@ export class RoomScene {
     }
   }
 
+  pointerLeave():void {this.hand=null;this.tank.setHand(null);}
+  private normalized(p:Point):{x:number;y:number}|null {
+    const w=this.camera.toWorld(p.x,p.y),r=this.tank.waterBounds;
+    if(!inRect(r,w.x,w.y))return null;
+    return {x:(w.x-r.x)/r.width,y:(w.y-r.y)/r.height};
+  }
   pointerMove(p: Point): void {
+    const point=this.mode==='tank'?this.normalized(p):null;
+    if(point){const old=this.hand;const dt=Math.max(.016,this.seconds-(old?.at??this.seconds));this.hand={...point,at:this.seconds,speed:old?Math.hypot(point.x-old.x,point.y-old.y)*60/dt:0};}
+    else this.hand=null;
     const g = this.gesture;
     if (!g) return;
+    if(this.mode==='tank' && this.handTool==='sponge' && this.ui.hit(g.start.x,g.start.y)===null){
+      const a=this.normalized(g.last),b=this.normalized(p);
+      if(a&&b&&Math.hypot(a.x-b.x,a.y-b.y)>.004){
+        const samples=strokeSamples(a,b),distance=Math.hypot(a.x-b.x,a.y-b.y);
+        const strength=Math.min(1,defaultConfig.algae.manualScrubStrength*distance/.04/samples.length);
+        for(const sample of samples)this.act({type:'scrubGlass',...sample,radius:defaultConfig.algae.manualScrubRadius,strength});
+        g.dragging=true;g.last=p;
+      }
+      return;
+    }
+    if(this.mode==='tank' && this.handTool!=='observe'){g.last=p;return;}
     const dx = p.x - g.last.x;
     const dy = p.y - g.last.y;
     g.last = p;
@@ -258,15 +300,34 @@ export class RoomScene {
       return;
     }
     if (hit?.kind === 'care') {
+      if(hit.id==='feed'){this.selectTool('food');return;}
+      if(hit.id==='cleanGlass'){this.selectTool('sponge');return;}
       this.tools(hit.id);
       return;
     }
 
     const w = this.camera.toWorld(p.x, p.y);
     if (this.mode === 'tank') {
-      // Golpecito en el vidrio: los peces se asustan (no hay que hacerlo).
-      if (inRect(this.tank.bounds, w.x, w.y)) {
-        this.tools('fish', this.tank.fishAt(w.x,w.y) ?? undefined);
+      const r=this.tank.waterBounds,state=this.state;
+      if(!state)return;
+      if(this.handTool==='food'){
+        // A click above the surface chooses where the hand drops its pinch.
+        if(w.x>=r.x && w.x<=r.x+r.width && w.y>=this.tank.bounds.y-35 && w.y<=r.y+r.height){
+          if(state.tank.hasLid){this.ui.say(texts.hand.openFirst);return;}
+          const grams=pinchGrams(state);
+          if(grams<=.0001){this.ui.say(texts.hand.wait);return;}
+          this.act({type:'feed',grams,x:Math.max(0,Math.min(1,(w.x-r.x)/r.width))});
+          this.ui.say(texts.hand.pinch);
+        }
+        return;
+      }
+      if(inRect(r,w.x,w.y)){
+        if(this.handTool==='tap'){
+          if(this.seconds-this.lastTap<1)return;
+          this.lastTap=this.seconds;this.act({type:'tapGlass'});this.tank.scareAt(w.x,w.y);this.ui.say(texts.hand.knock);
+        } else if(this.handTool==='observe'){
+          const id=this.tank.fishAt(w.x,w.y);if(id!==null)this.tools('fish',id);
+        }
       }
       return;
     }
@@ -307,6 +368,11 @@ export class RoomScene {
     }
   }
 
+  selectTool(tool:HandTool):void {
+    this.showTank();this.handTool=tool;
+    this.ui.say(tool==='food'?texts.hand.foodHint:tool==='sponge'?texts.hand.spongeHint:tool==='tap'?texts.hand.tapHint:texts.hand.observeHint);
+  }
+  toggleLid():void {if(this.state){this.act({type:'setLid',hasLid:!this.state.tank.hasLid});}}
   showRoom(): void { this.exitFocus(); }
 
   showTank(): void { this.enterFocus('tank', this.tankFocus(0.85)); }
@@ -343,7 +409,7 @@ export class RoomScene {
 
   private exitFocus(): void {
     if (this.mode === 'room') return;
-    this.mode = 'room';
+    this.mode = 'room';this.handTool='observe';this.pointerLeave();
     this.camera.goTo(this.roomView);
   }
 

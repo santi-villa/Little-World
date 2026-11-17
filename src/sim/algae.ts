@@ -1,3 +1,4 @@
+import { evolveGlass } from './glass';
 /**
  * Algas, como cobertura de 0 a 1 en el vidrio y en la decoración.
  *
@@ -28,6 +29,7 @@ export function algaeCapacityGrams(
 /** Avanza las algas un paso. Devuelve los gramos de detrito nuevo. */
 export function stepAlgae(state: SimState, dtDays: number, config: SimConfig): number {
   const a = config.algae;
+  const previousGlass=state.algae.glass;
   const water = state.water;
   const liters = state.tank.waterLiters;
   const capacity = algaeCapacityGrams(state, config);
@@ -88,6 +90,8 @@ export function stepAlgae(state: SimState, dtDays: number, config: SimConfig): n
       Math.max(a.seedCoverage, (biomass + grown - lost) / capacity[place]),
     );
   }
+
+  evolveGlass(state.algae,previousGlass);
 
   // Las algas muertas pasan a detrito; lo que sobra de nutrientes vuelve al agua.
   const o = config.organics;

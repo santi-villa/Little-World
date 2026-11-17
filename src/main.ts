@@ -164,7 +164,7 @@ async function boot(): Promise<void> {
   };
 
   await loadAssets();
-  const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom());
+  const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom(), tool => scene.selectTool(tool), () => scene.toggleLid());
   const scene = new RoomScene((action) => void game.act(action), (page, animalId) => {
     if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor') tools.open(page);
@@ -214,6 +214,7 @@ async function boot(): Promise<void> {
   });
   canvas.addEventListener('pointermove', (event) => scene.pointerMove(toScene(event)));
   canvas.addEventListener('pointerup', (event) => scene.pointerUp(toScene(event)));
+  canvas.addEventListener('pointerleave', () => scene.pointerLeave());
   canvas.addEventListener('pointercancel', (event) => scene.pointerUp(toScene(event), true));
 
   let lastFrame = performance.now();

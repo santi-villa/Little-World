@@ -76,6 +76,7 @@ export class Game {
   saveSoon = false;
   /** El último catch-up, para mostrar cuánto tardó. */
   lastCatchUp: CatchUpReport | null = null;
+  private lastGlassNote=-Infinity;
   private pendingMinutes = 0;
 
   constructor(state: SimState, settings: GameSettings = DEFAULT_SETTINGS, public player: PlayerState = createPlayer()) {
@@ -162,6 +163,7 @@ export class Game {
   }
 
   act(action: SimAction): SimEvent[] {
+    if(action.type==='feed' && action.grams>0 && this.player.tutorial===2)this.player.tutorial=3;
     const result = applyAction(this.state, action);
     this.state = result.state;
     this.record(result.events);
@@ -211,6 +213,7 @@ export class Game {
   private record(events: SimEvent[]): void {
     for (const event of events) {
       if (event.type.startsWith('cat_') || event.type === 'animal_mood') continue;
+      if(event.type==='glass_cleaned'){if(event.timeMinutes-this.lastGlassNote<0.5)continue;this.lastGlassNote=event.timeMinutes;}
       const explanation = event.type === 'alert_raised' ? ` ${advice[event.alert]}` :
         event.type === 'fed' ? careText.lo_que_no_se_come_termina :
         event.type === 'filter_cleaned' ? careText.el_filtro_aloja_bacterias_utiles_no :

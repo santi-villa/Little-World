@@ -1,3 +1,4 @@
+import { scrubGlass } from './glass';
 /**
  * Acciones del jugador sobre la pecera. Igual que step(), son puras:
  *   applyAction(state, action) -> { state, events }
@@ -80,6 +81,7 @@ export function applyAction(
       // La comida cae a la superficie; feeding.ts la hunde y reparte.
       const grams = Math.max(0, action.grams);
       next.food.surfaceG += grams;
+      if(action.x!==undefined && Number.isFinite(action.x))next.food.x=clamp(action.x,0,1);
       events.push({ type: 'fed', timeMinutes, grams });
       if (grams > 0 && next.animals.length > 0) {
         // Aprenden que el jugador trae comida, y van enseguida a buscarla.
@@ -177,9 +179,17 @@ export function applyAction(
       break;
     }
 
+    case 'scrubGlass': {
+      if(![action.x,action.y,action.radius,action.strength].every(Number.isFinite))break;
+      const removed=scrubGlass(next.algae,clamp(action.x,0,1),clamp(action.y,0,1),clamp(action.radius,0.01,0.3),clamp(action.strength,0,1));
+      if(removed>0)events.push({type:'glass_cleaned',timeMinutes,coverageRemoved:removed});
+      break;
+    }
     case 'cleanGlass': {
       const removed = next.algae.glass * config.algae.scrubRemovalFraction;
+      const before=next.algae.glass;
       next.algae.glass = Math.max(config.algae.seedCoverage, next.algae.glass - removed);
+      if(next.algae.glassCells)next.algae.glassCells=next.algae.glassCells.map(v=>before>0?v*next.algae.glass/before:next.algae.glass);
       events.push({ type: 'glass_cleaned', timeMinutes, coverageRemoved: removed });
       break;
     }

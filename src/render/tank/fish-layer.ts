@@ -1,3 +1,6 @@
+import { Container, MeshPlane } from 'pixi.js';
+import { tex } from '../assets';
+import type { HandInput } from '../motion/hand';
 import { drawPixelText, textWidth } from '../ui/pixel-font';
 import { ART, fishPigment } from '../art-direction';
 /**
@@ -32,9 +35,13 @@ function hex(color: string): number {
 export class FishLayer {
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
+  readonly artBack=new Container();
+  readonly artFront=new Container();
+  private readonly bettas=new Map<number,{mesh:MeshPlane;rest:Float32Array;turn:number}>();
+  hand:HandInput|null=null;
   readonly foodGraphics = new Graphics();
   private ink = this.graphics;
-  private fedAt = -100;
+  private batches:{x:number;grams:number;at:number}[]=[];
   private selectedId: number | null = null;
   private selectedUntil = 0;
   private positions = new Map<number, {x:number;y:number;radius:number}>();
@@ -92,9 +99,11 @@ export class FishLayer {
 
     // Comida nueva: cae en algún lugar de la superficie.
     if (state.food.surfaceG > this.lastSurfaceG + 1e-6 || this.foodXCm === 0) {
-      this.fedAt = seconds;
-      this.foodXCm = bounds.width * (0.25 + 0.5 * Math.random());
+      this.foodXCm = bounds.width * (state.food.x ?? (0.25 + 0.5 * Math.random()));
     }
+    if(state.food.surfaceG<this.lastSurfaceG && this.lastSurfaceG>0){const keep=state.food.surfaceG/this.lastSurfaceG;for(const batch of this.batches)batch.grams*=keep;}
+    if(state.food.surfaceG>this.lastSurfaceG+1e-6)this.batches.push({x:this.foodXCm,grams:state.food.surfaceG-this.lastSurfaceG,at:seconds});
+    this.batches=this.batches.filter(b=>b.grams>1e-6).slice(-16);
     this.lastSurfaceG = state.food.surfaceG;
 
     const species = new Map<number, Species>();
@@ -126,9 +135,12 @@ export class FishLayer {
         x: this.foodXCm,
       },
       scare: this.scare,
+      hand:this.hand,
       catAtGlass: cat === 'watch_fish' || cat === 'tap_glass',
     });
 
+    const ids=new Set(animals.filter(a=>a.species.id==='betta').map(a=>a.id));
+    for(const [id,entry]of this.bettas)if(!ids.has(id)){entry.mesh.destroy();this.bettas.delete(id);}
     this.dt = Math.min(0.1, Math.max(0, dtSeconds));
     for (const id of this.anim.keys()) if (!this.motion.bodies.has(id)) this.anim.delete(id);
 
@@ -168,13 +180,16 @@ export class FishLayer {
     const g = this.foodGraphics;
     const x0 = area.x + this.foodXCm * pxPerCm;
     const spread = Math.max(5, pxPerCm * 2);
-    const floating = Math.min(40, Math.ceil(state.food.surfaceG * 200));
-    for (let i = 0; i < floating; i++) {
-      const x = Math.round(x0 + (scatter(i, 21) - 0.5) * 2 * spread);
-      if (x < area.x || x > area.x + area.width - 2) continue;
-      const age = seconds - this.fedAt - i * 0.035;
-      const y = area.y - 12 + 12 * Math.min(1,Math.max(0,age)/0.7)**2;
-      g.rect(x, Math.round(y + Math.sin(seconds*1.7+i)*0.5), 2, 1);
+    let floating=0;
+    for(const [batchIndex,batch]of this.batches.entries()){
+      const count=Math.min(16,Math.ceil(batch.grams*200));floating+=count;
+      for(let i=0;i<count;i++){
+        const x=Math.round(area.x+batch.x*pxPerCm+(scatter(i+batchIndex*19,21)-.5)*2*spread);
+        if(x<area.x||x>area.x+area.width-2)continue;
+        const age=seconds-batch.at-i*.035;
+        const y=area.y-12+12*Math.min(1,Math.max(0,age)/.7)**2;
+        g.rect(x,Math.round(y+Math.sin(seconds*1.7+i)*.5),2,1);
+      }
     }
     const sinking = Math.min(40, Math.ceil(state.food.sinkingG * 200));
     for (let i = 0; i < sinking; i++) {
@@ -233,6 +248,25 @@ export class FishLayer {
       this.foodGraphics.rect(cx-2,area.y+1,4,1).fill({color:0xe8dec7,alpha:0.3});
     }
     const dir = body.facing;
+
+    if(sp.id==='betta'){
+      let entry=this.bettas.get(animal.id);
+      if(!entry){const mesh=new MeshPlane({texture:tex('betta'),verticesX:12,verticesY:4});const rest=(mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array).slice();entry={mesh,rest,turn:body.facing};this.bettas.set(animal.id,entry);}
+      const mesh=entry.mesh,texture=mesh.texture;
+      const parent=body.plane<1.2?this.artBack:this.artFront;
+      if(mesh.parent!==parent)parent.addChild(mesh);
+      mesh.pivot.set(texture.width*.5,texture.height*.5);
+      const k=len/texture.width;
+      const turnDelta=body.facing-entry.turn;
+      entry.turn+=Math.sign(turnDelta)*Math.min(Math.abs(turnDelta),this.dt*TURN_SPEED);
+      const turn=(entry.turn<0?-1:1)*Math.max(.35,Math.abs(Math.sin(entry.turn*Math.PI/2)));
+      mesh.scale.set(turn*k,animal.alive?k:-k);mesh.position.set(cx,cy);
+      mesh.tint=lightOn?0xffffff:0x687c98;mesh.alpha=1;
+      const attribute=mesh.geometry.getAttribute('aPosition'),positions=attribute.buffer.data as Float32Array;
+      for(let i=0;i<positions.length;i+=2){const x=entry.rest[i]!,y=entry.rest[i+1]!,tail=Math.max(0,1-x/(texture.width*.65));
+        positions[i]=x;positions[i+1]=y+(animal.alive?Math.sin(seconds*3.1+body.phase+x*.018)*texture.height*.025*tail*tail:0);}
+      attribute.buffer.update();return;
+    }
 
     // Especies con sprite propio; el resto sigue con el placeholder de abajo.
     const sprite = FISH_SPRITES[sp.id];

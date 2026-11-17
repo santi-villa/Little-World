@@ -1,3 +1,16 @@
+# Mano, cuidado y betta detallado
+
+Implementados: pizcas elegidas sobre la pecera con tapa abierta; cierre de tapa;
+esponja por arrastre con limpieza espacial persistente; golpes con susto real;
+curiosidad breve ante la mano lenta y retirada ante movimientos bruscos.
+El betta usa la imagen detallada ya disponible, con ondulación y giro suaves.
+
+Pendientes: sifón/vertido manual, distribución física de cada grano, saltos,
+y más animaciones específicas de alimentación. No interpretar notas históricas
+sobre alimentación automática o limpieza de todo el vidrio como comportamiento actual.
+
+---
+
 # Pulido de observación y dirección de arte
 
 Aplicados: luz común, pigmentos menos saturados, sombras de contacto, oclusión por planos,
