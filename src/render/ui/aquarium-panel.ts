@@ -235,6 +235,12 @@ export class AquariumPanel {
   }
   private fish(): void {
     this.title(careText.conoce_a_tus_peces);
+    const styleLabel=document.createElement('label');styleLabel.textContent=texts.fishArt.label+' ';
+    const style=document.createElement('select');style.setAttribute('aria-label',texts.fishArt.label);
+    for(const [value,label]of [['code',texts.fishArt.code],['image',texts.fishArt.image]]){const option=document.createElement('option');option.value=value!;option.textContent=label!;style.append(option);}
+    style.value=this.game.player.bettaStyle??'code';style.addEventListener('change',()=>{this.game.player.bettaStyle=style.value as 'code'|'image';this.game.dirty=true;this.game.saveSoon=true;});
+    styleLabel.append(style);this.body.append(styleLabel);
+
     if (!this.game.state.animals.length) this.paragraph(careText.todavia_no_hay_animales_en_esta);
     for (const a of this.game.state.animals) {
       const card = document.createElement('section');card.dataset.animalId=String(a.id);

@@ -199,7 +199,7 @@ async function boot(): Promise<void> {
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
   scene.update(game.state, derive(game.state), performance.now() / 1000,
-    { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default' });
+    { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default', bettaStyle:game.player.bettaStyle??'code' });
   tools.setBusy(true);
   // Mientras se recupera el acuario, el cursor es el reloj de arena.
   document.body.classList.add('busy');
@@ -300,7 +300,7 @@ async function boot(): Promise<void> {
       window.setTimeout(() => void save(), SAVE_AFTER_ACTION_MS);
     }
     const now = performance.now();
-    scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default' });
+    scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default', bettaStyle:game.player.bettaStyle??'code' });
     panel.update(now);
   });
 

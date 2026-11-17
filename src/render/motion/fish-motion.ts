@@ -75,6 +75,7 @@ export interface FishBody extends Body {
   goalUntil: number;
   /** Fase propia, para que no aleteen todos a la vez. */
   phase: number;
+  pauseUntil?: number;
 }
 
 interface SchoolGoal {
@@ -165,6 +166,7 @@ export class FishMotion {
   private pickGoal(body: FishBody, animal: MotionAnimal, bounds: Bounds): void {
     const r = this.random;
     let [top, bottom] = zoneBand(animal.species);
+    if(animal.species.id==='betta' && r()<.35)[top,bottom]=[.12,.82];
     // Salidas ocasionales de su zona.
     if (r() < 0.15) [top, bottom] = [0.08, 0.92];
     const visitHome = r() < 0.4;
@@ -232,7 +234,7 @@ export class FishMotion {
       }
 
       const crawler = sp.category !== 'fish';
-      const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity);
+      const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
       const [bandTop, bandBottom] = zoneBand(sp);
       let desired: Vec = { x: 0, y: 0 };
       let boost = 1;
@@ -333,7 +335,10 @@ export class FishMotion {
             body.targetPlane = goal.plane;
             desired = arrive(body, goal.x, goal.y, cruise, 6);
           } else {
-            if (this.time >= body.goalUntil || length(body.goalX - body.x, body.goalY - body.y) < 2) {
+            if(sp.id==='betta' && this.time<(body.pauseUntil??0)){desired={x:0,y:0};break;}
+            const arrived=length(body.goalX-body.x,body.goalY-body.y)<2;
+            if(sp.id==='betta' && arrived && body.goalUntil>=0){body.pauseUntil=this.time+.5+1.2*r();body.goalUntil=-1;desired={x:0,y:0};break;}
+            if (this.time >= body.goalUntil || arrived) {
               this.pickGoal(body, animal, bounds);
             }
             const toGoal = arrive(body, body.goalX, body.goalY, cruise, 5);

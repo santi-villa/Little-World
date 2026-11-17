@@ -948,3 +948,11 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 El código incluye su propio manifiesto de arte y cada PNG se publica bajo `art/<sha256>-nombre.png`. Cambiar un archivo cambia su URL: no se combinan dimensiones de un manifiesto nuevo con texturas viejas. El precache incluye solo las rutas versionadas, no los PNG originales bajo assets/.
 
 La app registra el service worker sin reutilizar su caché HTTP, busca actualizaciones al volver y cada 30 minutos, y guarda antes de recargar al cambiar de controlador. La primera instalación no recarga. Actualizar juego comprueba conectividad, guarda, elimina solo entradas del scope de esta app y desregistra solo su worker antes de navegar al HTML fresco. Nunca borra IndexedDB, ajustes ni partidas. Si falla el guardado o la descarga, no inicia la reparación.
+
+### Comparación de betta procedural e imagen
+
+Por pedido del usuario, el estilo inicial es ahora `code`. Cuaderno → Peces permite elegir Dibujado con código o Imagen original y guarda la preferencia opcional `player.bettaStyle`, sin cambiar la partida ni los cuerpos de movimiento.
+
+`render/tank/code-betta.ts` dibuja el pez entero mediante geometría: cuerpo sombreado por capas, escamas, branquias, ojos y aletas con radios. No usa texturas ni imágenes. `motion/betta-pose.ts` suaviza inclinación, giro y esfuerzo; hay aleteo residual en reposo y golpes más fuertes en los arranques/sustos. La inclinación sigue la velocidad vertical y el giro comprime la silueta antes de cambiar de lado.
+
+Al explorar, el betta hace excursiones ocasionales a media/baja agua, alterna intensidad de avance y puede detenerse brevemente al llegar a un punto. Se conservan límites de velocidad, aceleración, giro y contención. Descanso, alimentación, miedo y curiosidad mantienen sus prioridades. La química y las necesidades no cambian por elegir el aspecto.

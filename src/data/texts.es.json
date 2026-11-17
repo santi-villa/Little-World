@@ -597,5 +597,10 @@
     "filterCleaned": "Listo: filtro limpio.",
     "pinch": "Una pizca. Mirá cómo come.",
     "knock": "Los golpes asustan a los peces."
+  },
+  "fishArt": {
+    "label": "Aspecto del betta",
+    "code": "Dibujado con código",
+    "image": "Imagen original"
   }
 }

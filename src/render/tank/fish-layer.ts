@@ -1,3 +1,4 @@
+import { CodeBetta } from './code-betta';
 import { Container, MeshPlane } from 'pixi.js';
 import { tex } from '../assets';
 import type { HandInput } from '../motion/hand';
@@ -35,6 +36,8 @@ function hex(color: string): number {
 export class FishLayer {
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
+  bettaStyle:'code'|'image'='code';
+  private readonly codedBettas=new Map<number,CodeBetta>();
   readonly artBack=new Container();
   readonly artFront=new Container();
   private readonly bettas=new Map<number,{mesh:MeshPlane;rest:Float32Array;turn:number}>();
@@ -141,6 +144,9 @@ export class FishLayer {
 
     const ids=new Set(animals.filter(a=>a.species.id==='betta').map(a=>a.id));
     for(const [id,entry]of this.bettas)if(!ids.has(id)){entry.mesh.destroy();this.bettas.delete(id);}
+    for(const [id,fish]of this.codedBettas)if(!ids.has(id)){fish.destroy();this.codedBettas.delete(id);}
+    for(const fish of this.codedBettas.values())fish.container.visible=false;
+    for(const entry of this.bettas.values())entry.mesh.visible=false;
     this.dt = Math.min(0.1, Math.max(0, dtSeconds));
     for (const id of this.anim.keys()) if (!this.motion.bodies.has(id)) this.anim.delete(id);
 
@@ -249,10 +255,18 @@ export class FishLayer {
     }
     const dir = body.facing;
 
+    if(sp.id==='betta' && this.bettaStyle==='code'){
+      let fish=this.codedBettas.get(animal.id);
+      if(!fish){fish=new CodeBetta(animal.id,body.facing);this.codedBettas.set(animal.id,fish);}
+      const parent=body.plane<1.2?this.artBack:this.artFront;
+      if(fish.container.parent!==parent)parent.addChild(fish.container);
+      fish.container.visible=true;
+      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage);return;
+    }
     if(sp.id==='betta'){
       let entry=this.bettas.get(animal.id);
       if(!entry){const mesh=new MeshPlane({texture:tex('betta'),verticesX:12,verticesY:4});const rest=(mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array).slice();entry={mesh,rest,turn:body.facing};this.bettas.set(animal.id,entry);}
-      const mesh=entry.mesh,texture=mesh.texture;
+      const mesh=entry.mesh,texture=mesh.texture;mesh.visible=true;
       const parent=body.plane<1.2?this.artBack:this.artFront;
       if(mesh.parent!==parent)parent.addChild(mesh);
       mesh.pivot.set(texture.width*.5,texture.height*.5);

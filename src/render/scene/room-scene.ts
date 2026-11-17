@@ -48,6 +48,7 @@ export interface SceneView {
   weather: Weather;
   outside?: OutsideView;
   decorId?: string;
+  bettaStyle?: 'code'|'image';
 }
 
 type Point = { x: number; y: number };
@@ -191,6 +192,7 @@ export class RoomScene {
     const hand=this.hand;
     this.tank.setHand(this.mode==='tank' && hand ? {x:hand.x*state.tank.lengthCm,y:hand.y*(this.tank.waterBounds.height/Math.max(1,this.tank.waterBounds.width))*state.tank.lengthCm,speed:hand.speed,age:seconds-hand.at}:null);
     document.body.dataset.handTool=this.handTool;
+    this.tank.fish.bettaStyle=view.bettaStyle??'code';
     this.tank.update(state, derived, seconds);
     this.handOverlay.clear();
     if(this.mode==='tank' && hand && seconds-hand.at<2){
