@@ -196,6 +196,7 @@
   },
   "food": {
     "floatMinutes": 3,
+    "suggestedMealHungerFraction": 0.25,
     "sinkMinutes": 2,
     "shySurfaceAccessMin": 0.4,
     "access": {

@@ -11,11 +11,9 @@ import {
   SPECIES,
   TANK_MODELS,
   checkAddition,
-  defaultConfig,
   derive,
   findSpecies,
   getSpecies,
-  petTolerance,
   stockFromAnimals,
   type DerivedValues,
   type SimAction,
@@ -37,19 +35,6 @@ const n = (value: number, digits = 2): string => value.toFixed(digits);
 const pct = (fraction: number, digits = 0): string => `${(fraction * 100).toFixed(digits)}%`;
 const yesNo = (value: boolean): string => (value ? T.yes : T.no);
 
-const CAT_ROWS: [RowId, Getter][] = [
-  [
-    'catBehavior',
-    (s) => `${texts.catBehaviors[s.cat.behavior]} · ${texts.catSpots[s.cat.spot]}`,
-  ],
-  [
-    'catNeeds',
-    (s) => `${n(s.cat.needs.sleep)} / ${n(s.cat.needs.hunger)} / ${n(s.cat.needs.curiosity)}`,
-  ],
-  ['catNeeds2', (s) => `${n(s.cat.needs.affection)} / ${n(s.cat.needs.energy)}`],
-  ['catPetting', (s) => `${n(s.cat.petting, 1)} / ${n(petTolerance(s.cat, defaultConfig), 1)}`],
-  ['catBowl', (s) => pct(s.cat.bowl)],
-];
 
 const ROWS: { section: SectionId; rows: [RowId, Getter][] }[] = [
   {
@@ -212,17 +197,6 @@ const ACTION_BUTTONS: ActionButton[] = [
   { id: 'removeDead', run: act({ type: 'removeDead' }) },
 ];
 
-const CAT_BUTTONS: ActionButton[] = [
-  { id: 'petCat', run: act({ type: 'petCat' }) },
-  {
-    id: 'petCatMany',
-    bad: true,
-    run: (game) => {
-      for (let i = 0; i < 10; i++) game.act({ type: 'petCat' });
-    },
-  },
-  { id: 'fillBowl', run: act({ type: 'fillCatBowl' }) },
-];
 
 const AWAY_BUTTONS: { id: ButtonId; minutes: number }[] = [
   { id: 'away3h', minutes: 180 },
@@ -278,9 +252,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 function readOpen(): boolean {
   try {
-    return localStorage.getItem(OPEN_KEY) !== '0';
+    return localStorage.getItem(OPEN_KEY) === '1';
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -408,14 +382,6 @@ export class DebugPanel {
 
     // --- Gato ---
     const cat = this.section('cat');
-    const catTable = el('table', 'debug-table');
-    for (const [id, get] of CAT_ROWS) {
-      const tr = el('tr');
-      const value = el('td', 'debug-value');
-      tr.append(el('th', undefined, T.rows[id]), value);
-      catTable.append(tr);
-      this.cells.push({ get, node: value });
-    }
     this.weather = el('select', 'debug-speed');
     this.weather.setAttribute('aria-label', T.weatherLabel);
     for (const id of Object.keys(texts.weather) as Weather[]) {
@@ -438,7 +404,7 @@ export class DebugPanel {
       const h = Number(hour.value);
       scenePreview.hour = h < 0 ? null : h;
     });
-    cat.append(catTable, this.buttons(CAT_BUTTONS), this.weather, hour);
+    cat.append(this.weather, hour);
 
     // --- Acciones y ajustes ---
     this.section('actions').append(this.buttons(ACTION_BUTTONS));

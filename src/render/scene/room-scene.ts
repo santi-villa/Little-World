@@ -29,7 +29,7 @@ import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
 import { Hud } from '../ui/hud';
-import { CARE_BAR_HEIGHT, SceneUi, type UiMode } from '../ui/scene-ui';
+import { CARE_BAR_HEIGHT, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
@@ -110,7 +110,7 @@ export class RoomScene {
   private seconds = 0;
 
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
-  constructor(private readonly act: (action: SimAction) => void) {
+  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | CareId) => void) {
     const hole = asset(this.data.background)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
     this.window = {
       x: Math.floor(hole.x / PX),
@@ -176,12 +176,7 @@ export class RoomScene {
     this.tank.update(state, derived, seconds);
     const light = this.drawRoom(state, derived, seconds, view);
     this.cat.update(
-      state,
-      this.tank.bounds,
-      Math.max(light, derived.lightOn ? 0.6 : 0.3),
-      seconds,
-      dt,
-      this.birdVisit && this.bird.alpha > 0.5 ? { x: this.bird.x, y: this.bird.y - 20 } : null,
+      Math.max(light, derived.lightOn ? 0.6 : 0.3), seconds,
     );
     // De cerca, la cámara acompaña al gato si camina.
     if (this.mode === 'cat' && !this.gesture?.dragging) this.focusOn(this.catFocus(), false);
@@ -261,8 +256,7 @@ export class RoomScene {
       return;
     }
     if (hit?.kind === 'care') {
-      this.act(hit.action);
-      this.ui.pressedCare(hit.id);
+      this.tools(hit.id);
       return;
     }
 
@@ -270,8 +264,7 @@ export class RoomScene {
     if (this.mode === 'tank') {
       // Golpecito en el vidrio: los peces se asustan (no hay que hacerlo).
       if (inRect(this.tank.bounds, w.x, w.y)) {
-        this.act({ type: 'tapGlass' });
-        this.tank.scareAt(w.x, w.y);
+        this.tools('fish');
       }
       return;
     }
@@ -298,7 +291,7 @@ export class RoomScene {
         this.petCat();
         break;
       case 'panel':
-        if (zone.panel) this.ui.openPanel(zone.panel);
+        if (zone.panel) this.tools(zone.panel === 'notebook' ? 'diary' : 'guide');
         break;
       case 'toggle-window': {
         const open = !(this.state?.room.windowOpen ?? false);

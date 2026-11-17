@@ -6,9 +6,10 @@
  * la versión anterior en la nueva. Así las partidas viejas siguen cargando.
  */
 
-import { createCat, defaultConfig, type SimState, type Weather } from '../sim';
+import { ALERT_IDS, INTENTS, CAT_BEHAVIORS, applyAction, createNewTank, createCat, defaultConfig, findSpecies, type SimState, type Weather } from '../sim';
+import { createPlayer, type PlayerState } from '../player';
 
-export const SAVE_FORMAT_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 3;
 
 export interface GameSettings {
   /** Minutos simulados por segundo real (0 = pausa). */
@@ -34,6 +35,7 @@ export interface SaveFile {
   /** Estado de la simulación (incluye el estado del RNG). */
   sim: SimState;
   settings: GameSettings;
+  player: PlayerState;
 }
 
 /** Una migración recibe el guardado en la versión N y lo devuelve en la N+1. */
@@ -41,6 +43,7 @@ export type Migration = (save: Record<string, unknown>) => Record<string, unknow
 
 /** MIGRATIONS[N] convierte de la versión N a la N+1. */
 export const MIGRATIONS: Record<number, Migration> = {
+  2: (save) => ({ ...save, player: createPlayer() }),
   // v1 -> v2: llegan los animales, la comida en el agua y el gato.
   1: (save) => {
     const sim = isRecord(save.sim) ? save.sim : {};
@@ -67,6 +70,49 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Check every required nested field before the simulation can consume it. */
+function matches(value: unknown, sample: unknown): boolean {
+  if (typeof sample === 'number') return typeof value === 'number' && Number.isFinite(value);
+  if (sample === null) return value === null;
+  if (isRecord(sample)) return isRecord(value) && Object.entries(sample).every(([k, v]) => matches(value[k], v));
+  return typeof value === typeof sample;
+}
+const template = createNewTank();
+const animalTemplate = applyAction(template, { type: 'addAnimals', speciesId: 'betta', count: 1 }).state.animals[0]!;
+function validSim(value: unknown): value is SimState {
+  if (!isRecord(value) || !Array.isArray(value.animals) || !Array.isArray(value.alerts)) return false;
+  const { animals: _a, alerts: _b, ...required } = template;
+  if (!matches(value, required)) return false;
+  const sim = value as unknown as SimState;
+  if (sim.timeMinutes < 0 || !Number.isInteger(sim.rngState) || sim.rngState < 0 || sim.rngState > 0xffffffff ||
+    !Number.isInteger(sim.nextAnimalId) || sim.nextAnimalId < 1 ||
+    sim.tank.fullLiters <= 0 || sim.tank.waterLiters <= 0 || sim.tank.waterLiters > sim.tank.fullLiters ||
+    [sim.tank.lengthCm, sim.tank.widthCm, sim.tank.heightCm].some(n => n <= 0) ||
+    !CAT_BEHAVIORS.includes(sim.cat.behavior) ||
+    !['bed','sunbeam','tank_lid','tank_front','windowsill','bowl','floor','away'].includes(sim.cat.spot) ||
+    !sim.alerts.every(id => ALERT_IDS.includes(id))) return false;
+  const ids = new Set<number>();
+  for (const animal of value.animals) {
+    if (!isRecord(animal)) return false;
+    const { name: _name, targetId: _target, ...fields } = animalTemplate;
+    if (!matches(animal, fields) || !(animal.name === null || typeof animal.name === 'string') ||
+      !(animal.targetId === null || (Number.isInteger(animal.targetId) && (animal.targetId as number) > 0)) ||
+      !findSpecies(animal.speciesId as string) || !INTENTS.includes(animal.intent as never) ||
+      !['male', 'female'].includes(animal.sex as string) ||
+      !['happy','normal','stressed','sick'].includes(animal.mood as string) ||
+      !Number.isInteger(animal.id) || (animal.id as number) < 1 || ids.has(animal.id as number) ||
+      (animal.id as number) >= sim.nextAnimalId) return false;
+    ids.add(animal.id as number);
+  }
+  return true;
+}
+function validPlayer(value: unknown): value is PlayerState {
+  return isRecord(value) && Number.isInteger(value.tutorial) && (value.tutorial as number) >= 0 &&
+    (value.tutorial as number) <= 4 && Array.isArray(value.journal) && value.journal.length <= 100 &&
+    value.journal.every(entry => isRecord(entry) && typeof entry.text === 'string' && entry.text.length <= 2000 &&
+      typeof entry.timeMinutes === 'number' && Number.isFinite(entry.timeMinutes));
+}
+
 /** Valida un guardado crudo y lo lleva a la versión actual. */
 export function parseSave(
   raw: unknown,
@@ -87,18 +133,21 @@ export function parseSave(
     current = { ...migrate(current), formatVersion: v + 1 };
   }
 
-  if (!isRecord(current.sim) || typeof current.sim.timeMinutes !== 'number') {
+  if (!validSim(current.sim)) {
     return { status: 'invalid', reason: 'falta el estado de la simulación' };
   }
+  if (current.player !== undefined && !validPlayer(current.player)) return { status: 'invalid', reason: 'progreso o diario inválido' };
+  if (current.lastTimestamp !== undefined && (typeof current.lastTimestamp !== 'number' || !Number.isFinite(current.lastTimestamp) || current.lastTimestamp < 0)) return { status: 'invalid', reason: 'timestamp inválido' };
   const settings = isRecord(current.settings) ? current.settings : {};
   const save: SaveFile = {
     formatVersion: targetVersion,
     lastTimestamp: typeof current.lastTimestamp === 'number' ? current.lastTimestamp : 0,
     sim: current.sim as unknown as SimState,
+    player: current.player as PlayerState ?? createPlayer(),
     settings: {
-      speed: typeof settings.speed === 'number' ? settings.speed : DEFAULT_SETTINGS.speed,
+      speed: typeof settings.speed === 'number' && Number.isFinite(settings.speed) && settings.speed >= 0 ? settings.speed : DEFAULT_SETTINGS.speed,
       outdoorC:
-        typeof settings.outdoorC === 'number' ? settings.outdoorC : DEFAULT_SETTINGS.outdoorC,
+        typeof settings.outdoorC === 'number' && Number.isFinite(settings.outdoorC) ? settings.outdoorC : DEFAULT_SETTINGS.outdoorC,
       weather: WEATHERS.includes(settings.weather as Weather)
         ? (settings.weather as Weather)
         : DEFAULT_SETTINGS.weather,
@@ -107,6 +156,6 @@ export function parseSave(
   return { status: 'ok', save, migratedFrom: version === targetVersion ? null : version };
 }
 
-export function createSave(sim: SimState, settings: GameSettings, lastTimestamp: number): SaveFile {
-  return { formatVersion: SAVE_FORMAT_VERSION, lastTimestamp, sim, settings };
+export function createSave(sim: SimState, settings: GameSettings, lastTimestamp: number, player: PlayerState = createPlayer()): SaveFile {
+  return { formatVersion: SAVE_FORMAT_VERSION, lastTimestamp, sim, settings, player };
 }

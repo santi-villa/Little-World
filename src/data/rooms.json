@@ -4,9 +4,9 @@
     "dormitorio": {
       "background": "dormitorio",
       "camera": {
-        "x": 660,
-        "y": 380,
-        "zoom": 1.5
+        "x": 640,
+        "y": 360,
+        "zoom": 1
       },
       "zones": [
         {

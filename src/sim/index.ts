@@ -64,7 +64,7 @@ export {
 } from './fish';
 export { foodInReach, fullMealG, layerAccess } from './feeding';
 export { decideIntents, isActivePeriod, isDaytime } from './behavior';
-export { createCat, petTolerance } from './cat';
+export { createCat } from './cat';
 export {
   checkAddition,
   checkCompatibility,

@@ -120,7 +120,7 @@ Posible migración futura a Godot 4 si se quiere publicar en Play Store con noti
     feeding.ts      la comida flota, se hunde y se reparte por zona y velocidad
     behavior.ts     decisiones de comportamiento (la intención de cada animal)
     compat.ts       compatibilidad entre especies: advertencias para la tienda
-    cat.ts          necesidades y comportamiento del gato
+    cat.ts          compañero decorativo dormido
     text.ts         plantillas de texto ({clave})
     plants.ts       (futuro)
     economy.ts      (futuro)
@@ -580,43 +580,16 @@ Está en `src/render/motion/` como lógica pura (sin Pixi) y con tests: `steerin
 
 - **Hora de comer**: con el tiempo, los peces aprenden a acercarse al frente cuando te ven (pasa en la vida real). Los nuevos son más tímidos.
 - **Tocar un pez**: abre su ficha (nombre, especie, edad, ánimo, necesidades).
-- **Golpear el vidrio**: los peces se asustan y sube el estrés. El diario explica que no hay que hacerlo. *(Provisorio: hoy cualquier toque sobre la pecera cuenta como golpe, para poder probar la reacción. Cuando tocar la pecera abra su panel, el golpe va a ser un gesto aparte.)*
+- **Golpear el vidrio**: los peces se asustan y sube el estrés. Queda como herramienta de debug. Un toque normal en la vista de pecera abre las fichas, sin asustarlos.
 - **Prender la luz de golpe** de noche: susto breve. Con el temporizador más adelante, hay amanecer gradual.
 - **Ponerles nombre** a todos.
 
 ### El gato
 
-El gato es un ser vivo con **necesidades** (sueño, hambre, curiosidad, cariño, energía) y elige qué hacer según ellas, la hora real y el clima.
-
-Cómo está hecho (`sim/cat.ts`, constantes en `cat` de `sim-config.json`): igual que los peces, la simulación decide el **comportamiento** (`sleep`, `watch_fish`, `tap_glass`, `look_window`, `beg_food`, `eat`, `groom`, `wander`, `play`, `purr`, `sulk`) y el **lugar** (cama, rayo de sol, tapa de la pecera, frente a la pecera, ventana, plato, piso, se fue), y el render lo lleva caminando hasta ahí (`render/scene/cat-view.ts`, placeholder de formas simples).
-
-- Decide cada 5 a 25 minutos puntuando opciones. Duerme unas 13 horas por día: al sol si está despejado y es de día, a veces sobre la tapa si la luz lleva un rato prendida, y si no en su cama. Con lluvia mira más por la ventana.
-- **Pecera**: cuando tiene curiosidad se sienta a mirar. Al terminar, a veces (30%) toca el vidrio: susto general. Si se queda más de 10 minutos, los peces que no se acostumbraron se estresan.
-- **Acostumbramiento**: cada animal tiene un `catHabituation` de 0 a 0,85 que sube con los días en la pecera (unos 10 días; más rápido mientras el gato mira). Reduce en esa proporción el susto y el estrés que causa el gato.
-- **Caricias**: cada caricia baja su necesidad de cariño y suma a un contador que se va solo (1,5 por minuto). Mientras no pase su aguante (6 caricias, hasta 18 si tiene muchas ganas de mimos; menos si come o duerme) ronronea. Si se pasa, se molesta, se va 20 minutos y no se deja acariciar. En pantalla: apoyar el dedo es una caricia y deslizarlo suma más.
-- **Comida**: come de su plato cuando tiene hambre; con el plato vacío pide comida si hay alguien. Durante una ausencia no le pasa nada malo: solo te espera con hambre.
-- **Pendiente**: juguetes, tirar cosas, pescar con la tapa abierta, pájaros, la ventana abierta.
-
-| Comportamiento | Cuándo |
-|---|---|
-| Dormir | Mucho, sobre todo de día. Busca el **rayo de sol real** si está despejado, o la cama y el almohadón si llueve |
-| Mirar los peces | Cuando tiene curiosidad: se sienta frente a la pecera, mueve la cabeza siguiendo un pez y la cola nerviosa |
-| Tocar el vidrio con la pata | A veces: los peces se asustan y se dispersan |
-| Dormir sobre la tapa | Si la luz de la pecera calienta la tapa (lo hacen los gatos reales) |
-| Mirar por la ventana | Lluvia, pájaros. Con la ventana abierta se sienta en el borde |
-| Pedir comida | Maúlla y te sigue. Tenés que llenar su plato |
-| Acariciarlo | Deslizás el dedo y ronronea. **Si lo acariciás demasiado se molesta y se va** (realista) |
-| Jugar | Con un juguete que le das (bolita, ratón de tela) |
-| Tirar cosas | Rara vez empuja algo de la mesa, como un lápiz |
-| Intentar pescar | Solo si dejás la **tapa abierta**: mete la pata y los peces se estresan. Nunca mata peces (para mantenerlo cozy) |
-
-Más adelante: elegir el gato (color o raza), o tener un perro u otra mascota.
-
-### Reacciones de los peces al gato
-
-- Gato pegado al vidrio un rato largo → los peces tímidos se esconden y los curiosos se acercan.
-- Pata en el vidrio → susto general.
-- Con el tiempo se acostumbran (el estrés que causa el gato baja con los días).
+El gato es un compañero decorativo: duerme en su cama con una animación en bucle.
+Tocarlo o acariciarlo hace aparecer corazones durante unos segundos, sin despertarlo.
+No tiene hambre, tareas, tolerancia a las caricias, paseos ni interacciones con los peces.
+Los campos antiguos del estado se conservan para leer partidas existentes, pero se normalizan a descanso.
 
 ### Otros seres vivos
 
@@ -782,16 +755,14 @@ Peces, plantas, equipamiento, peceras, decoración del acuario y de la habitaci�
 
 El tutorial **enseña el ciclado sin que tengas que esperar 4 semanas**, usando una técnica real.
 
-1. **Llegás a tu habitación.** Un amigo acuarista te dejó un cubo de 20 L, arena, una anubias, un filtro chico y una nota.
-2. **La nota** explica que el material del filtro viene de su acuario y ya tiene bacterias buenas, y te pide no lavarlo con agua de la canilla. Es el **material de filtro colonizado**.
-3. **Armado guiado**: sustrato → decoración → planta → llenar → **acondicionador** (se explica el cloro) → encender el filtro y el calefactor.
-4. **Esperar unas horas reales** y medir con el kit de test (se explican el amoníaco, el nitrito y el nitrato).
-5. **Elegir tu primer animal (gratis)**: un **betta**, o **gambas red cherry y un caracol nerita**.
-6. **Aclimatación guiada** (bolsa flotando, mezclar agua).
-7. **Primera alimentación**: aprender a no dar de más.
-8. **Día 3 a 7**: se desbloquea la tienda y llega un **segundo regalo** (otro animal compatible o una planta).
-9. **Primera semana**: cambio de agua guiado y limpieza del vidrio guiada.
-10. **Fin del tutorial**: primer logro, monedas iniciales y se desbloquea la cocina con la pecera redonda.
+Primera versión implementada:
+
+1. Una nota explica el material de filtro colonizado que acompaña al betta en la rectangular de 65 L.
+2. Ficha del pez: nombre editable, especie, edad, hambre, estrés, salud y confianza al alimentarlo.
+3. Primera alimentación con porción calculada por población y hambre; el alimento disponible descuenta la porción.
+4. Observación sin apuro y explicación de Agua, Diario y los cuidados. Cada paso queda guardado; se puede cerrar y continuar desde Guía.
+
+El armado por etapas, elección de otros animales, aclimatación, tienda y regalos quedan para próximas versiones.
 
 Después del tutorial, la siguiente pecera **sí hay que ciclarla** (o pasarle material de filtro de una pecera tuya ya madura, que se desbloquea como acción).
 
@@ -931,3 +902,11 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - [ ] ¿Personaje del jugador visible (manos) o solo herramientas?
 - [ ] Música: ¿componer, usar pistas libres o encargarla?
 - [ ] ¿Migrar a Godot en algún momento para publicar en tiendas?
+
+### Iteración de cuidado y estabilidad
+
+- Herramientas HTML accesibles: Agua (lecturas al medir, alertas explicadas), Peces, Diario y Guía. Cuaderno abre Diario y biblioteca abre Guía.
+- Cuidados con confirmación y contexto: porciones pequeñas o medias, cambios de 10%/25%, relleno y limpieza del filtro solo cuando está obstruido. Agua nueva acondicionada y a igual temperatura.
+- El diario conserva las últimas 100 entradas entre sesiones y explica cuidados y alertas sin afirmar causas únicas.
+- Guardado v3: progreso del tutorial y diario separados de la simulación, migración de v1/v2 y validación estructural antes de cargar.
+- El reloj en vivo usa tiempo monotónico sin recortar cuadros lentos. En segundo plano no actualiza; al regresar recupera solo mediante catch-up.

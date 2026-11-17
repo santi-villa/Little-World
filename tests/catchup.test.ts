@@ -76,7 +76,7 @@ describe('catch-up offline', () => {
     expect(a.summary).toEqual(b.summary);
     // Y pasaron cosas de verdad (decisiones con RNG de por medio).
     expect(a.state.rngState).not.toBe(state.rngState);
-    expect(a.events.length).toBeGreaterThan(10);
+    expect(a.state.animals.some((animal, i) => animal.hunger > state.animals[i]!.hunger)).toBe(true);
   });
 
   it('también con pasos de 10 minutos y con otra semilla cambia', () => {
@@ -184,14 +184,10 @@ describe('resumen de bienvenida', () => {
     const result = catchUp(community(), 4 * DAY);
     const text = result.summary.lines.map((l) => l.text).join('\n');
     expect(text).toMatch(/tienen hambre|muy hambrientos/);
-    // Lo que hizo el gato sale de los eventos.
-    const watched = result.events.filter(
-      (e) => e.type === 'cat_behavior' && e.behavior === 'watch_fish',
-    ).length;
-    expect(watched).toBeGreaterThan(1);
-    expect(text).toContain(`mirar los peces ${watched} veces`);
-    // Nadie le llenó el plato en 4 días.
-    expect(text).toMatch(/gato tiene hambre/);
+    // El gato es decorativo: no introduce tareas ni eventos durante la ausencia.
+    expect(result.state.cat.behavior).toBe('sleep');
+    expect(result.events.some(e => e.type === 'cat_behavior')).toBe(false);
+    expect(text).not.toMatch(/gato tiene hambre/);
     // Cada alerta que se levantó y sigue activa aparece.
     for (const alert of result.state.alerts) {
       if (result.events.some((e) => e.type === 'alert_raised' && e.alert === alert)) {

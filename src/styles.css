@@ -382,3 +382,33 @@ body.debug-open #stage {
   color: var(--muted);
   text-decoration: line-through;
 }
+
+/* Aquarium tools: touch targets and native modal focus/keyboard behavior. */
+.aquarium-nav {
+  position: fixed; right: max(8px, env(safe-area-inset-right));
+  top: max(48px, calc(env(safe-area-inset-top) + 48px));
+  z-index: 9; display: flex; gap: 5px; flex-wrap: wrap; max-width: 70vw;
+}
+.aquarium-nav button, .aquarium-dialog button, .aquarium-dialog select, .aquarium-dialog input {
+  min-height: 44px; padding: 8px 12px; border: 1px solid #756047;
+  border-radius: 5px; background: #29271f; color: #f4e9c8; font: inherit;
+}
+.aquarium-nav button { font-size: 12px; background: rgba(12,16,30,.9); }
+.aquarium-nav .has-alerts { border-color: #f0b34a; color: #ffda94; }
+.aquarium-dialog {
+  width: min(560px, 94vw); max-height: 88dvh; overflow-y: auto;
+  padding: 20px; border: 2px solid #9a7952; border-radius: 8px;
+  background: #191e28; color: #eee7d6; line-height: 1.55; font-size: 14px;
+}
+.aquarium-dialog::backdrop { background: rgba(5, 8, 18, .65); }
+.aquarium-dialog h2 { font-size: 20px; margin: 0 0 12px; color: #ffdb9d; }
+.aquarium-dialog h3 { font-size: 16px; margin: 8px 0; }
+.aquarium-dialog section, .aquarium-dialog li { padding: 10px 0; border-bottom: 1px solid #414450; }
+.aquarium-dialog button, .aquarium-dialog select { margin: 4px 6px 4px 0; }
+.aquarium-dialog form { display: flex; gap: 8px; flex-wrap: wrap; }
+.aquarium-dialog input { min-width: 0; max-width: 100%; user-select: text; }
+.aquarium-dialog small { color: #bac5d8; }
+.aquarium-dialog button:disabled { opacity: .5; }
+.aquarium-dialog :focus-visible, .aquarium-nav :focus-visible { outline: 3px solid #f4d59e; outline-offset: 2px; }
+.aquarium-close { width: 100%; margin-top: 16px !important; }
+body.debug-open .aquarium-nav { right: calc(var(--debug-width) + 8px); }

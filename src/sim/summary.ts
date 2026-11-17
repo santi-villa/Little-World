@@ -210,7 +210,7 @@ export function buildWelcomeSummary(
   else if (plan.simulatedMinutes >= 120 && asleepMinutes > 0.75 * plan.simulatedMinutes) {
     add('info', T.catSlept);
   }
-  if (after.cat.bowl <= 0 && after.cat.needs.hunger > 0.6) add('warn', T.catHungry);
+
 
   if (lines.length === fixed) add('good', T.quiet);
   return {

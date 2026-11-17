@@ -6,7 +6,7 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
-import type { SimAction, SimState } from '../../sim';
+import type { SimState } from '../../sim';
 import type { PanelId } from '../scene/room-zones';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { drawPixelText, textWidth } from './pixel-font';
@@ -26,26 +26,10 @@ export type CareId = keyof typeof texts.scene.care;
 export type UiMode = 'room' | 'tank' | 'cat';
 
 /** Acciones de cuidado de la vista de pecera. */
-const CARE: { id: CareId; action: (state: SimState) => SimAction; when?: (state: SimState) => boolean }[] = [
-  { id: 'feed', action: () => ({ type: 'feed', grams: 0.1 }) },
-  { id: 'cleanGlass', action: () => ({ type: 'cleanGlass' }) },
-  {
-    id: 'waterChange',
-    action: (state) => ({
-      type: 'waterChange',
-      fraction: 0.25,
-      conditioned: true,
-      vacuum: true,
-      temperatureC: state.water.temperatureC,
-    }),
-  },
-  { id: 'topOff', action: (state) => ({ type: 'topOff', conditioned: true, temperatureC: state.water.temperatureC }) },
-  { id: 'cleanFilter', action: () => ({ type: 'cleanFilter', method: 'tankWater' }) },
-  {
-    id: 'removeDead',
-    action: () => ({ type: 'removeDead' }),
-    when: (state) => state.animals.some((animal) => !animal.alive),
-  },
+const CARE: { id: CareId; when?: (state: SimState) => boolean }[] = [
+  { id: 'feed' }, { id: 'cleanGlass' }, { id: 'waterChange' },
+  { id: 'topOff' }, { id: 'cleanFilter' },
+  { id: 'removeDead', when: state => state.animals.some(a => !a.alive) },
 ];
 
 interface Button {
@@ -56,7 +40,7 @@ interface Button {
   hit: UiHit;
 }
 
-export type UiHit = { kind: 'back' } | { kind: 'care'; id: CareId; action: SimAction } | { kind: 'panel' };
+export type UiHit = { kind: 'back' } | { kind: 'care'; id: CareId } | { kind: 'panel' };
 
 export class SceneUi {
   readonly container = new Container();
@@ -118,7 +102,7 @@ export class SceneUi {
     if (mode !== 'room') {
       // Volver: botón grande, fácil de tocar con el dedo.
       const bw = textWidth(t.back, 2) + 16;
-      this.button(g, t.back, W - 6 - bw, 6, { kind: 'back' }, 'back', bw, 2);
+      this.button(g, t.back, 6, 30, { kind: 'back' }, 'back', bw, 2);
       // Indicación para salir deslizando, que se apaga sola.
       if (focusAge < 4) {
         const w = textWidth(t.swipeHint) + 8;
@@ -185,7 +169,7 @@ export class SceneUi {
       lines.forEach((line, k) => {
         drawPixelText(g, line, x + Math.round((w - textWidth(line, 2)) / 2), y0 + k * lineH, INK, 2);
       });
-      this.buttons.push({ x, y, w, h, hit: { kind: 'care', id: care.id, action: care.action(state) } });
+      this.buttons.push({ x, y, w, h, hit: { kind: 'care', id: care.id } });
     });
   }
 

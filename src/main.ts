@@ -1,3 +1,4 @@
+import { AquariumPanel } from './render/ui/aquarium-panel';
 import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
 import { loadAssets } from './render/assets';
@@ -39,7 +40,7 @@ async function loadGame(): Promise<LoadedGame> {
           ? s.loaded
           : fill(s.migrated, { version: result.migratedFrom });
       return {
-        game: new Game(result.save.sim, result.save.settings),
+        game: new Game(result.save.sim, result.save.settings, result.save.player),
         savingWorks: true,
         note,
         lastTimestamp: result.save.lastTimestamp,
@@ -132,7 +133,7 @@ async function boot(): Promise<void> {
     try {
       // El timestamp es el momento hasta el que la simulación está al día: si
       // el guardado sale estando en segundo plano, no se pierde ese tiempo.
-      await writeSave(createSave(game.state, game.settings, syncedAt()));
+      await writeSave(createSave(game.state, game.settings, syncedAt(), game.player));
       lastSavedAt = Date.now();
       saveNote = '';
     } catch (error) {
@@ -153,17 +154,21 @@ async function boot(): Promise<void> {
   };
 
   await loadAssets();
-  const scene = new RoomScene((action) => void game.act(action));
+  const tools = new AquariumPanel(game);
+  const scene = new RoomScene((action) => void game.act(action), page => {
+    if (page === 'fish' || page === 'diary' || page === 'guide') tools.open(page);
+    else tools.care(page);
+  });
   app.stage.addChild(scene.container);
 
   const panel = new DebugPanel(game, document.body, {
     saveStatus,
-    onReset: (tankId) => game.reset(randomSeed(), tankId),
+    onReset: (tankId) => { game.reset(randomSeed(), tankId); tools.open('guide'); },
     onNewGame: () => {
       // Se borra el guardado y se arranca de cero: pecera inicial con un solo betta.
       void deleteSave().finally(() => {
         game.reset(randomSeed());
-        game.act({ type: 'addAnimals', speciesId: 'betta', count: 1 });
+        tools.open('guide');
       });
     },
     onSimulateAway: (minutes) => {
@@ -190,8 +195,13 @@ async function boot(): Promise<void> {
   canvas.addEventListener('pointerup', (event) => scene.pointerUp(toScene(event)));
   canvas.addEventListener('pointercancel', (event) => scene.pointerUp(toScene(event), true));
 
-  app.ticker.add((ticker) => {
-    game.update(ticker.deltaMS / 1000);
+  let lastFrame = performance.now();
+  app.ticker.add(() => {
+    const frame = performance.now();
+    const elapsed = (frame - lastFrame) / 1000;
+    lastFrame = frame;
+    if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
+    tools.update();
     // Después de una acción del jugador se guarda enseguida.
     if (game.saveSoon) {
       game.saveSoon = false;
@@ -215,9 +225,11 @@ async function boot(): Promise<void> {
     if (hiddenAt === null || document.visibilityState !== 'visible') return;
     const since = hiddenAt;
     hiddenAt = null;
+    lastFrame = performance.now();
     recoveringFrom = since;
     void catchUpSince(since).finally(() => {
       recoveringFrom = null;
+      lastFrame = performance.now();
     });
   };
   document.addEventListener('visibilitychange', () => {

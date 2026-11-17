@@ -1,3 +1,18 @@
+# Actualización: primera experiencia y gato
+
+El gato ahora es decorativo: duerme en su cama y las caricias muestran corazones.
+Se retiraron sus necesidades y acciones de cuidado. Las notas históricas sobre paseos,
+plato, tolerancia y poses ya no describen el comportamiento actual.
+
+Ya están implementados Agua con avisos explicados, fichas y nombres, Diario persistente,
+Guía inicial y confirmaciones de cuidados. El filtro inicial viene colonizado.
+La cámara inicial muestra la habitación completa; el debug arranca cerrado.
+
+Las pruebas de esta iteración incluyen navegador de escritorio y viewport móvil horizontal;
+queda probar la sensación y rendimiento en un celular físico.
+
+---
+
 # Pendiente
 
 ## Sprites de peces

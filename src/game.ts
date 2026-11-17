@@ -1,3 +1,8 @@
+import allTexts from './data/texts.es.json';
+import { createCat } from './sim/cat';
+import { advice } from './care';
+import { describeEvent } from './render/ui/texts';
+import { createPlayer, type PlayerState } from './player';
 /**
  * Pegamento entre la simulación pura y el resto (render, UI, guardado).
  * Es el único lugar que conoce el reloj real.
@@ -24,6 +29,8 @@ import {
 } from './sim';
 import { DEFAULT_SETTINGS, type GameSettings } from './save/save-format';
 
+const careText = allTexts.careUi;
+
 /** Minutos simulados por segundo real. */
 export const SPEEDS = {
   pause: 0,
@@ -37,8 +44,6 @@ export type SpeedId = keyof typeof SPEEDS;
 
 export const DEFAULT_SPEED: number = SPEEDS.realtime;
 const MAX_LOG = 40;
-/** Si un cuadro tarda más que esto (pestaña en segundo plano), lo que falta lo recupera el catch-up. */
-const MAX_FRAME_SECONDS = 0.25;
 /** Con el juego abierto la simulación avanza cada 10 segundos de juego, así reacciona enseguida. */
 const LIVE_STEP_MINUTES = 1 / 6;
 /** Ausencias más cortas que esto no se recuperan (no vale la pena). */
@@ -72,8 +77,8 @@ export class Game {
   lastCatchUp: CatchUpReport | null = null;
   private pendingMinutes = 0;
 
-  constructor(state: SimState, settings: GameSettings = DEFAULT_SETTINGS) {
-    this.state = state;
+  constructor(state: SimState, settings: GameSettings = DEFAULT_SETTINGS, public player: PlayerState = createPlayer()) {
+    this.state = { ...state, cat: createCat(state.timeMinutes) };
     this.speed = settings.speed;
     this.outdoorC = settings.outdoorC;
     this.weather = settings.weather;
@@ -82,8 +87,10 @@ export class Game {
   /** Pecera nueva, con el reloj de la simulación en la hora real. */
   static newTank(seed: number | string, tankId?: string, now: Date = new Date()): Game {
     const game = new Game(
-      createNewTank({ seed, tankId, startMinuteOfDay: localMinuteOfDay(now) }),
+      createNewTank({ seed, tankId, seededMedia: true, startMinuteOfDay: localMinuteOfDay(now) }),
     );
+    game.player = createPlayer(0);
+    game.note(careText.un_amigo_te_dejo_material_de);
     // Una pecera nueva arranca con un solo betta.
     game.act({ type: 'addAnimals', speciesId: 'betta', count: 1 });
     game.dirty = true;
@@ -106,8 +113,8 @@ export class Game {
 
   /** Avanza según el reloj real y la velocidad elegida. */
   update(realSeconds: number): void {
-    if (this.speed <= 0) return;
-    this.pendingMinutes += Math.min(realSeconds, MAX_FRAME_SECONDS) * this.speed;
+    if (this.speed <= 0 || !Number.isFinite(realSeconds) || realSeconds <= 0) return;
+    this.pendingMinutes += realSeconds * this.speed;
     if (this.pendingMinutes < LIVE_STEP_MINUTES) return;
     const minutes = this.pendingMinutes;
     this.pendingMinutes = 0;
@@ -182,7 +189,9 @@ export class Game {
   }
 
   reset(seed: number | string, tankId?: string, now: Date = new Date()): void {
-    this.state = createNewTank({ seed, tankId, startMinuteOfDay: localMinuteOfDay(now) });
+    const fresh = Game.newTank(seed, tankId, now);
+    this.state = fresh.state;
+    this.player = fresh.player;
     this.speed = DEFAULT_SPEED;
     this.log.length = 0;
     this.pendingMinutes = 0;
@@ -191,7 +200,22 @@ export class Game {
     this.saveSoon = true;
   }
 
+  note(text: string): void {
+    this.player.journal.unshift({ timeMinutes: this.state.timeMinutes, text });
+    this.player.journal.length = Math.min(100, this.player.journal.length);
+    this.dirty = true;
+    this.saveSoon = true;
+  }
+
   private record(events: SimEvent[]): void {
+    for (const event of events) {
+      if (event.type.startsWith('cat_') || event.type === 'animal_mood') continue;
+      const explanation = event.type === 'alert_raised' ? ` ${advice[event.alert]}` :
+        event.type === 'fed' ? careText.lo_que_no_se_come_termina :
+        event.type === 'filter_cleaned' ? careText.el_filtro_aloja_bacterias_utiles_no :
+        event.type === 'glass_tapped' ? careText.los_golpes_asustan_a_los_peces : '';
+      this.note(describeEvent(event) + explanation);
+    }
     // Si llegan muchos de golpe (un catch-up), solo entran los últimos.
     const start = Math.max(0, events.length - MAX_LOG);
     for (let i = start; i < events.length; i++) this.log.unshift(events[i] as SimEvent);
