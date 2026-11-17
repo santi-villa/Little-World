@@ -486,3 +486,14 @@ body[data-view='tank'] .tool-tray {
 .room-study {width:min(1150px,96vw);max-height:94dvh;background:#f3e3c2;color:#5b3a24;border:3px solid #916b47;padding:18px;overflow:auto;font-family:'Pixelify Sans',monospace;}
 .study-columns {display:grid;grid-template-columns:1fr 1fr;gap:16px}.study-columns figure{margin:0}.study-columns img{width:100%;background:#abc6c6}.study-columns figcaption{font-size:20px;line-height:1.4}.room-study button{min-height:44px;font:inherit}
 @media(max-width:700px){.study-columns{grid-template-columns:1fr}}
+/* Observation stays in the current camera, including a tracked fish. */
+.fish-focus{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:12;display:flex;gap:12px;align-items:center;background:#f3e3c2ed;color:#5b3a24;padding:10px 14px;border:2px solid #916b47;border-radius:8px;font-size:20px;max-width:96vw;box-sizing:border-box}
+.fish-focus[hidden]{display:none}.fish-rings{display:flex;gap:6px}.fish-ring{width:40px;height:40px;display:block;flex-shrink:0}.fish-ring svg{width:100%;height:100%}
+body.following-fish .tool-tray{display:none!important}
+body.contemplating .fish-focus,body.contemplating .aquarium-nav,body.contemplating .debug-toggle,body.contemplating #debug-toggle,body.contemplating .update-button{display:none!important}
+body.contemplating .reveal-controls{opacity:0;transition:opacity .2s}body.contemplating .reveal-controls:hover,body.contemplating .reveal-controls:focus-visible{opacity:1}
+@media(max-width:700px){.fish-focus{gap:6px;padding:6px;flex-wrap:wrap;justify-content:center}.fish-ring{width:32px;height:32px}.fish-focus button{min-height:44px}}
+body.following-fish .hud-paper,body.following-fish .aquarium-nav>button:not(:last-child){display:none}
+body.contemplating #debug,body.contemplating .app-update{display:none!important}
+body.contemplating .repair-app,body.contemplating .debug-panel{display:none!important}
+body.following-fish .repair-app,body.following-fish .debug-toggle{display:none}

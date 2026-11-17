@@ -613,5 +613,17 @@
     "geometry": "Geometría con cámara fija. Escritorio 140×74×60 cm; pecera 60×36×30 cm. Tocá la mesa para mover la maceta dentro de su superficie.",
     "close": "Volver al juego",
     "error": "No se pudo abrir la prueba gráfica. Podés volver al juego."
+  },
+  "observation": {
+    "status": "Estado del pez observado",
+    "details": "Más información",
+    "back": "Ver acuario",
+    "metrics": [
+      "Salud",
+      "Estrés",
+      "Hambre",
+      "Confianza",
+      "Aletas sanas"
+    ]
   }
 }

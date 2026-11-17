@@ -55,7 +55,7 @@ export class FishLayer {
   hit(x:number,y:number): number | null {
     let nearest:number|null=null, distance=Infinity;
     for(const [id,p] of this.positions){const d=Math.hypot(x-p.x,y-p.y);if(d<p.radius && d<distance){nearest=id;distance=d;}}
-    this.selectedId=nearest;this.selectedUntil=this.motion.seconds+30;
+
     return nearest;
   }
   readonly motion = new FishMotion((Math.random() * 0xffffffff) >>> 0);
@@ -85,6 +85,8 @@ export class FishLayer {
     }
     return null;
   }
+
+  pointFor(id:number){return this.positions.get(id)??null;}
 
   /**
    * @param area   Rectángulo del agua donde se puede nadar, en píxeles.
@@ -237,11 +239,11 @@ export class FishLayer {
         const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
         c = lerpColor(c, NIGHT_TINT, fade);
       }
-      return lerpColor(c, WATER_TINT, 0.3 * far);
+      return lerpColor(c, WATER_TINT, 0.13 * far);
     };
     const main = tint(hex(sp.color));
     const accent = tint(hex(sp.accent));
-    const len = Math.max(3, Math.round(animal.sizeCm * this.pxPerCm * scale));
+    const len = Math.max(sp.category==='fish'?12:3, animal.sizeCm * this.pxPerCm * scale);
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;
     const halfLen = Math.min(len / 2, area.width / 2);

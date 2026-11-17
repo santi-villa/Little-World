@@ -103,6 +103,9 @@ export class RoomScene {
   private state:SimState|null=null;
   private lastTap=-100;
   private mode: UiMode = 'room';
+  followingId:number|null=null;private fishTapAt=-100;
+  showFish(id:number):void {const p=this.tank.fishPoint(id);if(!p)return;this.followingId=id;this.handTool='hand';this.enterFocus('tank',{x:p.x,y:p.y,zoom:Math.max(3,Math.min(12,120/Math.max(1,p.length)))});}
+  fishDetails():void {if(this.followingId!==null)this.tools('fish',this.followingId);}
   /** Vista de la habitación a la que se vuelve al salir de una vista de cerca. */
   private roomView: CameraView;
   private focusSince = 0;
@@ -185,6 +188,8 @@ export class RoomScene {
     document.body.dataset.handTool=this.handTool;
     this.tank.fish.bettaStyle=view.bettaStyle??'code';
     this.tank.update(state, derived, seconds);
+    if(this.followingId!==null){const p=this.tank.fishPoint(this.followingId),animal=state.animals.find(a=>a.id===this.followingId);if(!p||!animal?.alive)this.showTank();else this.focusOn({x:p.x,y:p.y,zoom:this.camera.target.zoom},false);}
+
     this.handOverlay.clear();
     if(this.mode==='tank' && hand && seconds-hand.at<2){
       const r=this.tank.waterBounds,cx=r.x+hand.x*r.width,cy=r.y+hand.y*r.height;
@@ -323,7 +328,7 @@ export class RoomScene {
           if(this.seconds-this.lastTap<1)return;
           this.lastTap=this.seconds;this.act({type:'tapGlass'});this.tank.scareAt(w.x,w.y);this.ui.say(texts.ui.knock);
         } else if(this.handTool==='observe'||this.handTool==='hand'){
-          const id=this.tank.fishAt(w.x,w.y);if(id!==null)this.tools('fish',id);
+          const id=this.tank.fishAt(w.x,w.y);if(id!==null){if(this.followingId===id && this.seconds-this.fishTapAt<.45)this.fishDetails();else this.showFish(id);this.fishTapAt=this.seconds;}
         } else if(this.handTool==='kit'){
           this.tools('status');
         } else if(this.handTool==='bucket'){
@@ -377,7 +382,7 @@ export class RoomScene {
    * no se agarra y devuelve el motivo (la bandeja la sacude y lo explica).
    */
   selectTool(tool:HandTool):string|null {
-    if(this.mode!=='tank')this.showTank();
+    if(this.mode!=='tank'||this.followingId!==null)this.showTank();
     if(tool==='hand'||tool===this.handTool){this.handTool='hand';return null;}
     const why=this.state?cannotUse(tool,this.state):null;
     // La comida con la tapa cerrada se puede agarrar igual: el aviso dice qué falta.
@@ -441,7 +446,7 @@ export class RoomScene {
   toggleLid():void {if(this.state){this.act({type:'setLid',hasLid:!this.state.tank.hasLid});}}
   showRoom(): void { this.exitFocus(); }
 
-  showTank(): void { this.enterFocus('tank', this.tankFocus(0.85)); }
+  showTank(): void { this.followingId=null;this.enterFocus('tank', this.tankFocus(0.85)); }
 
   /** La pecera de cerca: ocupa `fill` de la pantalla, arriba de la barra de acciones. */
   private tankFocus(fill: number): CameraView {
@@ -475,6 +480,7 @@ export class RoomScene {
   }
 
   private exitFocus(): void {
+    this.followingId=null;
     if (this.mode === 'room') return;
     this.mode = 'room';this.handTool='hand';this.pointerLeave();
     this.camera.goTo(this.roomView);

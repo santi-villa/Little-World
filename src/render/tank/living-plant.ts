@@ -1,9 +1,10 @@
 import { Container, Graphics } from 'pixi.js';
+import { PlantMotion } from '../motion/plant-motion';
 /** Anchored stems and flexible tips. Fish proximity bends leaves, not the roots. */
 export class LivingPlant {
   readonly container = new Container();
   private g = new Graphics();
-  private bend = 0;
+  private stems: PlantMotion[] = [];
   constructor(
     readonly kind: 'anubias' | 'vallisneria',
     readonly width: number,
@@ -11,6 +12,10 @@ export class LivingPlant {
     readonly seed: number,
   ) {
     this.container.addChild(this.g);
+    this.stems = Array.from(
+      { length: 9 },
+      (_, i) => new PlantMotion(9, seed + i * 1.7),
+    );
   }
   update(
     seconds: number,
@@ -18,15 +23,12 @@ export class LivingPlant {
     flow: number,
     fish: { x: number; y: number; vx: number }[],
   ): void {
-    let push = 0;
-    for (const f of fish) {
-      const dx = f.x - this.container.x,
-        dy = f.y - (this.container.y - this.height * 0.6);
-      const d = Math.hypot(dx, dy);
-      if (d < this.width)
-        push += Math.sign(f.vx || dx) * (1 - d / this.width) * 0.12;
-    }
-    this.bend += (push - this.bend) * (1 - Math.exp(-Math.min(0.1, dt) * 3));
+    const visitors = fish.map((f) => ({
+      height: (this.container.y - f.y) / this.height,
+      distance: Math.abs(f.x - this.container.x) / Math.max(20, this.width),
+      speed: f.vx / 4,
+    }));
+    for (const stem of this.stems) stem.update(dt, seconds, flow, visitors);
     const g = this.g;
     g.clear();
     const w = this.width,
@@ -35,28 +37,29 @@ export class LivingPlant {
       for (let i = 0; i < 9; i++) {
         const x = (i - 4) * w * 0.07,
           len = h * (0.65 + 0.35 * ((Math.sin(i * 2 + this.seed) + 1) / 2));
-        const sway =
-          (Math.sin(seconds * (0.37 + i * 0.017) + i * 1.7 + this.seed) *
-            0.04 *
-            (0.25 + flow) +
-            this.bend) *
-          h;
-        const lean = (i - 4) * w * 0.07 + sway;
-        g.moveTo(x, 0)
-          .bezierCurveTo(
-            x - 2,
-            -len * 0.35,
-            x + lean,
-            -len * 0.75,
-            x + lean * 0.8,
-            -len,
-          )
-          .bezierCurveTo(x + lean - 4, -len * 0.6, x + 4, -len * 0.3, x + 3, 0)
-          .closePath()
-          .fill(i % 2 ? 0x447a54 : 0x659865);
-        g.moveTo(x + 1, -2)
-          .quadraticCurveTo(x + lean * 0.6, -len * 0.5, x + lean * 0.8, -len)
-          .stroke({ color: 0x93b67a, width: 0.6, alpha: 0.6 });
+        const stem = this.stems[i]!,
+          points = stem.offsets.map((offset, j) => {
+            const u = j / (stem.segments - 1);
+            return {
+              x: x + (i - 4) * w * 0.09 * u * u + offset * h,
+              y: -len * u,
+            };
+          });
+        const ribbon: number[] = [];
+        for (let j = 0; j < points.length; j++) {
+          const p = points[j]!,
+            thickness = (1 - j / points.length) * w * 0.018 + 0.3;
+          ribbon.push(p.x - thickness, p.y);
+        }
+        for (let j = points.length - 1; j >= 0; j--) {
+          const p = points[j]!,
+            thickness = (1 - j / points.length) * w * 0.018 + 0.3;
+          ribbon.push(p.x + thickness, p.y);
+        }
+        g.poly(ribbon).fill(i % 2 ? 0x447a54 : 0x659865);
+        g.moveTo(points[0]!.x, 0);
+        for (const p of points.slice(1)) g.lineTo(p.x, p.y);
+        g.stroke({ color: 0x93b67a, width: 0.6, alpha: 0.5 });
       }
     } else {
       g.moveTo(-w * 0.3, 0)
@@ -65,15 +68,11 @@ export class LivingPlant {
       for (let i = 0; i < 7; i++) {
         const x = (i - 3) * w * 0.09,
           y = -h * (0.3 + 0.5 * ((Math.sin(i * 1.9) + 1) / 2));
-        const sway =
-          (Math.sin(seconds * 0.44 + i * 1.8 + this.seed) *
-            0.025 *
-            (0.3 + flow) +
-            this.bend) *
-          h;
+        const stem = this.stems[i]!,
+          sway = stem.offsets[8]! * h * 0.55;
         const tip = x + (i % 2 ? 1 : -1) * w * 0.22 + sway;
         g.moveTo(x * 0.4, 0)
-          .quadraticCurveTo(x, -h * 0.3, tip, y)
+          .quadraticCurveTo(x + stem.offsets[4]! * h * 0.5, -h * 0.3, tip, y)
           .stroke({ color: 0x507047, width: 1.1 });
         g.moveTo(tip, y)
           .bezierCurveTo(

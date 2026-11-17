@@ -19,6 +19,7 @@ export class CodeBetta {
   private pitch = 0;
   private readonly species?: Species;
   constructor(seed: number, facing: number, species?: Species) {
+    this.container.label='fish-'+seed;
     this.species = species;
     this.pose = newBettaPose(facing, seed);
     this.yaw = facing < 0 ? Math.PI : 0;
@@ -74,10 +75,10 @@ export class CodeBetta {
       eel = sp?.traits.includes('eel_like');
     const bodyHeight = tall ? 2.1 : eel ? 0.48 : betta ? 1 : 0.78;
     const main = betta
-      ? 0x368391
+      ? 0xb95c48
       : fishPigment(Number.parseInt(sp!.color.slice(1), 16));
     const accent = betta
-      ? 0x647da0
+      ? 0x5866a1
       : fishPigment(Number.parseInt(sp!.accent.slice(1), 16));
     const dark = lerpColor(main, 0x152e36, 0.55),
       light = lerpColor(main, 0xd6dfc5, 0.32);

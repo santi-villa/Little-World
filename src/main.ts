@@ -1,3 +1,4 @@
+import {FishFocus} from './render/ui/fish-focus';
 import { beforeAppUpdate, startAppUpdates } from './app-update';
 import { AquariumPanel } from './render/ui/aquarium-panel';
 import { Application, TextureSource } from 'pixi.js';
@@ -195,6 +196,7 @@ async function boot(): Promise<void> {
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
   });
+  const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   scene.onReject = (tool, reason) => tray.reject(tool, reason);
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
@@ -270,14 +272,17 @@ async function boot(): Promise<void> {
     cancelLong?.();
     cancelLong = null;
     pressStart = null;
-    scene.pointerUp(toScene(event), cancelled);
+    const calm=document.body.classList.contains('contemplating');
+    scene.pointerUp(toScene(event), cancelled||calm);if(calm)tools.revealControls();
     setCursor(scene.cursorAt(toScene(event)));
     follow(null, 0, 0);
   };
   canvas.addEventListener('pointerup', (event) => release(event));
+  canvas.addEventListener('dblclick',()=>{if(scene.followingId!==null)scene.fishDetails();});
   canvas.addEventListener('pointerleave', () => scene.pointerLeave());
   canvas.addEventListener('pointercancel', (event) => release(event, true));
 
+  window.addEventListener('keydown',e=>{if(e.key==='Escape')tools.revealControls();});
   let lastFrame = performance.now();
   app.ticker.add(() => {
     const frame = performance.now();
@@ -285,6 +290,7 @@ async function boot(): Promise<void> {
     lastFrame = frame;
     if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
     tools.update();
+    fishFocus.update(game.state.animals.find(a=>a.id===scene.followingId));
     hud.update(game.state, game.weather, derive(game.state).hour);
     tray.update(scene.activeTool, game.state.tank.hasLid);
     // La cámara deja la pecera arriba de la bandeja: su alto, en píxeles del juego.

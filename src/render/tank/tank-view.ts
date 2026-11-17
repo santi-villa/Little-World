@@ -1,3 +1,4 @@
+import {PlantMotion} from '../motion/plant-motion';
 import {LivingPlant} from './living-plant';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { GLASS_COLS, GLASS_ROWS } from '../../sim/glass';
@@ -102,6 +103,7 @@ interface Geo {
 }
 
 interface Plant {
+  motion:PlantMotion;
   mesh: MeshPlane;
   /** Posiciones originales de los vértices. */
   rest: Float32Array;
@@ -160,6 +162,7 @@ export class TankView {
   }
 
   get waterBounds():TankRect { const k=this.art.scale.x;return {x:this.art.x+this.waterArea.x*k,y:this.art.y+this.waterArea.y*k,width:this.waterArea.width*k,height:this.waterArea.height*k}; }
+  fishPoint(id:number){const p=this.fish.pointFor(id),k=this.art.scale.x;return p?{x:this.art.x+p.x*k,y:this.art.y+p.y*k,length:p.radius/.8*k}:null;}
   setHand(hand:HandInput|null):void {this.fish.hand=hand;}
   fishAt(x:number,y:number):number|null { return this.fish.hit((x-this.art.x)/this.art.scale.x,(y-this.art.y)/this.art.scale.y); }
 
@@ -210,8 +213,8 @@ export class TankView {
     this.glassBack.tint = lerpColor(this.waterColor(lit, tannins, 0.4), 0xffffff, 0.45);
     // La corriente mueve las plantas: más con el filtro andando.
     const flow = state.filter.flowLph > 0 ? Math.min(1, derived.effectiveFlowLph / state.filter.flowLph) : 0;
-    this.swayPlants(seconds, 1 + flow);
     const visitors=[...this.fish.motion.bodies.values()].map(b=>({x:geo.left+b.x*pxPerCm,y:geo.waterTop+2+b.y*pxPerCm,vx:b.vx}));
+    this.swayPlants(seconds,flow,Math.max(0,seconds-this.lastSeconds),visitors);
     for(const plant of this.living){plant.update(seconds,Math.max(0,seconds-this.lastSeconds),flow,visitors);plant.container.tint=tint;}
     this.fish.habitat=this.habitat;
 
@@ -438,7 +441,7 @@ export class TankView {
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
         (item.layer === 'back' ? this.rearPlants : item.layer === 'front' ? this.frontPlants : this.plantLayer).addChild(mesh);
         const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
-        this.plants.push({ mesh, rest: positions.slice(), unit, phase: index * 1.7 });
+        this.plants.push({ motion:new PlantMotion(9,index*1.7),mesh, rest: positions.slice(), unit, phase: index * 1.7 });
       } else {
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5, 1);
@@ -455,15 +458,17 @@ export class TankView {
    * unos píxeles, de a píxeles enteros del dibujo; la malla dobla la planta de
    * forma pareja (sin rayas).
    */
-  private swayPlants(seconds: number, strength: number): void {
+  private swayPlants(seconds:number,flow:number,dt:number,visitors:{x:number;y:number;vx:number}[]): void {
     for (const plant of this.plants) {
       const attribute = plant.mesh.geometry.getAttribute('aPosition');
       const positions = attribute.buffer.data as Float32Array;
       const height = plant.rest[plant.rest.length - 1] || 1;
+      plant.motion.update(dt,seconds,flow,visitors.map(f=>({height:(plant.mesh.y+plant.mesh.height-f.y)/Math.max(1,plant.mesh.height),distance:Math.abs(f.x-(plant.mesh.x+(plant.mesh.scale.x<0?-1:1)*plant.mesh.width*.5))/Math.max(20,plant.mesh.width),speed:f.vx/4})));
       for (let i = 0; i < positions.length; i += 2) {
         const free = Math.pow(1 - (plant.rest[i + 1] as number) / height, 1.5);
-        const wave = Math.sin(seconds * 0.7 + plant.phase) * 0.8 + Math.sin(seconds * 0.43 + plant.phase * 2.1) * 0.2;
-        positions[i] = (plant.rest[i] as number) + wave * strength * free * plant.unit;
+        const index=Math.min(8,Math.round(free*8));
+        positions[i] = (plant.rest[i] as number) + plant.motion.offsets[index]!*height;
+
       }
       attribute.buffer.update();
     }
@@ -554,7 +559,7 @@ export class TankView {
       const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 6;
       g.rect(clamp(px, left, right - 1), waterTop + 2 + py, 1, 1);
     }
-    if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.4 : 0.14 });
+    if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.2 : 0.1 });
 
     // Brillos que corren por la superficie.
     let run = 0;

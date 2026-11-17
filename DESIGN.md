@@ -970,3 +970,13 @@ Anubias y vallisneria son ahora geometría procedural en las tres composiciones 
 El cielo tiene degradado más fino, nubes curvas con viento continuo, sol/luna con halo, barrio con profundidad y follaje por estación (menos follaje en invierno). Se mantiene la hora solar y la conexión/fallback de clima de Buenos Aires. Un único recorte del exterior evita que nubes o pájaro invadan la pared. Se retiran las capas de cortinas y el pájaro PNG: CodeBird dibuja cuerpo, alas y patas y anima llegada, posado y salida con intervalos sin visitas.
 
 Cuaderno → Decorar → Comparar habitación 2.5D abre un estudio aislado con escritorio, pecera y maceta medidos en centímetros y proyección fija. La maceta se coloca por toque en la zona libre de la mesa. Compara geometría simple con el PNG original sin capas; no es una reconstrucción terminada ni modifica la partida o el fondo del juego. Mantener la habitación actual hasta que un estudio artístico más trabajado justifique reemplazarla.
+
+### Plantas flexibles y observación individual
+
+Las plantas usan ahora segmentos acoplados con resorte, amortiguación y corriente variable (`motion/plant-motion.ts`). La raíz queda fija; las puntas acumulan inercia y los peces perturban tramos cercanos. Anubias/vallisneria y las mallas de plantas PNG comparten esta dinámica visual. No hay crecimiento ni cambio químico de nutrientes.
+
+Las composiciones dejan más espacio de nado: madera/rocas más pequeñas, menos plantas superpuestas y primer plano bajo. Los peces reciben menos tinte de profundidad y un mínimo visual de legibilidad sin cambiar su tamaño o necesidades simulados; el betta usa cuerpo cobrizo y aletas azuladas para contrastar con el agua.
+
+Un clic en un pez con la mano/lupa sigue su centro con cámara suavizada y zoom acotado; no abre el cuaderno. La barra de seguimiento muestra nombre y cinco iconos con anillos: salud, estrés, hambre, confianza y aletas sanas. Etiquetas accesibles y tooltip expresan porcentajes; hambre/estrés altos son desfavorables. Más información o doble clic abre la ficha. Ver acuario sale del seguimiento; elegir herramienta también vuelve al encuadre general.
+
+Contemplar conserva el encuadre y el seguimiento, oculta HUD, herramientas, controles de depuración y reparación. Un toque en la escena, Escape o el botón accesible Mostrar controles lo restaura. No se agrega audio ambiental todavía: se conserva la interfaz de sonido existente y queda para incorporar la pista que el usuario elija.

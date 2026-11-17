@@ -268,3 +268,11 @@ Falta:
 - Implementado: estudio separado de escritorio/pecera/maceta 2.5D en el cuaderno. El fondo original se conserva por calidad artística.
 - Pendiente: anatomías específicas más detalladas, materiales menos facetados, rest spots que sigan cada hoja deformada, obstáculos con profundidad/contorno más preciso y volumen de pez completo en vez de margen reducido. No hay crecimiento de plantas ni consumo de nutrientes agregado en esta prueba.
 - La verificación de celular es por emulación de Chromium; faltan mediciones en teléfonos reales, especialmente cardúmenes grandes.
+
+## Plantas y seguimiento individual
+
+- Segmentos flexibles con raíz fija, corriente, amortiguación y estela de peces para plantas procedurales y mallas PNG. Es física visual simplificada; la química vegetal sigue pendiente.
+- Decoración despejada, menor tinte de peces y betta cobrizo para mejorar contraste. Revisar también con especies pequeñas en cardúmenes y en teléfonos reales.
+- Un clic sigue al pez; iconos con anillos de salud/estrés/hambre/confianza/aletas. Doble clic o Más información abre ficha. Ver acuario sale del seguimiento.
+- Contemplar conserva la cámara, oculta los controles y permite restaurarlos con toque/Escape. Audio ambiental pendiente de la pista del usuario.
+- No se pudo verificar la comparación solicitada con fotos externas: las tres fuentes consultadas devolvieron bloqueo HTTP 403.

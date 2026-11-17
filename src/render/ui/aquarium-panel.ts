@@ -30,6 +30,7 @@ export class AquariumPanel {
   private readonly statusButton: HTMLButtonElement;
   private readonly weatherButton: HTMLButtonElement;
   private weatherKey = '';
+  revealControls():void {document.body.classList.remove('contemplating');const reveal=document.querySelector<HTMLButtonElement>('.reveal-controls');if(reveal)reveal.hidden=true;}
   private page: Page | null = null;
   private lastKey = '';
   private selectedAnimal: number | null = null;
@@ -45,7 +46,7 @@ export class AquariumPanel {
     // El estado del agua está en la gotita del HUD; acá quedan los caminos a la habitación y al cuaderno.
     nav.append(returnRoom,tankFocus,notebook);
     const contemplate=button(careText.contemplar,()=>{
-      showRoom(); document.body.classList.add('contemplating'); reveal.hidden=false; reveal.focus();
+      document.body.classList.add('contemplating'); reveal.hidden=false;
     });
     const reveal=button(careText.mostrar_controles,()=>{document.body.classList.remove('contemplating');reveal.hidden=true;contemplate.focus();});
     reveal.className='reveal-controls';reveal.hidden=true;document.body.append(reveal);nav.append(contemplate);

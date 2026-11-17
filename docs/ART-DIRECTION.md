@@ -66,3 +66,9 @@ El modo Código con volumen usa una cámara ortográfica fija y caras ordenadas 
 La anubias tiene hojas anchas y tallos separados; la vallisneria, cintas largas. Su flexión por proximidad es una respuesta visual amortiguada, mientras los núcleos sólidos/refugios se describen aparte en el hábitat. Los movimientos usan coordenadas continuas y antialias; los PNG conservan nearest. No es necesario que el movimiento siga la grilla del fondo.
 
 La habitación geométrica del cuaderno es un estudio de volumen, sombras de contacto y colocación con medidas. Mantener el dormitorio pintado: el estudio aún pierde riqueza, materiales y personalidad. Para unificar el arte conviene conservar una sola dirección de luz, la paleta crema/azul verdosa y la misma perspectiva; después trabajar materiales y siluetas de un conjunto pequeño (pez + dos plantas + roca), comparándolos en el agua real antes de convertir más elementos. La interactividad también puede usar volúmenes invisibles bajo imágenes: no exige reconstruir toda la habitación.
+
+## Legibilidad de la pecera y observación
+
+El cuerpo cobrizo del betta contrasta con el agua azul verdosa; se reduce el tinte por profundidad y las motas frontales. Las masas de plantas quedan principalmente atrás y a los lados, con un corredor central y objetos bajos más pequeños. Mantener tamaño simulado separado del mínimo visual necesario para leer un animal pequeño.
+
+La observación individual usa iconos con anillos y cámara continua; el cuaderno se reserva al detalle. Contemplar limpia la pantalla conservando el pez seguido. Referencias externas solicitadas: se intentaron consultar Wikipedia/Aquascaping, Tropica/Inspiration y 2Hr Aquarist; el acceso HTTP fue bloqueado (403), por lo que esta iteración no se presenta como una comparación fotográfica verificada.
