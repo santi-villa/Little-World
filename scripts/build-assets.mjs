@@ -269,10 +269,23 @@ async function processSprites(path, rel, cfg) {
   // Las plantas de pecera vienen en etapas de crecimiento (las de la habitación no).
   const isPlant = dir.split(sep).includes('plantas') && dir.split(sep)[0] === 'pecera';
   const scaleRef = img.width / 1376;
-  let pieces = findPieces(img, (cfg.gap ?? 14) * scaleRef);
-  pieces = (cfg.order ?? (isPlant ? 'x' : 'rows')) === 'x' ? pieces.sort((a, b) => a.x - b.x) : readingOrder(pieces);
-  const scale = cfg.scale ?? 0.5;
+  let pieces;
+  if (cfg.boxes) {
+    // Cajas fijas (en px del original): para piezas con partes sueltas, como las
+    // migas de la pizca o las chispitas del golpecito, que si no saldrían separadas.
+    pieces = cfg.boxes.map(([x0, y0, x1, y1]) => {
+      const keep = (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
+      const box = contentBoxOf(img, x0, y0, Math.min(x1, img.width), Math.min(y1, img.height), keep);
+      if (!box) throw new Error(`${rel}: caja vacía ${[x0, y0, x1, y1]}`);
+      return { ...box, keep };
+    });
+  } else {
+    pieces = findPieces(img, (cfg.gap ?? 14) * scaleRef);
+    pieces = (cfg.order ?? (isPlant ? 'x' : 'rows')) === 'x' ? pieces.sort((a, b) => a.x - b.x) : readingOrder(pieces);
+  }
   const stem = cfg.name ?? base;
+  if (cfg.cursor) return processCursors(img, pieces, rel, dir, cfg);
+  const scale = cfg.scale ?? 0.5;
   for (let i = 0; i < pieces.length; i++) {
     const name = cfg.names?.[i] ?? (pieces.length === 1 ? stem : `${stem}-${i + 1}`);
     const file = join(dir, `${name}.png`);
@@ -282,6 +295,42 @@ async function processSprites(path, rel, cfg) {
     if (cfg.pivot) extra.pivot = cfg.pivot;
     if (isPlant) Object.assign(extra, { plant: stem, stage: i + 1, stages: pieces.length });
     register(name, file, size, rel, extra);
+  }
+  return pieces.length;
+}
+
+/**
+ * Cursores: todas las piezas al mismo tamaño (un cuadrado de `cursor.size` px,
+ * la pieza centrada y achicada parejo para que entre), con su punto activo
+ * (`cursor.hotspots`, en fracción de la pieza: la punta del dedo o de la
+ * herramienta). Sale cada uno en 1x y en 2x (agrandado con vecino más cercano).
+ */
+async function processCursors(img, pieces, rel, dir, cfg) {
+  const S = cfg.cursor.size ?? 32;
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i];
+    const name = cfg.names[i];
+    const fit = (S - 2) / Math.max(piece.w, piece.h);
+    const tmp = join(OUT, dir, `${name}.tmp.png`);
+    const size = await savePng(img, piece, fit, tmp, 'mitchell');
+    const left = Math.floor((S - size.width) / 2);
+    const top = Math.floor((S - size.height) / 2);
+    const square = await sharp(tmp)
+      .extend({ left, top, right: S - size.width - left, bottom: S - size.height - top, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+    rmSync(tmp);
+    const file = join(dir, `${name}.png`);
+    const file2 = join(dir, `${name}@2x.png`);
+    await sharp(square).toFile(join(OUT, file));
+    await sharp(square).resize(S * 2, S * 2, { kernel: 'nearest' }).toFile(join(OUT, file2));
+    const [hx, hy] = cfg.cursor.hotspots[i] ?? [0.5, 0.5];
+    register(name, file, { width: S, height: S }, rel, {
+      kind: 'cursor',
+      artPx: 1,
+      file2x: file2.split(sep).join('/'),
+      hotspot: { x: Math.round(left + hx * size.width), y: Math.round(top + hy * size.height) },
+    });
   }
   return pieces.length;
 }

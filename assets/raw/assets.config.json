@@ -299,6 +299,316 @@
       "scale": 0.078,
       "kernel": "mitchell",
       "why": "a su tamaño real: la etapa grande mide un tercio del agua de la rectangular mediana"
+    },
+    "ui/cursores-manos": {
+      "names": [
+        "mano-abierta",
+        "mano-senalar",
+        "mano-agarrar",
+        "mano-acariciar"
+      ],
+      "boxes": [
+        [
+          8,
+          235,
+          200,
+          450
+        ],
+        [
+          230,
+          250,
+          415,
+          445
+        ],
+        [
+          435,
+          250,
+          625,
+          450
+        ],
+        [
+          630,
+          220,
+          855,
+          450
+        ]
+      ],
+      "cursor": {
+        "size": 32,
+        "hotspots": [
+          [
+            0.42,
+            0.06
+          ],
+          [
+            0.06,
+            0.06
+          ],
+          [
+            0.45,
+            0.35
+          ],
+          [
+            0.55,
+            0.55
+          ]
+        ]
+      }
+    },
+    "ui/cursores-herramientas": {
+      "names": [
+        "herramienta-pizca",
+        "herramienta-esponja",
+        "herramienta-lupa",
+        "herramienta-balde",
+        "herramienta-golpecito",
+        "herramienta-reloj"
+      ],
+      "boxes": [
+        [
+          20,
+          250,
+          210,
+          470
+        ],
+        [
+          215,
+          275,
+          425,
+          445
+        ],
+        [
+          445,
+          250,
+          635,
+          460
+        ],
+        [
+          640,
+          250,
+          850,
+          465
+        ],
+        [
+          860,
+          240,
+          1065,
+          475
+        ],
+        [
+          1105,
+          255,
+          1265,
+          455
+        ]
+      ],
+      "cursor": {
+        "size": 32,
+        "hotspots": [
+          [
+            0.18,
+            0.88
+          ],
+          [
+            0.5,
+            0.5
+          ],
+          [
+            0.38,
+            0.36
+          ],
+          [
+            0.1,
+            0.85
+          ],
+          [
+            0.32,
+            0.36
+          ],
+          [
+            0.5,
+            0.5
+          ]
+        ]
+      }
+    },
+    "ui/iconos-acciones": {
+      "names": [
+        "icono-comida",
+        "icono-esponja",
+        "icono-balde",
+        "icono-kit",
+        "icono-filtro",
+        "icono-agua",
+        "icono-lupa",
+        "icono-bolsa"
+      ],
+      "boxes": [
+        [
+          115,
+          95,
+          305,
+          350
+        ],
+        [
+          405,
+          115,
+          655,
+          350
+        ],
+        [
+          740,
+          95,
+          965,
+          350
+        ],
+        [
+          1040,
+          105,
+          1295,
+          350
+        ],
+        [
+          115,
+          405,
+          335,
+          655
+        ],
+        [
+          440,
+          415,
+          655,
+          645
+        ],
+        [
+          750,
+          415,
+          980,
+          655
+        ],
+        [
+          1075,
+          415,
+          1265,
+          655
+        ]
+      ],
+      "scale": 0.1667,
+      "kernel": "mitchell"
+    },
+    "ui/marcos-ui": {
+      "names": [
+        "ui-papel",
+        "ui-nota",
+        "ui-boton",
+        "ui-boton-presionado",
+        "ui-pestana-amarilla",
+        "ui-pestana-rosa",
+        "ui-pestana-turquesa",
+        "ui-celular",
+        "ui-bandeja"
+      ],
+      "boxes": [
+        [
+          49,
+          54,
+          597,
+          652
+        ],
+        [
+          641,
+          114,
+          1026,
+          402
+        ],
+        [
+          1053,
+          119,
+          1406,
+          266
+        ],
+        [
+          1053,
+          274,
+          1406,
+          415
+        ],
+        [
+          622,
+          467,
+          883,
+          619
+        ],
+        [
+          888,
+          467,
+          1148,
+          619
+        ],
+        [
+          1154,
+          467,
+          1415,
+          619
+        ],
+        [
+          1455,
+          71,
+          1765,
+          635
+        ],
+        [
+          1781,
+          396,
+          2145,
+          614
+        ]
+      ],
+      "scale": 0.1667,
+      "kernel": "mitchell"
+    },
+    "ui/objetos-cuarto": {
+      "names": [
+        "objeto-celular",
+        "objeto-calendario",
+        "objeto-kit",
+        "objeto-cuaderno",
+        "objeto-libro"
+      ],
+      "boxes": [
+        [
+          60,
+          250,
+          451,
+          597
+        ],
+        [
+          462,
+          168,
+          858,
+          592
+        ],
+        [
+          912,
+          228,
+          1314,
+          586
+        ],
+        [
+          1352,
+          223,
+          1705,
+          603
+        ],
+        [
+          1721,
+          190,
+          2129,
+          592
+        ]
+      ],
+      "scale": 0.1667,
+      "kernel": "mitchell"
     }
   },
   "video": {

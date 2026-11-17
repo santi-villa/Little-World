@@ -596,69 +596,311 @@
       "of": "vidrio",
       "artPx": 1.08
     },
-    "iconos-acciones-1": {
-      "file": "ui/iconos-acciones-1.png",
+    "herramienta-pizca": {
+      "file": "ui/herramienta-pizca.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-pizca@2x.png",
+      "hotspot": {
+        "x": 8,
+        "y": 27
+      }
+    },
+    "herramienta-esponja": {
+      "file": "ui/herramienta-esponja.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-esponja@2x.png",
+      "hotspot": {
+        "x": 16,
+        "y": 16
+      }
+    },
+    "herramienta-lupa": {
+      "file": "ui/herramienta-lupa.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-lupa@2x.png",
+      "hotspot": {
+        "x": 13,
+        "y": 12
+      }
+    },
+    "herramienta-balde": {
+      "file": "ui/herramienta-balde.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-balde@2x.png",
+      "hotspot": {
+        "x": 4,
+        "y": 27
+      }
+    },
+    "herramienta-golpecito": {
+      "file": "ui/herramienta-golpecito.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-golpecito@2x.png",
+      "hotspot": {
+        "x": 11,
+        "y": 12
+      }
+    },
+    "herramienta-reloj": {
+      "file": "ui/herramienta-reloj.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-herramientas",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/herramienta-reloj@2x.png",
+      "hotspot": {
+        "x": 16,
+        "y": 16
+      }
+    },
+    "mano-abierta": {
+      "file": "ui/mano-abierta.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-manos",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/mano-abierta@2x.png",
+      "hotspot": {
+        "x": 13,
+        "y": 3
+      }
+    },
+    "mano-senalar": {
+      "file": "ui/mano-senalar.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-manos",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/mano-senalar@2x.png",
+      "hotspot": {
+        "x": 4,
+        "y": 3
+      }
+    },
+    "mano-agarrar": {
+      "file": "ui/mano-agarrar.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-manos",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/mano-agarrar@2x.png",
+      "hotspot": {
+        "x": 15,
+        "y": 12
+      }
+    },
+    "mano-acariciar": {
+      "file": "ui/mano-acariciar.png",
+      "width": 32,
+      "height": 32,
+      "source": "ui/cursores-manos",
+      "kind": "cursor",
+      "artPx": 1,
+      "file2x": "ui/mano-acariciar@2x.png",
+      "hotspot": {
+        "x": 17,
+        "y": 18
+      }
+    },
+    "icono-comida": {
+      "file": "ui/icono-comida.png",
+      "width": 30,
+      "height": 40,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-esponja": {
+      "file": "ui/icono-esponja.png",
+      "width": 39,
+      "height": 37,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-balde": {
+      "file": "ui/icono-balde.png",
+      "width": 35,
+      "height": 40,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-kit": {
+      "file": "ui/icono-kit.png",
+      "width": 39,
+      "height": 38,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-filtro": {
+      "file": "ui/icono-filtro.png",
+      "width": 33,
+      "height": 39,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-agua": {
+      "file": "ui/icono-agua.png",
+      "width": 34,
+      "height": 36,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-lupa": {
+      "file": "ui/icono-lupa.png",
+      "width": 35,
+      "height": 37,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "icono-bolsa": {
+      "file": "ui/icono-bolsa.png",
+      "width": 29,
+      "height": 38,
+      "source": "ui/iconos-acciones",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "ui-papel": {
+      "file": "ui/ui-papel.png",
       "width": 89,
-      "height": 120,
-      "source": "ui/iconos-acciones",
+      "height": 97,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-2": {
-      "file": "ui/iconos-acciones-2.png",
-      "width": 118,
-      "height": 112,
-      "source": "ui/iconos-acciones",
+    "ui-nota": {
+      "file": "ui/ui-nota.png",
+      "width": 62,
+      "height": 46,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-3": {
-      "file": "ui/iconos-acciones-3.png",
-      "width": 106,
-      "height": 120,
-      "source": "ui/iconos-acciones",
+    "ui-boton": {
+      "file": "ui/ui-boton.png",
+      "width": 57,
+      "height": 22,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-4": {
-      "file": "ui/iconos-acciones-4.png",
-      "width": 117,
-      "height": 114,
-      "source": "ui/iconos-acciones",
+    "ui-boton-presionado": {
+      "file": "ui/ui-boton-presionado.png",
+      "width": 57,
+      "height": 22,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-5": {
-      "file": "ui/iconos-acciones-5.png",
-      "width": 98,
-      "height": 117,
-      "source": "ui/iconos-acciones",
+    "ui-pestana-amarilla": {
+      "file": "ui/ui-pestana-amarilla.png",
+      "width": 41,
+      "height": 23,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-6": {
-      "file": "ui/iconos-acciones-6.png",
-      "width": 101,
-      "height": 109,
-      "source": "ui/iconos-acciones",
+    "ui-pestana-rosa": {
+      "file": "ui/ui-pestana-rosa.png",
+      "width": 41,
+      "height": 23,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-7": {
-      "file": "ui/iconos-acciones-7.png",
-      "width": 106,
-      "height": 112,
-      "source": "ui/iconos-acciones",
+    "ui-pestana-turquesa": {
+      "file": "ui/ui-pestana-turquesa.png",
+      "width": 41,
+      "height": 23,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
     },
-    "iconos-acciones-8": {
-      "file": "ui/iconos-acciones-8.png",
-      "width": 86,
-      "height": 115,
-      "source": "ui/iconos-acciones",
+    "ui-celular": {
+      "file": "ui/ui-celular.png",
+      "width": 52,
+      "height": 91,
+      "source": "ui/marcos-ui",
       "kind": "sprite",
-      "artPx": 2
+      "artPx": 1
+    },
+    "ui-bandeja": {
+      "file": "ui/ui-bandeja.png",
+      "width": 59,
+      "height": 34,
+      "source": "ui/marcos-ui",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "objeto-celular": {
+      "file": "ui/objeto-celular.png",
+      "width": 64,
+      "height": 56,
+      "source": "ui/objetos-cuarto",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "objeto-calendario": {
+      "file": "ui/objeto-calendario.png",
+      "width": 64,
+      "height": 68,
+      "source": "ui/objetos-cuarto",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "objeto-kit": {
+      "file": "ui/objeto-kit.png",
+      "width": 64,
+      "height": 60,
+      "source": "ui/objetos-cuarto",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "objeto-cuaderno": {
+      "file": "ui/objeto-cuaderno.png",
+      "width": 57,
+      "height": 61,
+      "source": "ui/objetos-cuarto",
+      "kind": "sprite",
+      "artPx": 1
+    },
+    "objeto-libro": {
+      "file": "ui/objeto-libro.png",
+      "width": 66,
+      "height": 66,
+      "source": "ui/objetos-cuarto",
+      "kind": "sprite",
+      "artPx": 1
     },
     "gato-agacharse": {
       "file": "gato/gato-agacharse.png",
