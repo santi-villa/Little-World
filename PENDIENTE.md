@@ -1,3 +1,41 @@
+# Interfaz de papel y madera (etapa 1 hecha)
+
+Hecho: sistema de UI con el arte de `marcos-ui.png` (papel, nota, madera,
+pestañas, bandeja), HUD de papel con día, hora, clima y gotita del agua,
+cursores de mano y herramientas con punto activo, herramienta pegada al dedo y
+toque largo en táctil, bandeja de herramientas en la vista pecera (comida,
+esponja, balde, kit, filtro, lupa y golpecito), papelitos y confirmaciones con
+dos botones de madera, fuente Pixelify Sans y sonidos suaves. Reglas en
+`docs/ART-DIRECTION.md` (sección Interfaz).
+
+Revisado con capturas en escritorio (habitación, pecera con herramienta, panel
+de agua). Falta probar en un celular real: tamaño de la bandeja, toque largo y
+la herramienta pegada al dedo. Los cursores no salen en las capturas: revisarlos
+a mano.
+
+Pendiente de la etapa 1:
+- Monedas: no existen todavía; el HUD las mostrará solo al ganarlas o en la tienda.
+- Reloj de arena: hoy solo mientras se recupera el acuario al abrir; no hay
+  aclimatación todavía.
+- El panel de debug sigue con su estilo propio (es herramienta de desarrollo).
+- Los textos viejos de `texts.hand` (en mayúsculas sin tildes) quedaron sin uso
+  donde se reemplazaron por `texts.ui`.
+
+Etapa 2 (no se hizo; queda para la próxima):
+- Menús como objetos del cuarto: ubicar celular y cuaderno sobre el escritorio,
+  calendario en la pared, kit de test junto a la pecera y libro en la biblioteca
+  (arte ya procesado: `objeto-*.png` en `public/assets/ui/`), con sus zonas en
+  `rooms.json`; al tocarlos, zoom suave y el menú en la mano:
+  cuaderno = diario (páginas y pestañas), libro = enciclopedia, celular = tienda
+  (dentro de `ui-celular.png`), calendario = próximos cuidados e historial de
+  cambios de agua, kit = medir con tubitos y tabla de colores. Tocadiscos =
+  música: el arte existe (`tocadiscos.png`) pero no está en la habitación.
+- Ajustes: ícono arriba a la derecha (y toque largo en la lámpara) con
+  volúmenes de música, ambiente y efectos, calidad visual, ubicación del clima,
+  modo suave, notificaciones y exportar/importar partida.
+
+---
+
 # Mano, cuidado y betta detallado
 
 Implementados: pizcas elegidas sobre la pecera con tapa abierta; cierre de tapa;

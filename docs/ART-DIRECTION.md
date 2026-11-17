@@ -33,3 +33,28 @@ Los ajustes del motor reducen las diferencias actuales; no sustituyen esa edici�
 ## Corrección del betta
 
 Se comprobó que el asset detallado `public/assets/animales/betta.png` ya existía. Ahora se usa directamente en una malla con filtrado nearest, movimiento restringido a las aletas y giro progresivo. La diferencia de calidad venía de la ruta procedural de muy pocos píxeles, no de ese PNG. Se conserva el tamaño físico del animal: acercar la cámara muestra su detalle sin convertirlo en un pez desproporcionado.
+
+## Interfaz
+
+La interfaz vive "dentro del mundo": papel, tinta, madera. Es mínima y nunca tapa la pecera ni bloquea la escena sin necesidad. Todo lo nuevo sigue estas reglas.
+
+**Paleta.** Papel crema `#f3e3c2`, tinta marrón `#5b3a24` (secundaria `#8a6446`), texto sobre madera `#fbeed2` con sombra `#4a2a16`, acento turquesa `#3f9a94` (foco, herramienta elegida, botón principal). Estados del agua: bien `#4aa8c8`, revisar `#e0a64a`, peligro `#d0584a`. Variables en `src/ui.css`.
+
+**Fuente.** Una sola: Pixelify Sans (SIL OFL 1.1, licencia en `public/fonts/PixelifySans-OFL.txt`). Dos tamaños: 20 px para texto y 30 px para títulos; son los que la dejan nítida (2 y 3 px de pantalla por píxel de la letra). No usar otros tamaños ni negritas sintéticas.
+
+**Arte y escala.** Los marcos salen de `assets/raw/ui/marcos-ui.png` (`npm run assets`) a su grilla (1 px del PNG = 1 px del dibujo) y se muestran a escala entera: `--ui` = 2 px de CSS por píxel del dibujo (1 en pantallas bajas, como un celular horizontal). Nunca achicar una imagen al dibujarla.
+- Papel (paneles, cuaderno): 9-slice que estira solo el centro (`border-image ... round`); la cinta washi es una imagen aparte centrada arriba, así no se deforma.
+- Nota (papelitos, HUD): igual que el papel, con su cinta rosa aparte.
+- Botón de madera: normal y presionado (`:active`), alto mínimo 44 px reales.
+- Pestañas: amarilla, rosa y turquesa, en ese orden, a tamaño fijo.
+- Bandeja de madera: la barra de herramientas de la vista pecera.
+
+**Componentes** (`src/render/ui/paper-ui.ts`): `showNote` (papelito que aparece y se va solo, nunca bloquea), `confirmPaper` (solo para acciones importantes: dos botones de madera, el principal con acento turquesa), `woodButton`. El HUD (`hud-paper.ts`) es un papelito con día, hora e ícono de clima y una gotita con el estado del agua; se oculta en Contemplar.
+
+**Cursores** (`assets/raw/ui/cursores-*.jpg`): todos al mismo tamaño (32x32, y 64x64 para pantallas densas) con el punto activo en la punta del dedo o de la herramienta (`hotspot` en el manifest). Estados: mano abierta (normal), señalar (sobre algo tocable), agarrar (arrastrando la cámara), acariciar (sobre el gato), la herramienta activa (pizca, esponja, lupa, balde, golpecito) y reloj de arena (esperando). Con el dedo no hay cursor: la herramienta activa va pegada al dedo mientras se arrastra, y un toque largo muestra el nombre de lo que se toca (lo mismo que el hover).
+
+**Herramientas.** Se eligen en la bandeja; la elegida se levanta con un borde turquesa y aparece "Soltar". Si no se puede usar, se sacude suave y un papelito explica por qué.
+
+**Animación.** Corta y suave: deslizar y fundido de 200 a 320 ms con `cubic-bezier(0.2, 0.7, 0.2, 1)`; sin rebotes ni escalados grandes. Con `prefers-reduced-motion`, sin animación.
+
+**Sonido.** Opcional y bajo: roce de papel al abrir papeles y papelitos, click de madera en los botones (`ui-sound.ts`, se apaga con `localStorage lw-sound = off`).
