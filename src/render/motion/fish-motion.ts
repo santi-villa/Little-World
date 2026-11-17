@@ -1,3 +1,4 @@
+import {BettaDynamics} from './betta-dynamics';
 import {resolveHabitat,habitatTarget,type Habitat} from './habitat';
 import { interestedInHand, type HandInput } from './hand';
 /**
@@ -129,6 +130,7 @@ function mulberry(seed: number): () => number {
 export function favoriteCorner(id: number): 'left' | 'right' { return ((Math.imul(id, 2654435761) >>> 0) & 1) === 0 ? 'left' : 'right'; }
 
 export class FishMotion {
+  readonly bettas=new Map<number,BettaDynamics>();
   readonly bodies = new Map<number, FishBody>();
   private readonly schools = new Map<string, SchoolGoal>();
   private readonly random: () => number;
@@ -206,7 +208,7 @@ export class FishMotion {
       present.add(animal.id);
       if (!this.bodies.has(animal.id)) this.bodies.set(animal.id, this.spawn(animal, bounds));
     }
-    for (const id of this.bodies.keys()) if (!present.has(id)) this.bodies.delete(id);
+    for (const id of this.bodies.keys()) if (!present.has(id)){this.bodies.delete(id);this.bettas.delete(id);}
     if (!(dt > 0)) return;
     this.time += dt;
 
@@ -235,6 +237,8 @@ export class FishMotion {
         integrate(body, v.x, v.y, { maxSpeed: 1.5, maxAccel: 2, maxTurn: 10 }, dt, bounds);
         continue;
       }
+
+      if(sp.id==='betta'){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,input,this.time,r);continue;}
 
       const crawler = sp.category !== 'fish';
       const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
