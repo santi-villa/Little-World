@@ -42,12 +42,7 @@
   "turnMinWidth": 0.22,
   "pectoralHz": 3,
   "pectoralAmplitudeDeg": 8,
-  "spriteCuts": [
-    0,
-    0.3,
-    0.58,
-    1
-  ],
+  "spriteCuts": [0, 0.3, 0.58, 1],
   "spriteHeight": 0.5,
   "overlapPixels": 1,
   "investigateChance": 0.3,
@@ -73,30 +68,10 @@
   "devArrowScale": 7,
   "devArrowPixels": 100,
   "devSliders": {
-    "mass": [
-      0.2,
-      5,
-      0.1
-    ],
-    "drag": [
-      0.01,
-      4,
-      0.01
-    ],
-    "maxTurnDegS": [
-      10,
-      360,
-      1
-    ],
-    "tailHz": [
-      0.1,
-      6,
-      0.1
-    ],
-    "floatAmplitude": [
-      0,
-      0.05,
-      0.001
-    ]
+    "mass": [0.2, 5, 0.1],
+    "drag": [0.01, 4, 0.01],
+    "maxTurnDegS": [10, 360, 1],
+    "tailHz": [0.1, 6, 0.1],
+    "floatAmplitude": [0, 0.05, 0.001]
   }
 }

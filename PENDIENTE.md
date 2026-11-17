@@ -286,3 +286,5 @@ Conductas visuales del betta: vagar, investigar, respirar con anillo, comida, so
 ## Prototipo betta con peso: revisión pendiente
 
 Partes 1–5 implementadas. Panel D/toque de 2 s solo en desarrollo; sliders en vivo y exportación JSON. Falta revisión visual del sprite articulado, retorno de plantas y velocidades en teléfonos reales. El escalado entero estable implica tamaño visual cuantizado; la rotación y compresión de giro pueden producir escalones. El PNG recortado no reemplaza arte por capas de aletas ni un flare detallado. La simulación química queda intacta. Por instrucción del usuario: sin tests ni capturas, una compilación al final. Parámetros y extensión a otras especies en docs/MOVIMIENTO.md.
+
+Validación final del prototipo: se ejecutó una sola vez `npm run build`, completada correctamente con typecheck y generación PWA. No se escribieron ni ejecutaron tests y no se tomaron capturas. Falta validación visual y de interacción del prototipo; no asumir que compilar valida la calidad del nado o de los cortes.
