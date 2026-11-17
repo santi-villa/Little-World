@@ -19,6 +19,11 @@ const sampleState = () => {
 };
 
 describe('formato de guardado', () => {
+  it.each(['code', 'flat', 'image'] as const)('conserva el aspecto %s sin reiniciar la partida', bettaStyle => {
+    const save = createSave(createNewTank({seed: 42}), DEFAULT_SETTINGS, 1234, {tutorial: 4, journal: [], bettaStyle});
+    expect(parseSave(JSON.parse(JSON.stringify(save)))).toEqual({status: 'ok', save, migratedFrom: null});
+  });
+
   it('lleva versión de formato, lastTimestamp y la semilla del RNG', () => {
     const save = createSave(sampleState(), { ...DEFAULT_SETTINGS, speed: 60 }, 1234);
     expect(save.formatVersion).toBe(SAVE_FORMAT_VERSION);

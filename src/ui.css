@@ -483,3 +483,6 @@ body[data-view='tank'] .tool-tray {
     animation: none;
   }
 }
+.room-study {width:min(1150px,96vw);max-height:94dvh;background:#f3e3c2;color:#5b3a24;border:3px solid #916b47;padding:18px;overflow:auto;font-family:'Pixelify Sans',monospace;}
+.study-columns {display:grid;grid-template-columns:1fr 1fr;gap:16px}.study-columns figure{margin:0}.study-columns img{width:100%;background:#abc6c6}.study-columns figcaption{font-size:20px;line-height:1.4}.room-study button{min-height:44px;font:inherit}
+@media(max-width:700px){.study-columns{grid-template-columns:1fr}}

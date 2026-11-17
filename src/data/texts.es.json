@@ -599,8 +599,19 @@
     "knock": "Los golpes asustan a los peces."
   },
   "fishArt": {
-    "label": "Aspecto del betta",
-    "code": "Dibujado con código",
-    "image": "Imagen original"
+    "label": "Aspecto de los peces",
+    "code": "Código con volumen (2.5D)",
+    "image": "Arte anterior (betta PNG)",
+    "flat": "Betta plano anterior"
+  },
+  "roomStudy": {
+    "button": "Comparar habitación 2.5D",
+    "label": "Comparación de habitación 2.5D",
+    "title": "Prueba de escritorio y pecera 2.5D",
+    "alt": "Arte original de la habitación, sin las capas del juego",
+    "original": "Fondo actual: conserva más detalle y calidez.",
+    "geometry": "Geometría con cámara fija. Escritorio 140×74×60 cm; pecera 60×36×30 cm. Tocá la mesa para mover la maceta dentro de su superficie.",
+    "close": "Volver al juego",
+    "error": "No se pudo abrir la prueba gráfica. Podés volver al juego."
   }
 }

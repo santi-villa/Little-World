@@ -92,10 +92,8 @@ export class Camera {
     if (Math.abs(t.y - c.y) < 0.05) c.y = t.y;
     this.clamp(c);
 
-    const r = display.resolution;
-    const px = (v: number): number => Math.round(v * r) / r;
     this.world.scale.set(c.zoom);
-    this.world.position.set(px(GAME_WIDTH / 2 - c.x * c.zoom), px(GAME_HEIGHT / 2 - c.y * c.zoom));
+    this.world.position.set(GAME_WIDTH/2-c.x*c.zoom,GAME_HEIGHT/2-c.y*c.zoom);
   }
 
   /** De la pantalla (píxeles del juego) al mundo. */

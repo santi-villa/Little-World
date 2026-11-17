@@ -81,10 +81,10 @@ async function boot(): Promise<void> {
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     background: 0x0b1020,
-    antialias: false,
-    resolution: 1,
+    antialias: true,
+    resolution: Math.min(2, window.devicePixelRatio || 1),
     autoDensity: false,
-    roundPixels: true,
+    roundPixels: false,
     powerPreference: 'low-power',
     // Los filtros propios (vaivén de las plantas) están escritos en GLSL.
     preference: 'webgl',

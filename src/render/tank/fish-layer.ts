@@ -1,3 +1,5 @@
+import {emptyHabitat,type Habitat} from '../motion/habitat';
+import { FlatBetta } from './flat-betta';
 import { CodeBetta } from './code-betta';
 import { Container, MeshPlane } from 'pixi.js';
 import { tex } from '../assets';
@@ -36,11 +38,13 @@ function hex(color: string): number {
 export class FishLayer {
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
-  bettaStyle:'code'|'image'='code';
-  private readonly codedBettas=new Map<number,CodeBetta>();
+  bettaStyle:'code'|'image'|'flat'='code';
+  private readonly codedBettas=new Map<number,CodeBetta|FlatBetta>();
+  private lastStyle='';
   readonly artBack=new Container();
   readonly artFront=new Container();
   private readonly bettas=new Map<number,{mesh:MeshPlane;rest:Float32Array;turn:number}>();
+  habitat:Habitat=emptyHabitat();
   hand:HandInput|null=null;
   readonly foodGraphics = new Graphics();
   private ink = this.graphics;
@@ -139,10 +143,12 @@ export class FishLayer {
       },
       scare: this.scare,
       hand:this.hand,
+      habitat:this.habitat,
       catAtGlass: cat === 'watch_fish' || cat === 'tap_glass',
     });
 
-    const ids=new Set(animals.filter(a=>a.species.id==='betta').map(a=>a.id));
+    if(this.lastStyle!==this.bettaStyle){for(const fish of this.codedBettas.values())fish.destroy();this.codedBettas.clear();this.lastStyle=this.bettaStyle;}
+    const ids=new Set(animals.filter(a=>a.species.category==='fish').map(a=>a.id));
     for(const [id,entry]of this.bettas)if(!ids.has(id)){entry.mesh.destroy();this.bettas.delete(id);}
     for(const [id,fish]of this.codedBettas)if(!ids.has(id)){fish.destroy();this.codedBettas.delete(id);}
     for(const fish of this.codedBettas.values())fish.container.visible=false;
@@ -194,7 +200,7 @@ export class FishLayer {
         if(x<area.x||x>area.x+area.width-2)continue;
         const age=seconds-batch.at-i*.035;
         const y=area.y-12+12*Math.min(1,Math.max(0,age)/.7)**2;
-        g.rect(x,Math.round(y+Math.sin(seconds*1.7+i)*.5),2,1);
+        g.rect(x,y+Math.sin(seconds*1.7+i)*.5,2,1);
       }
     }
     const sinking = Math.min(40, Math.ceil(state.food.sinkingG * 200));
@@ -202,7 +208,7 @@ export class FishLayer {
       const x = Math.round(x0 + (scatter(i, 22) - 0.5) * 2 * spread);
       if (x < area.x || x > area.x + area.width - 2) continue;
       const fall = (scatter(i, 23) + seconds * (0.05 + 0.04 * scatter(i, 24))) % 1;
-      g.rect(x, Math.round(area.y + fall * (area.height - 2)), 1, 1);
+      g.rect(x, area.y + fall * (area.height - 2), 1, 1);
     }
     if (floating + sinking > 0) g.fill(ART.food);
   }
@@ -239,11 +245,11 @@ export class FishLayer {
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;
     const halfLen = Math.min(len / 2, area.width / 2);
-    const cx = Math.round(
-      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x + body.x * this.pxPerCm)),
+    const cx = (
+      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x + body.x * this.pxPerCm))
     );
-    const cy = Math.round(
-      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm)),
+    const cy = (
+      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm))
     );
     this.positions.set(animal.id,{x:cx,y:cy,radius:Math.max(8,len*0.8)});
     const nibbling = animal.alive && animal.intent === 'eat' &&
@@ -255,13 +261,13 @@ export class FishLayer {
     }
     const dir = body.facing;
 
-    if(sp.id==='betta' && this.bettaStyle==='code'){
+    if((sp.category==='fish' && this.bettaStyle==='code') || (sp.id==='betta' && this.bettaStyle==='flat')){
       let fish=this.codedBettas.get(animal.id);
-      if(!fish){fish=new CodeBetta(animal.id,body.facing);this.codedBettas.set(animal.id,fish);}
+      if(!fish){fish=this.bettaStyle==='flat'?new FlatBetta(animal.id,body.facing):new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
       const parent=body.plane<1.2?this.artBack:this.artFront;
       if(fish.container.parent!==parent)parent.addChild(fish.container);
       fish.container.visible=true;
-      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage);return;
+      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage);fish.container.tint=tint(0xffffff);return;
     }
     if(sp.id==='betta'){
       let entry=this.bettas.get(animal.id);

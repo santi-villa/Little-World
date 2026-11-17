@@ -1,3 +1,5 @@
+import {LivingPlant} from './living-plant';
+import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { GLASS_COLS, GLASS_ROWS } from '../../sim/glass';
 import type { HandInput } from '../motion/hand';
 import { ambientTint, ART } from '../art-direction';
@@ -124,6 +126,8 @@ export class TankView {
   private readonly rearPlants = new Container();
   private readonly frontPlants = new Container();
   private readonly contactShadows = new Graphics();
+  private living:LivingPlant[]=[];
+  private habitat:Habitat=emptyHabitat();
   private plants: Plant[] = [];
   private readonly mid = new Graphics();
   private readonly fx = new Graphics();
@@ -181,7 +185,7 @@ export class TankView {
   update(state: SimState, derived: DerivedValues, seconds: number): void {
     const lit = derived.lightOn;
     const geo = this.layout(state, derived);
-    this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.waterHeight-geo.sandH-4)};
+    this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.sandTop-geo.waterTop-2)};
     const tex=this.glass.texture;
     const cut=Math.max(1,this.inner.y-3);
     const lidKey=`${tex.uid}:${cut}`;
@@ -207,6 +211,9 @@ export class TankView {
     // La corriente mueve las plantas: más con el filtro andando.
     const flow = state.filter.flowLph > 0 ? Math.min(1, derived.effectiveFlowLph / state.filter.flowLph) : 0;
     this.swayPlants(seconds, 1 + flow);
+    const visitors=[...this.fish.motion.bodies.values()].map(b=>({x:geo.left+b.x*pxPerCm,y:geo.waterTop+2+b.y*pxPerCm,vx:b.vx}));
+    for(const plant of this.living){plant.update(seconds,Math.max(0,seconds-this.lastSeconds),flow,visitors);plant.container.tint=tint;}
+    this.fish.habitat=this.habitat;
 
     const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
     this.drawMid(state, derived, geo, shade, seconds);
@@ -402,7 +409,7 @@ export class TankView {
     for (const child of this.rearPlants.removeChildren()) child.destroy();
     for (const child of this.frontPlants.removeChildren()) child.destroy();
     this.contactShadows.clear();
-    this.plants = [];
+    this.plants = [];this.living=[];this.habitat=emptyHabitat();
     for (const [index, item] of this.decor.items.entries()) {
       const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
       if (!asset(name)) continue;
@@ -418,7 +425,14 @@ export class TankView {
       const shadowW = Math.min(w * 0.7,geo.width*0.32);
       for(let row=0;row<3;row++) this.contactShadows.rect(Math.round(cx-shadowW/2+row*2),geo.sandTop+row,Math.max(1,Math.round(shadowW-row*4)),1);
       this.contactShadows.fill({color:ART.shadow,alpha:item.plant?0.1:0.22});
-      if (item.plant) {
+      if(item.plant==='anubias'||item.plant==='vallisneria'){
+        const plant=new LivingPlant(item.plant,w,h,index*1.71);plant.container.position.set(cx,baseY);
+        (item.layer==='back'?this.rearPlants:this.plantLayer).addChild(plant.container);this.living.push(plant);
+        const ny=(baseY-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2),nh=h/Math.max(1,geo.sandTop-geo.waterTop-2);
+        this.habitat.refuges.push({x:(cx-geo.left)/geo.width,y:Math.max(.12,Math.min(.88,ny-nh*.4))});
+        if(item.plant==='anubias')this.habitat.leaves.push({x:(cx-geo.left)/geo.width,y:Math.max(.1,Math.min(.8,ny-nh*.8))});
+        this.habitat.obstacles.push({x:(cx-geo.left)/geo.width,y:Math.min(.98,ny-.04),rx:.012,ry:.035});
+      } else if (item.plant) {
         const mesh = new MeshPlane({ texture, verticesX: 2, verticesY: PLANT_ROWS });
         mesh.scale.set(item.flip ? -scale : scale, scale);
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
@@ -431,6 +445,7 @@ export class TankView {
         sprite.scale.set(item.flip ? -scale : scale, scale);
         sprite.position.set(cx, baseY);
         this.hardscape.addChild(sprite);
+        this.habitat.obstacles.push({x:(cx-geo.left)/geo.width,y:Math.min(.95,(baseY-h*.38-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2)),rx:w*.27/geo.width,ry:h*.22/Math.max(1,geo.sandTop-geo.waterTop-2)});
       }
     }
   }
@@ -448,7 +463,7 @@ export class TankView {
       for (let i = 0; i < positions.length; i += 2) {
         const free = Math.pow(1 - (plant.rest[i + 1] as number) / height, 1.5);
         const wave = Math.sin(seconds * 0.7 + plant.phase) * 0.8 + Math.sin(seconds * 0.43 + plant.phase * 2.1) * 0.2;
-        positions[i] = (plant.rest[i] as number) + Math.round(wave * strength * free) * plant.unit;
+        positions[i] = (plant.rest[i] as number) + wave * strength * free * plant.unit;
       }
       attribute.buffer.update();
     }
@@ -515,8 +530,8 @@ export class TankView {
         const half = Math.round(len * 0.55);
         let pending = 0;
         for (let yy = 0; yy < len; yy += 3) {
-          const x0 = clamp(Math.round(baseX + slant * yy), left, right);
-          const x1 = clamp(Math.round(baseX + slant * yy + wd + yy * 0.05), left, right);
+          const x0 = clamp(baseX + slant * yy, left, right);
+          const x1 = clamp(baseX + slant * yy + wd + yy * 0.05, left, right);
           if (x1 > x0) {
             g.rect(x0, waterTop + 1 + yy, x1 - x0, Math.min(3, len - yy));
             pending++;
@@ -537,7 +552,7 @@ export class TankView {
       const drift = (i % 3 === 0 ? -1 : 1) * (0.5 + scatter(i, 83));
       const py = (((scatter(i, 84) * column + seconds * drift) % column) + column) % column;
       const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 6;
-      g.rect(clamp(Math.round(px), left, right - 1), waterTop + 2 + Math.floor(py), 1, 1);
+      g.rect(clamp(px, left, right - 1), waterTop + 2 + py, 1, 1);
     }
     if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.4 : 0.14 });
 

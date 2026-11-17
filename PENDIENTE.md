@@ -259,3 +259,12 @@ Falta:
 - Plato del gato: sin dibujo hasta que haya arte del plato.
 - Debug: "Nueva partida" borra el guardado y arranca con la pecera inicial y un
   solo betta.
+
+## Estado de la prueba procedural 2.5D
+
+- Implementado: giro con volumen y aletas articuladas en los peces del modo código; selector de comparación con betta plano y PNG. Animación continua, antialias de geometría y cámara sin saltos por redondeo.
+- Implementado: anubias/vallisneria con corriente, reacción a cercanía y hábitat con núcleos sólidos, refugios y hojas de descanso. Los núcleos son aproximaciones 2D y no representan cada rama/hoja ni colisiones físicas 3D completas.
+- Implementado: cielo más suave, follaje estacional, recorte del exterior, pájaro procedural y retiro de capas de cortinas. Los assets originales se conservan para comparación y recuperación.
+- Implementado: estudio separado de escritorio/pecera/maceta 2.5D en el cuaderno. El fondo original se conserva por calidad artística.
+- Pendiente: anatomías específicas más detalladas, materiales menos facetados, rest spots que sigan cada hoja deformada, obstáculos con profundidad/contorno más preciso y volumen de pez completo en vez de margen reducido. No hay crecimiento de plantas ni consumo de nutrientes agregado en esta prueba.
+- La verificación de celular es por emulación de Chromium; faltan mediciones en teléfonos reales, especialmente cardúmenes grandes.

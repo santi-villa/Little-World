@@ -45,10 +45,10 @@ export function drawSky(
   const bottom = y + H;
   /** Rectángulo recortado al vidrio. */
   const rect = (rx: number, ry: number, rw: number, rh: number): boolean => {
-    const x0 = Math.max(x, Math.round(rx));
-    const y0 = Math.max(y, Math.round(ry));
-    const x1 = Math.min(right, Math.round(rx + rw));
-    const y1 = Math.min(bottom, Math.round(ry + rh));
+    const x0 = Math.max(x, rx);
+    const y0 = Math.max(y, ry);
+    const x1 = Math.min(right, rx + rw);
+    const y1 = Math.min(bottom, ry + rh);
     if (x1 <= x0 || y1 <= y0) return false;
     g.rect(x0, y0, x1 - x0, y1 - y0);
     return true;
@@ -63,11 +63,11 @@ export function drawSky(
   let low = lerpColor(lerpColor(0x18223f, 0xd0e3dc, day), greyLow, ov);
   top = lerpColor(top, 0x6a5a9a, twilight * 0.4 * (1 - ov));
   low = lerpColor(low, 0xf2a25c, twilight * 0.7 * (1 - ov));
-  const bands = 24;
+  const bands = 96;
   const skyAt = (k: number): number => lerpColor(top, low, k);
   for (let i = 0; part === 'base' && i < bands; i++) {
-    const y0 = y + Math.round((i * H) / bands);
-    const y1 = y + Math.round(((i + 1) * H) / bands);
+    const y0 = y + (i * H) / bands;
+    const y1 = y + ((i + 1) * H) / bands;
     g.rect(x, y0, W, y1 - y0).fill(skyAt(i / (bands - 1)));
   }
 
@@ -93,29 +93,15 @@ export function drawSky(
   const progress = outside?.sunProgress ?? 0.5;
   if (day > 0.05 && ov < 0.9) {
     const sx = x + W * (0.12 + progress * 0.76), sy = y + H * (0.65 - Math.sin(progress * Math.PI) * 0.5);
-    for (let r = 16; r >= 8; r -= 4) {
-      for (let row = -r; row <= r; row += 2) {
-        const half = Math.round(Math.sqrt(Math.max(0,r*r-row*row))/2)*2;
-        rect(sx-half,sy+row,half*2,2);
-      }
-      g.fill({color: twilight > 0.5 ? 0xffc78e : 0xfff0bc, alpha:r===8 ? 0.85*(1-ov) : 0.07*(1-ov)});
-    }
+    for(const [radius,alpha] of [[21,.035],[15,.06],[8,.85]])g.circle(sx,sy,radius!).fill({color:twilight>.5?0xffc78e:0xfff0bc,alpha:alpha!*(1-ov)});
   } else if (day < 0.15 && ov < 0.7) {
-    const moonX=x+W*0.7, moonY=y+H*0.2;
-    for(let row=-7;row<=7;row++){
-      const half=Math.round(Math.sqrt(Math.max(0,49-row*row)));
-      rect(moonX-half,moonY+row,half*2,1);
-    }
-    g.fill({color:0xe9e3bd,alpha:0.85*(1-ov)});
-    // A soft crescent cutout rather than another bright lamp in the sky.
-    for(let row=-7;row<=7;row++){
-      const half=Math.round(Math.sqrt(Math.max(0,49-row*row)));
-      rect(moonX-half+5,moonY+row-2,half*2,1);
-    }
-    g.fill(skyAt(0.2));
+    const moonX=x+W*.7,moonY=y+H*.2;
+    g.circle(moonX,moonY,10).fill({color:0xc7d5e0,alpha:.04*(1-ov)});
+    g.circle(moonX,moonY,6).fill({color:0xe9e3bd,alpha:.85*(1-ov)});
+    g.circle(moonX+3,moonY-2,5.5).fill(skyAt(.2));
   }
 
-  // Nubes de bordes escalonados, con profundidad y viento real.
+  // Nubes curvas, con sombras suaves y desplazamiento continuo por viento real.
   const clouds = Math.round(2 + ov*7);
   const wind = Math.max(0.3,Math.min(3,(outside?.windKph??10)/14));
   const cloudLight = lerpColor(lerpColor(0x343d56,0xf2eede,day),lerpColor(0x242c40,0xa4adb4,day),ov);
@@ -124,14 +110,23 @@ export function drawSky(
     const w=42+scatter(i,37)*54, h=9+scatter(i,74)*9;
     const cx=x-100+((scatter(i,33)*(W+200)+t*(0.4+scatter(i,38))*wind)%(W+200));
     const cy=y+H*(0.1+scatter(i,39)*0.34);
-    for(let pass=0;pass<2;pass++) {
-      for(let row=-Math.round(h);row<=4;row+=2){
-        const normalized=(row+h)/(h+4);
-        const half=w*0.5*Math.sqrt(Math.max(0,1-(normalized-0.7)**2/0.5));
-        const lobes=Math.sin(normalized*9+i)*3;
-        rect(cx-half+lobes,cy+row+(pass===0?3:0),Math.max(2,half*2),2);
-      }
-      g.fill({color:pass===0?cloudDark:cloudLight,alpha:(weather==='clear'?0.45:0.68)*(pass===0?0.5:1)});
+    for(let pass=0;pass<3;pass++) {
+      const cyLayer=cy+pass*1.2,half=w*.5;
+      g.moveTo(cx-half,cyLayer).bezierCurveTo(cx-half*.9,cyLayer-h*.6,cx-half*.6,cyLayer-h*.65,cx-half*.4,cyLayer-h*.45)
+       .bezierCurveTo(cx-half*.2,cyLayer-h*1.5,cx+half*.25,cyLayer-h*1.3,cx+half*.4,cyLayer-h*.6)
+       .bezierCurveTo(cx+half*.8,cyLayer-h*.8,cx+half*1.05,cyLayer-h*.3,cx+half,cyLayer)
+       .bezierCurveTo(cx+half*.5,cyLayer+h*.2,cx-half*.4,cyLayer+h*.18,cx-half,cyLayer).closePath()
+       .fill({color:pass===2?cloudDark:cloudLight,alpha:(weather==='clear'?.23:.38)*(pass===2?.18:.65)});
+    }
+  }
+
+  // Atmospheric distance: a low horizon, river shimmer and softened roof lines.
+  if(part==='front'){
+    for(let i=0;i<5;i++)g.rect(x,bottom-H*.26+i*2,W,2).fill({color:lerpColor(0x22364b,0xb8c5bd,day),alpha:.12});
+    for(let i=0;i<10;i++){
+      const bx=x+scatter(i,170)*W,bh=10+scatter(i,171)*H*.22,bw=8+scatter(i,172)*13;
+      rect(bx,bottom-bh,bw,bh);g.fill({color:lerpColor(0x18253b,0x9daea9,day),alpha:.42});
+      if(day<.4){for(let k=0;k<3;k++)rect(bx+2,bottom-bh+5+k*5,2,1);g.fill({color:0xe8c98e,alpha:(.4-day)*.8});}
     }
   }
 
@@ -155,13 +150,16 @@ export function drawSky(
       const cx=x+(i+0.2)*(W/(count-1)),h=20+scatter(i+layer*20,91)*26;
       const radius=12+scatter(i,92)*12;
       const sway=Math.sin(t*0.7+i)*(outside?.windKph??10)/35;
-      rect(cx-2,bottom-h,3,h);
-      for(let row=-radius;row<radius;row+=2){
-        const half=Math.sqrt(Math.max(0,radius*radius-row*row));
-        rect(cx-half+sway,bottom-h+row,half*2,2);
+      rect(cx-1,bottom-h,1.5,h);g.fill({color,alpha:layer===0?.8:1});
+      for(const side of [-1,1]){
+        g.moveTo(cx,bottom-h*.3).lineTo(cx+side*radius*.65,bottom-h-radius*.3).stroke({color:lerpColor(color,0x665e50,.45),width:.8});
+      }
+      const leafAlpha=season==='winter'?.42:1;
+      for(let crown=0;crown<3;crown++){
+        const dx=(crown-1)*radius*.5,dy=crown===1?-radius*.3:radius*.12;
+        g.ellipse(cx+dx+sway,bottom-h+dy,radius*.75,radius*(.6+scatter(i+crown,193)*.25)).fill({color,alpha:(layer===0?.8:1)*leafAlpha});
       }
     }
-    g.fill({color,alpha:layer===0?0.8:1});
   }
   // Jacarandás de primavera: acentos lilas muy discretos, sin teñir toda la ciudad.
   if(season==='spring' && day>0.2){
@@ -231,7 +229,7 @@ export function drawSky(
         const startY = scatter(i, 45) * H * 0.5;
         const run = phase < 0.4 ? 0 : ((phase - 0.4) / 0.6) ** 2;
         const dy = startY + run * (H - startY);
-        const dx = x + 3 + scatter(i, 46) * (W - 6) + Math.round(Math.sin(dy * 0.13 + i) * 1.5);
+        const dx = x + 3 + scatter(i, 46) * (W - 6) + Math.sin(dy * 0.13 + i) * 1.5;
         if (pass === 0) {
           // Estela.
           if (run > 0) any = rect(dx, y + dy - Math.min(12, dy - startY), 1, Math.min(12, dy - startY)) || any;

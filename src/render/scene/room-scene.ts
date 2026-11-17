@@ -1,3 +1,4 @@
+import {CodeBird} from './code-bird';
 import { cannotUse, pinchGrams, strokeSamples, type HandTool } from '../hand-tools';
 import { confirmPaper, type CursorState } from '../ui/paper-ui';
 import { fill } from '../ui/texts';
@@ -10,11 +11,9 @@ import type { OutsideView } from '../../world/weather';
  *
  * Mundo (se mueve con la cámara), de atrás hacia adelante:
  *   skyBase  (código)  degradé del cielo según la hora
- *   night    (imagen)  cielo-noche.png, que aparece de a poco al anochecer
  *   sky      (código)  estrellas que titilan, nubes, árboles, lluvia y rayos
- *   bird     (imagen)  el pájaro que a veces se posa afuera, en el alféizar
+ *   bird     (código)  el pájaro que a veces se posa afuera, en el alféizar
  *   room     (imagen)  dormitorio.png, con los vidrios transparentes
- *   curtains (imagen)  los dos paños de la cortina, con vaivén
  *   plants   (imagen)  plantas colgantes y enredadera, con vaivén
  *   anim     (código)  vapor de la taza y plato del gato
  *   pecera -> gato
@@ -32,7 +31,7 @@ import { Container, Graphics, Sprite } from 'pixi.js';
 import { defaultConfig, type DerivedValues, type SimAction, type SimState, type Weather } from '../../sim';
 import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
-import { daylight, lerpColor } from '../pixel-utils';
+import { daylight } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
 import { careBarHeight, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
@@ -40,7 +39,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
 import { drawLights, drawRoomAnim } from './room-fx';
 import { inRect, roomData, zoneRect, type RoomZone } from './room-zones';
-import { BIRD_PERCH, CURTAINS, CURTAIN_TOP, HANGING, PX, scenePreview } from './scene-layout';
+import { BIRD_PERCH, HANGING, PX, scenePreview } from './scene-layout';
 import { drawSky } from './window-view';
 
 /** Lo que la escena necesita además del estado de la simulación. */
@@ -48,14 +47,12 @@ export interface SceneView {
   weather: Weather;
   outside?: OutsideView;
   decorId?: string;
-  bettaStyle?: 'code'|'image';
+  bettaStyle?: 'code'|'image'|'flat';
 }
 
 type Point = { x: number; y: number };
 
 const ROOM_ID = 'dormitorio';
-/** Tinte de la habitación de noche (multiplica la imagen). */
-const NIGHT_TINT = 0x424b68;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
 /** Cuánto hay que mover el dedo para que deje de ser un toque (píxeles de pantalla). */
@@ -84,11 +81,10 @@ export class RoomScene {
   private readonly data = roomData(ROOM_ID);
   private readonly skyBase = new Graphics();
   private readonly sky = new Graphics();
-  private readonly bird = new Sprite(tex('pajaro'));
-  /** Plantas y cortinas que se hamacan: rotación muy leve con el pivote arriba. */
+  private readonly outsideMask = new Graphics();
+  private readonly bird = new CodeBird();
+  /** Plantas que se hamacan: rotación muy leve con el pivote arriba. */
   private readonly swaying: { sprite: Sprite; phase: number; amount: number }[] = [];
-  private birdVisit: { start: number; stay: number; flip: boolean } | null = null;
-  private nextBird = 25;
   private readonly room = new Sprite(tex(this.data.background));
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
@@ -133,8 +129,6 @@ export class RoomScene {
     };
     this.skyBase.scale.set(PX);
     this.sky.scale.set(PX);
-    this.bird.anchor.set(0.5, 1);
-    this.bird.visible = false;
 
     const decor = new Container();
     const hang = (name: string, x: number, y: number, scale: number, phase: number, amount: number, flip = false): void => {
@@ -146,10 +140,6 @@ export class RoomScene {
       decor.addChild(sprite);
       this.swaying.push({ sprite, phase, amount });
     };
-    for (const c of CURTAINS) {
-      const half = Math.round((tex(c.asset).width * c.scale) / 2);
-      hang(c.asset, c.side === 'left' ? c.edge - half : c.edge + half, CURTAIN_TOP, c.scale, c.phase, 0.8);
-    }
     for (const p of HANGING) hang(p.asset, p.x, p.y, p.scale, p.phase, 1);
     this.anim.scale.set(PX);
     this.lights.blendMode = 'add';
@@ -159,10 +149,11 @@ export class RoomScene {
     // Las plantas colgantes quedan quietas (son parte del fondo): el viento con
     // un shader hacía rayas. Ver PENDIENTE.md: hacerlas con sprites separados.
 
+    const outside=new Container();
+    this.outsideMask.rect(this.window.x*PX,this.window.y*PX,this.window.width*PX,this.window.height*PX).fill(0xffffff);
+    outside.addChild(this.skyBase,this.sky,this.bird.container,this.outsideMask);outside.mask=this.outsideMask;
     this.world.addChild(
-      this.skyBase,
-      this.sky,
-      this.bird,
+      outside,
       this.room,
       decor,
       this.anim,
@@ -500,49 +491,7 @@ export class RoomScene {
    * alféizar, se queda unos segundos (a veces se da vuelta) y se va volando.
    */
   private updateBird(seconds: number, allowed: boolean, light: number): void {
-    const b = this.bird;
-    if (!this.birdVisit) {
-      b.visible = false;
-      if (seconds >= this.nextBird) {
-        if (allowed) this.birdVisit = { start: seconds, stay: 6 + Math.random() * 5, flip: Math.random() < 0.5 };
-        else this.nextBird = seconds + 20;
-      }
-      return;
-    }
-    const v = this.birdVisit;
-    const age = seconds - v.start;
-    const arrive = 0.7;
-    const leave = 0.8;
-    if (age > arrive + v.stay + leave) {
-      this.birdVisit = null;
-      this.nextBird = seconds + 40 + Math.random() * 60;
-      b.visible = false;
-      return;
-    }
-    let dx = 0;
-    let dy = 0;
-    let alpha = 1;
-    if (age < arrive) {
-      // Llega bajando.
-      const k = 1 - age / arrive;
-      dy = -18 * k * k;
-      dx = -10 * k;
-      alpha = 1 - k;
-    } else if (age > arrive + v.stay) {
-      // Se va volando hacia arriba.
-      const k = (age - arrive - v.stay) / leave;
-      dy = -30 * k;
-      dx = 24 * k;
-      alpha = 1 - k;
-    }
-    // A mitad de la visita se da vuelta, y da saltitos de vez en cuando.
-    const turned = v.flip !== age > arrive + v.stay / 2;
-    const hop = age > arrive && age < arrive + v.stay && Math.sin(age * 5) > 0.97 ? -2 : 0;
-    b.visible = true;
-    b.alpha = alpha;
-    b.scale.set(turned ? -1 : 1, 1);
-    b.position.set(Math.round(BIRD_PERCH.x + dx), Math.round(BIRD_PERCH.y + dy + hop));
-    b.tint = lerpColor(NIGHT_TINT, 0xffffff, light);
+    this.bird.update(seconds,allowed,light,BIRD_PERCH.x,BIRD_PERCH.y-8);
   }
 
   /** Brillo sutil sobre la zona recién tocada. */
@@ -588,7 +537,7 @@ export class RoomScene {
     // Día y noche: las imágenes se tiñen.
     const tint = ambientTint(light);
     this.room.tint = tint;
-    // Brisa: las plantas y la cortina se hamacan apenas (más con la ventana abierta).
+    // Brisa: las plantas se hamacan apenas (más con la ventana abierta).
     const breeze = (state.room.windowOpen ? 1.8 : 0.9) * (view.weather === 'storm' ? 1.2 : 1);
     for (const item of this.swaying) {
       item.sprite.tint = tint;

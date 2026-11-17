@@ -36,13 +36,8 @@ export const MUG = { x: 471, y: 414 };
 /** Tapa del escritorio: de dónde a dónde va y la línea del frente. */
 export const DESK = { left: 330, right: 984, top: 433, front: 469 };
 
-/** La barra de la cortina (de punta a punta) y su altura. */
-export const CURTAIN_ROD = { left: 347, right: 977, y: 34 };
-/** Donde empiezan los paños: apenas debajo de la barra. */
-export const CURTAIN_TOP = 41;
-
 /**
- * Plantas colgantes y cortinas: dónde se agarran (el pivote, arriba al centro)
+ * Plantas colgantes: dónde se agarran (el pivote, arriba al centro)
  * y a qué escala. Las imágenes vienen a la grilla del dibujo o a su tamaño
  * final, así que la escala es siempre entera (nunca se achican al dibujar: eso
  * saltea filas y hace rayas).
@@ -57,16 +52,6 @@ export const HANGING = [
   { asset: 'potus-2', x: 1196, y: 70, scale: 2, phase: 4.4 },
   // Enredadera colgando de la barra de la cortina.
   { asset: 'enredadera', x: 830, y: 32, scale: 2, phase: 2.3 },
-] as const;
-
-/**
- * Los dos paños de la cortina, colgados justo debajo de la barra (que se ve
- * entera) y a los costados: el borde de cada paño llega al borde del vidrio,
- * sin taparlo. `edge` es el borde de adentro del paño.
- */
-export const CURTAINS = [
-  { asset: 'cortina-izquierda', edge: 413, side: 'left', scale: 1, phase: 0.6 },
-  { asset: 'cortina-derecha', edge: 909, side: 'right', scale: 1, phase: 2.9 },
 ] as const;
 
 /** El pájaro se posa en el alféizar de afuera, en el vidrio de abajo a la izquierda. */

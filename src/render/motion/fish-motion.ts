@@ -1,3 +1,4 @@
+import {resolveHabitat,habitatTarget,type Habitat} from './habitat';
 import { interestedInHand, type HandInput } from './hand';
 /**
  * Movimiento de los animales de la pecera.
@@ -51,6 +52,7 @@ export interface MotionAnimal {
 }
 
 export interface MotionInput {
+  habitat?:Habitat;
   hand?: HandInput | null;
   /** Agua: ancho y profundidad en cm. */
   bounds: Bounds;
@@ -76,6 +78,7 @@ export interface FishBody extends Body {
   /** Fase propia, para que no aleteen todos a la vez. */
   phase: number;
   pauseUntil?: number;
+  slowSeconds?: number;
 }
 
 interface SchoolGoal {
@@ -257,9 +260,10 @@ export class FishMotion {
         }
         case 'rest': {
           // Los que respiran aire descansan arriba; el resto, cerca del fondo.
-          const y = sp.traits.includes('labyrinth') ? depth * 0.08 : depth * 0.86;
+          const leaf=input.habitat && sp.traits.includes('labyrinth')?habitatTarget(input.habitat.leaves,body.x,body.y,bounds.width,depth):null;
+          const y = leaf?.y ?? (sp.traits.includes('labyrinth') ? depth * 0.08 : depth * 0.86);
           if (body.goalUntil < this.time || Math.abs(body.goalY - y) > 1) {
-            body.goalX = Math.min(bounds.width * 0.92, Math.max(bounds.width * 0.08, body.x));
+            body.goalX = leaf?.x ?? Math.min(bounds.width * 0.92, Math.max(bounds.width * 0.08, body.x));
             body.goalY = y;
             body.goalUntil = this.time + 60;
             body.targetPlane = r() < 0.6 ? PLANE_FAR : PLANE_MID;
@@ -272,7 +276,8 @@ export class FishMotion {
         case 'hide': {
           // Los rincones del fondo, en el plano de atrás.
           const x = body.x < bounds.width / 2 ? bounds.width * 0.07 : bounds.width * 0.93;
-          desired = arrive(body, x, depth * 0.9, limits.maxSpeed * 0.6, 5);
+          const refuge=input.habitat?habitatTarget(input.habitat.refuges,body.x,body.y,bounds.width,depth):null;
+          desired = arrive(body, refuge?.x??x, refuge?.y??depth*.9, limits.maxSpeed*.6, 3);
           body.targetPlane = PLANE_FAR;
           break;
         }
@@ -401,6 +406,11 @@ export class FishMotion {
         if (sp.category === 'snail') body.targetPlane = PLANE_FAR;
       }
 
+      if(input.habitat){
+        const ahead=resolveHabitat(body.x+desired.x,body.y+desired.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));
+        desired.x+=(ahead.x-body.x-desired.x)*2;desired.y+=(ahead.y-body.y-desired.y)*2;
+        const goal=resolveHabitat(body.goalX,body.goalY,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));body.goalX=goal.x;body.goalY=goal.y;
+      }
       const speedLimit = limits.maxSpeed * boost;
       const l = length(desired.x, desired.y);
       if (l > speedLimit) {
@@ -409,6 +419,11 @@ export class FishMotion {
       }
       integrate(body, desired.x, desired.y, { ...limits, maxSpeed: speedLimit }, dt, bounds);
 
+      if(input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));body.x=safe.x;body.y=safe.y;}
+      if(['explore','school'].includes(animal.intent)){
+        body.slowSeconds=Math.hypot(body.vx,body.vy)<.12?(body.slowSeconds??0)+dt:0;
+        if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body,animal,bounds);body.slowSeconds=0;}
+      }
       // Cambio de plano suave.
       const dp = body.targetPlane - body.plane;
       const maxDp = PLANE_SPEED * dt * (animal.intent === 'flee' ? 3 : 1);

@@ -58,3 +58,11 @@ La interfaz vive "dentro del mundo": papel, tinta, madera. Es mínima y nunca ta
 **Animación.** Corta y suave: deslizar y fundido de 200 a 320 ms con `cubic-bezier(0.2, 0.7, 0.2, 1)`; sin rebotes ni escalados grandes. Con `prefers-reduced-motion`, sin animación.
 
 **Sonido.** Opcional y bajo: roce de papel al abrir papeles y papelitos, click de madera en los botones (`ui-sound.ts`, se apaga con `localStorage lw-sound = off`).
+
+## Prueba de arte procedural con volumen
+
+El modo Código con volumen usa una cámara ortográfica fija y caras ordenadas por profundidad. El giro muestra frente y costado con espesor; la paleta azul verdosa del betta y sus membranas evita saturaciones excesivas. Los otros peces heredan pigmentos y rasgos del catálogo, con aletas largas, cuerpos altos o alargados y franjas diferenciadas. La geometría todavía es estilizada y facetada: aporta articulación, no el detalle pictórico del PNG. La comparación anterior sigue disponible en Cuaderno → Peces.
+
+La anubias tiene hojas anchas y tallos separados; la vallisneria, cintas largas. Su flexión por proximidad es una respuesta visual amortiguada, mientras los núcleos sólidos/refugios se describen aparte en el hábitat. Los movimientos usan coordenadas continuas y antialias; los PNG conservan nearest. No es necesario que el movimiento siga la grilla del fondo.
+
+La habitación geométrica del cuaderno es un estudio de volumen, sombras de contacto y colocación con medidas. Mantener el dormitorio pintado: el estudio aún pierde riqueza, materiales y personalidad. Para unificar el arte conviene conservar una sola dirección de luz, la paleta crema/azul verdosa y la misma perspectiva; después trabajar materiales y siluetas de un conjunto pequeño (pez + dos plantas + roca), comparándolos en el agua real antes de convertir más elementos. La interactividad también puede usar volúmenes invisibles bajo imágenes: no exige reconstruir toda la habitación.
