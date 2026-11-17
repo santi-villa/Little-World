@@ -268,7 +268,12 @@
     "diedMany": "Murieron {count} animales ({cause}).",
     "corpseOne": "Hay un animal muerto sin retirar: pudre el agua.",
     "stressedOne": "Un animal está estresado.",
-    "sickOne": "Un animal está enfermo o débil."
+    "sickOne": "Un animal está enfermo o débil.",
+    "nextDead": "Para empezar: retirá los animales muertos y revisá los avisos del agua. No agregues peces nuevos todavía.",
+    "nextWater": "Para empezar: abrí Agua, revisá los avisos y elegí el cuidado indicado. Un cambio parcial acondicionado puede ayudar; evitá limpiar el filtro si conserva buen caudal.",
+    "nextFood": "Para empezar: ofrecé una porción pequeña y observá. No compenses la ausencia dando toda la comida de varios días junta.",
+    "nextQuiet": "Para empezar: observá a tus peces y medí el agua. Si todo sigue estable, no hace falta intervenir.",
+    "longAbsence": "Para próximas ausencias de varios días, planificá los cuidados. El juego no alimenta a los peces automáticamente."
   },
   "deathCauses": {
     "old_age": "vejez",
@@ -501,6 +506,18 @@
     "otono": "Otoño",
     "invierno": "Invierno",
     "historico_estimado": "No se pudo recuperar todo el histórico de temperatura exterior durante tu ausencia. Ese período se estimó con la temperatura de referencia disponible.",
-    "recuperando_acuario": "Recuperando lo que pasó en tu acuario…"
+    "recuperando_acuario": "Recuperando lo que pasó en tu acuario…",
+    "mostrar_controles": "Mostrar controles",
+    "secciones_del_cuaderno": "Secciones del cuaderno",
+    "data_animal_id": "[data-animal-id=\"{p0}\"]",
+    "una_porcion_pequena_mira_como_se": "Una porción pequeña. Mirá cómo se acerca y picotea; esperá antes de agregar más.",
+    "su_rincon_habitual_esta_a_la": "Su rincón habitual está a la {p0}. Confianza al alimentarlo: {p1}%.",
+    "esta_descansando_dale_espacio_y_mantene": "Está descansando. Dale espacio y mantené su horario de luz.",
+    "esta_buscando_refugio_evita_intervenir_de": "Está buscando refugio. Evitá intervenir de más y revisá los avisos del agua.",
+    "cuaderno": "Cuaderno",
+    "contemplar": "Contemplar",
+    "consultando": "Consultando…",
+    "izquierda": "izquierda",
+    "derecha": "derecha"
   }
 }

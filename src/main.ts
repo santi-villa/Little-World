@@ -165,7 +165,8 @@ async function boot(): Promise<void> {
 
   await loadAssets();
   const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom());
-  const scene = new RoomScene((action) => void game.act(action), page => {
+  const scene = new RoomScene((action) => void game.act(action), (page, animalId) => {
+    if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor') tools.open(page);
     else tools.care(page);
   });

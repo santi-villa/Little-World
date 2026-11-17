@@ -1,3 +1,4 @@
+import { ambientTint } from '../art-direction';
 /** Sleeping cat with a cosmetic heart response to petting. */
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { asset, tex } from '../assets';
@@ -81,7 +82,7 @@ export class CatView {
     sprite.anchor.set(clip.anchor.x, clip.anchor.y);
     sprite.scale.set(CAT_SCALE);
     sprite.position.set(BED.x, BED.y);
-    sprite.tint = lerpColor(0x4a5272, 0xffffff, daylight);
+    sprite.tint = ambientTint(daylight);
     const g = this.graphics;
     g.clear();
     const top = Math.round((BED.y - sprite.height) / 2), cx = Math.round(BED.x / 2);

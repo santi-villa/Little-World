@@ -1,3 +1,16 @@
+# Pulido de observación y dirección de arte
+
+Aplicados: luz común, pigmentos menos saturados, sombras de contacto, oclusión por planos,
+comida con caída/picoteo visual, rincón y confianza del pez, nombre al seleccionar,
+cuaderno agrupado y modo Contemplar. La pasada manual sobre PNG sigue pendiente:
+ver `docs/ART-DIRECTION.md` para grilla, paleta, halos, luz y criterios de aceptación.
+
+Se revisaron ausencias de 1/3/7 días con el acuario inicial y exterior de 23 °C.
+El séptimo día el pez sobrevive con hambre máxima y salud reducida. El resumen explica
+el siguiente cuidado; todavía no hay alimentador automático.
+
+---
+
 # Actualización visual y clima de Buenos Aires
 
 La habitación abre completa y sin modal automático. Hay zoom de pecera y ventana al tocar sus zonas; se vuelve con Habitación. La ventana muestra datos y controla su apertura. El gato sigue decorativo.

@@ -62,14 +62,16 @@
         "x": 0.88,
         "height": 0.4,
         "sink": 0.2,
-        "flip": true
+        "flip": true,
+        "layer": "front"
       },
       {
         "plant": "musgo-java",
         "stage": 1,
         "x": 0.44,
         "height": 0.14,
-        "sink": 0.2
+        "sink": 0.2,
+        "layer": "front"
       }
     ]
   },
@@ -98,7 +100,7 @@
         "stage": 3,
         "x": 0.85,
         "height": 0.65,
-        "layer": "back",
+        "layer": "front",
         "sink": 0.2
       },
       {
@@ -132,7 +134,8 @@
         "stage": 2,
         "x": 0.42,
         "height": 0.2,
-        "sink": 0.2
+        "sink": 0.2,
+        "layer": "front"
       }
     ]
   },
@@ -153,7 +156,7 @@
         "stage": 3,
         "x": 0.13,
         "height": 0.58,
-        "layer": "back",
+        "layer": "front",
         "sink": 0.2
       },
       {
@@ -180,7 +183,8 @@
         "stage": 1,
         "x": 0.73,
         "height": 0.17,
-        "sink": 0.2
+        "sink": 0.2,
+        "layer": "front"
       },
       {
         "plant": "helecho-java",

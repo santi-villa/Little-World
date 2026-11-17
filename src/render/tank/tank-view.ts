@@ -1,3 +1,4 @@
+import { ambientTint, ART } from '../art-direction';
 /**
  * La pecera. Refleja el estado de la simulación: tamaño del modelo, nivel del
  * agua, luz, taninos, calefactor, filtro, algas y residuos.
@@ -119,6 +120,8 @@ export class TankView {
   private readonly hardscape = new Container();
   private readonly plantLayer = new Container();
   private readonly rearPlants = new Container();
+  private readonly frontPlants = new Container();
+  private readonly contactShadows = new Graphics();
   private plants: Plant[] = [];
   private readonly mid = new Graphics();
   private readonly fx = new Graphics();
@@ -135,7 +138,7 @@ export class TankView {
   private lastSeconds = 0;
 
   constructor() {
-    this.inside.addChild(this.substrate, this.rearPlants, this.hardscape, this.plantLayer, this.foregroundSand, this.mid, this.fish.graphics, this.fx);
+    this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.hardscape, this.plantLayer, this.fish.foreground, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
     this.inside.mask = this.waterMask;
     this.art.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
     this.container.addChild(this.art);
@@ -145,6 +148,8 @@ export class TankView {
   get bounds(): TankRect {
     return this.outer;
   }
+
+  fishAt(x:number,y:number):number|null { return this.fish.hit((x-this.art.x)/this.art.scale.x,(y-this.art.y)/this.art.scale.y); }
 
   /** Cambia la decoración (más adelante va a salir del estado de la simulación). */
   setDecor(decor: TankDecor): void {
@@ -175,7 +180,7 @@ export class TankView {
     this.drawEquipment(state, geo, lit);
     this.buildDecor(geo);
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
-    const tint = lerpColor(lit ? 0xffffff : 0x4a5a80, lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
+    const tint = lerpColor(ambientTint(lit ? 1 : 0.18), lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
     this.substrate.tint = tint;
     this.foregroundSand.tint = tint;
     for (const child of this.hardscape.children) child.tint = tint;
@@ -378,6 +383,8 @@ export class TankView {
     for (const child of this.hardscape.removeChildren()) child.destroy();
     for (const child of this.plantLayer.removeChildren()) child.destroy();
     for (const child of this.rearPlants.removeChildren()) child.destroy();
+    for (const child of this.frontPlants.removeChildren()) child.destroy();
+    this.contactShadows.clear();
     this.plants = [];
     for (const [index, item] of this.decor.items.entries()) {
       const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
@@ -391,11 +398,14 @@ export class TankView {
       const h = texture.height * scale;
       const cx = Math.round(clamp(geo.left + item.x * geo.width, geo.left + w / 2, geo.right - w / 2));
       const baseY = Math.round(geo.sandTop + (item.sink ?? 0) * h);
+      const shadowW = Math.min(w * 0.7,geo.width*0.32);
+      for(let row=0;row<3;row++) this.contactShadows.rect(Math.round(cx-shadowW/2+row*2),geo.sandTop+row,Math.max(1,Math.round(shadowW-row*4)),1);
+      this.contactShadows.fill({color:ART.shadow,alpha:item.plant?0.1:0.22});
       if (item.plant) {
         const mesh = new MeshPlane({ texture, verticesX: 2, verticesY: PLANT_ROWS });
         mesh.scale.set(item.flip ? -scale : scale, scale);
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
-        (item.layer === 'back' ? this.rearPlants : this.plantLayer).addChild(mesh);
+        (item.layer === 'back' ? this.rearPlants : item.layer === 'front' ? this.frontPlants : this.plantLayer).addChild(mesh);
         const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
         this.plants.push({ mesh, rest: positions.slice(), unit, phase: index * 1.7 });
       } else {

@@ -46,6 +46,7 @@ export interface MotionAnimal {
   alive: boolean;
   boldness: number;
   activity: number;
+  feedingTrust?: number;
 }
 
 export interface MotionInput {
@@ -118,6 +119,9 @@ function mulberry(seed: number): () => number {
   };
 }
 
+/** Stable individual preference, independent of the simulation RNG and render session. */
+export function favoriteCorner(id: number): 'left' | 'right' { return ((Math.imul(id, 2654435761) >>> 0) & 1) === 0 ? 'left' : 'right'; }
+
 export class FishMotion {
   readonly bodies = new Map<number, FishBody>();
   private readonly schools = new Map<string, SchoolGoal>();
@@ -161,7 +165,8 @@ export class FishMotion {
     let [top, bottom] = zoneBand(animal.species);
     // Salidas ocasionales de su zona.
     if (r() < 0.15) [top, bottom] = [0.08, 0.92];
-    body.goalX = bounds.width * (0.08 + 0.84 * r());
+    const visitHome = r() < 0.4;
+    body.goalX = bounds.width * (visitHome ? (favoriteCorner(animal.id) === 'left' ? 0.2 : 0.8) : (0.12 + 0.76 * r()));
     body.goalY = bounds.height * (top + (bottom - top) * r());
     body.goalUntil = this.time + 4 + 6 * r();
     if (r() < 0.4) body.targetPlane = Math.floor(r() * 3);
@@ -241,9 +246,9 @@ export class FishMotion {
           else if (input.food.sinking) y = depth * (access === 'bottom' ? 0.8 : 0.45);
           else if (input.food.bottom) y = depth * 0.98;
           // Cada uno picotea en su lugarcito alrededor de la comida.
-          const spread = bounds.width * 0.18;
-          const x = input.food.x + Math.sin(body.phase + this.time * 0.7) * spread;
-          desired = arrive(body, x, y, limits.maxSpeed * 0.9, 4);
+          const spread = Math.min(2, bounds.width * 0.05);
+          const x = input.food.x + (Math.sin(body.phase) + 0.15 * Math.sin(this.time * 0.7 + body.phase)) * spread;
+          desired = arrive(body, x, y, limits.maxSpeed * 0.9, 1.5);
           break;
         }
         case 'rest': {
@@ -335,6 +340,11 @@ export class FishMotion {
           }
           break;
         }
+      }
+
+      if (animal.intent === 'explore' && (animal.feedingTrust ?? 0) > 0.4 && !input.food.surface && !input.food.sinking) {
+        // Familiar fish periodically approach the front, then resume their own routine.
+        if (Math.sin(this.time * 0.08 + body.phase) > 0.65) body.targetPlane = PLANE_NEAR;
       }
 
       // Boids: los que van en grupo se juntan y se alinean, más apretados si

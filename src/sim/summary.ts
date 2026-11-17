@@ -171,7 +171,7 @@ export function buildWelcomeSummary(
     if (stressed > 0) {
       add('warn', stressed === 1 ? T.stressedOne : fill(T.stressed, { count: stressed }));
     }
-    if (sick === 0 && stressed === 0 && corpses === 0) add('good', T.allHappy);
+    if (sick === 0 && stressed === 0 && corpses === 0 && hungriest <= f.hungryAt && alive.every(animal=>animal.health>=90)) add('good', T.allHappy);
   }
 
   // --- Agua ---
@@ -213,6 +213,12 @@ export function buildWelcomeSummary(
 
 
   if (lines.length === fixed) add('good', T.quiet);
+  // Close with one prioritized, actionable next step, without guessing a unique cause.
+  if(corpses>0)add('warn',T.nextDead);
+  else if(after.alerts.some(id=>id!=='algae_bloom'))add('warn',T.nextWater);
+  else if(alive.some(animal=>animal.hunger>config.fish.hungryAt))add('info',T.nextFood);
+  else if(alive.length>0)add('info',T.nextQuiet);
+  if(elapsed>=3*MINUTES_PER_DAY)add('info',T.longAbsence);
   return {
     title: T.title,
     elapsedMinutes: elapsed,

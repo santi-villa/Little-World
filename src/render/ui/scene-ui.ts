@@ -20,7 +20,7 @@ const INK = 0xf4e9c8;
 const BAR = 44;
 /** Alto de la barra de acciones, en píxeles de la pantalla (la cámara deja la pecera arriba). */
 export const CARE_BAR_HEIGHT = BAR * U;
-const BOX = 0x0a0d18;
+const BOX = 0x19241f;
 
 export type CareId = keyof typeof texts.scene.care;
 export type UiMode = 'room' | 'tank' | 'cat' | 'window';
@@ -159,7 +159,7 @@ export class SceneUi {
       const x = margin + i * (w + gap);
       const y = top + 5;
       const lit = this.pressed && this.pressed.id === care.id && this.seconds < this.pressed.until;
-      g.rect(x, y, w, h).fill({ color: lit ? 0x3a6a78 : 0x1e2a3a, alpha: 0.92 });
+      g.rect(x, y, w, h).fill({ color: lit ? 0x52674c : 0x29342f, alpha: 0.92 });
       g.rect(x, y, w, 1).fill({ color: INK, alpha: 0.25 });
       g.rect(x, y + h - 1, w, 1).fill({ color: 0x000000, alpha: 0.3 });
       // Letra doble; si no entra en un renglón, una palabra por renglón.

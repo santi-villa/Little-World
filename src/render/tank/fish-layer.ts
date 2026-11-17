@@ -1,3 +1,5 @@
+import { drawPixelText, textWidth } from '../ui/pixel-font';
+import { ART, fishPigment } from '../art-direction';
 /**
  * Animales y comida dentro del agua, dibujados con formas simples de colores
  * (placeholders hasta que haya sprites). El movimiento sale de FishMotion;
@@ -20,7 +22,6 @@ const TURN_SPEED = 4.5;
 const WATER_TINT = 0x2f7f8c;
 const NIGHT_TINT = 0x0a1420;
 const DEAD_COLOR = 0x8a8f96;
-const FOOD_COLOR = 0xd9703a;
 /** Cuánto dura el punto del susto (golpe en el vidrio). */
 const SCARE_SECONDS = 3;
 
@@ -30,6 +31,19 @@ function hex(color: string): number {
 
 export class FishLayer {
   readonly graphics = new Graphics();
+  readonly foreground = new Graphics();
+  readonly foodGraphics = new Graphics();
+  private ink = this.graphics;
+  private fedAt = -100;
+  private selectedId: number | null = null;
+  private selectedUntil = 0;
+  private positions = new Map<number, {x:number;y:number;radius:number}>();
+  hit(x:number,y:number): number | null {
+    let nearest:number|null=null, distance=Infinity;
+    for(const [id,p] of this.positions){const d=Math.hypot(x-p.x,y-p.y);if(d<p.radius && d<distance){nearest=id;distance=d;}}
+    this.selectedId=nearest;this.selectedUntil=this.motion.seconds+30;
+    return nearest;
+  }
   readonly motion = new FishMotion((Math.random() * 0xffffffff) >>> 0);
   private foodXCm = 0;
   private lastSurfaceG = 0;
@@ -72,13 +86,13 @@ export class FishLayer {
   ): void {
     this.area = area;
     this.pxPerCm = pxPerCm;
-    const g = this.graphics;
-    g.clear();
+    this.graphics.clear(); this.foreground.clear(); this.foodGraphics.clear(); this.positions.clear();
     if (area.height <= 2) return;
     const bounds = { width: area.width / pxPerCm, height: area.height / pxPerCm };
 
     // Comida nueva: cae en algún lugar de la superficie.
     if (state.food.surfaceG > this.lastSurfaceG + 1e-6 || this.foodXCm === 0) {
+      this.fedAt = seconds;
       this.foodXCm = bounds.width * (0.25 + 0.5 * Math.random());
     }
     this.lastSurfaceG = state.food.surfaceG;
@@ -97,6 +111,7 @@ export class FishLayer {
         alive: animal.alive,
         boldness: animal.personality.boldness,
         activity: animal.personality.activity,
+        feedingTrust: animal.feedingTrust,
       };
     });
     if (this.scare && this.motion.seconds > this.scare.until) this.scare = null;
@@ -124,6 +139,7 @@ export class FishLayer {
       .map((animal) => ({ animal, body: this.motion.bodies.get(animal.id) as FishBody }))
       .sort((a, b) => a.body.plane - b.body.plane);
     for (const { animal, body } of order) {
+      this.ink = body.plane < 1.2 ? this.graphics : this.foreground;
       const state_ = state.animals.find((a) => a.id === animal.id);
       this.drawAnimal(
         animal,
@@ -136,17 +152,29 @@ export class FishLayer {
         state_?.sex ?? 'male',
       );
     }
+    const selected = state.animals.find(a=>a.id===this.selectedId);
+    const position = selected ? this.positions.get(selected.id) : undefined;
+    if(selected && position && this.motion.seconds<this.selectedUntil){
+      const label=(selected.name ?? getSpecies(selected.speciesId).name).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().slice(0,24);
+      const w=textWidth(label)+6;
+      const x=Math.max(area.x,Math.min(area.x+area.width-w,Math.round(position.x-w/2)));
+      const y=Math.max(area.y+2,Math.round(position.y-position.radius-12));
+      this.foodGraphics.rect(x,y,w,10).fill({color:0x202c2b,alpha:0.85});
+      drawPixelText(this.foodGraphics,label,x+3,y+2,0xeee2c5,1);
+    }
   }
 
   private drawFood(state: SimState, area: TankRect, pxPerCm: number, seconds: number): void {
-    const g = this.graphics;
+    const g = this.foodGraphics;
     const x0 = area.x + this.foodXCm * pxPerCm;
-    const spread = Math.max(10, area.width * 0.18);
+    const spread = Math.max(5, pxPerCm * 2);
     const floating = Math.min(40, Math.ceil(state.food.surfaceG * 200));
     for (let i = 0; i < floating; i++) {
       const x = Math.round(x0 + (scatter(i, 21) - 0.5) * 2 * spread);
       if (x < area.x || x > area.x + area.width - 2) continue;
-      g.rect(x, area.y, 2, 1);
+      const age = seconds - this.fedAt - i * 0.035;
+      const y = area.y - 12 + 12 * Math.min(1,Math.max(0,age)/0.7)**2;
+      g.rect(x, Math.round(y + Math.sin(seconds*1.7+i)*0.5), 2, 1);
     }
     const sinking = Math.min(40, Math.ceil(state.food.sinkingG * 200));
     for (let i = 0; i < sinking; i++) {
@@ -155,7 +183,7 @@ export class FishLayer {
       const fall = (scatter(i, 23) + seconds * (0.05 + 0.04 * scatter(i, 24))) % 1;
       g.rect(x, Math.round(area.y + fall * (area.height - 2)), 1, 1);
     }
-    if (floating + sinking > 0) g.fill(FOOD_COLOR);
+    if (floating + sinking > 0) g.fill(ART.food);
   }
 
   private drawAnimal(
@@ -168,13 +196,13 @@ export class FishLayer {
     resting: boolean,
     sex: 'male' | 'female',
   ): void {
-    const g = this.graphics;
+    const g = this.ink;
     const sp = animal.species;
     // Plano: 0 lejos (chico y azulado) .. 2 cerca.
     const far = (2 - body.plane) / 2;
     const scale = 1 - 0.22 * far;
     const tint = (color: number): number => {
-      let c = color;
+      let c = fishPigment(color);
       if (!animal.alive) c = DEAD_COLOR;
       else if (sick) c = lerpColor(c, 0xe8e8e8, 0.35);
       // De noche los colores se apagan (los neones, más).
@@ -196,6 +224,14 @@ export class FishLayer {
     const cy = Math.round(
       Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm)),
     );
+    this.positions.set(animal.id,{x:cx,y:cy,radius:Math.max(8,len*0.8)});
+    const nibbling = animal.alive && animal.intent === 'eat' &&
+      Math.abs(body.x-this.foodXCm)<3 && body.y*this.pxPerCm<Math.max(8,this.area.height*0.15);
+    const pulse = nibbling ? Math.max(0,Math.sin(seconds*8+body.phase)) : 0;
+    if (pulse > 0.65) {
+      this.foodGraphics.rect(cx+body.facing*len*0.35,cy-1,2,1).fill(ART.food);
+      this.foodGraphics.rect(cx-2,area.y+1,4,1).fill({color:0xe8dec7,alpha:0.3});
+    }
     const dir = body.facing;
 
     // Especies con sprite propio; el resto sigue con el placeholder de abajo.

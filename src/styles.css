@@ -443,3 +443,14 @@ body[data-view='cat'] .aquarium-nav, body[data-view='window'] .aquarium-nav { bo
 body[data-view='room'] .room-return { display: none; }
 body[data-view='tank'] .tank-focus { display: none; }
 .recovery-status { position:fixed; z-index:25; top:12px; left:50%; transform:translateX(-50%); padding:10px 16px; background:#191e28ed; border:1px solid #756047; border-radius:5px; font-size:12px; }
+/* Small, warm notebook controls let the aquarium carry the scene. */
+body[data-view='room'] .water-tool:not(.has-alerts) { display:none; }
+.notebook-tabs { display:flex; flex-wrap:wrap; gap:4px; padding-bottom:10px; border-bottom:1px solid #75604766; }
+.notebook-tabs button { min-height:40px; font-size:12px; }
+.selected-fish { border-left:3px solid #d6bd83; padding-left:12px!important; }
+.care-feedback { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); z-index:9; max-width:min(520px,92vw); width:max-content; padding:10px 14px; border:1px solid #b9a17855; border-radius:5px; background:#252b26eb; color:#efe5c9; font-size:12px; text-align:center; pointer-events:none; }
+.reveal-controls { position:fixed; bottom:12px; left:12px; z-index:25; padding:9px 12px; min-height:44px; color:#eee5d0; background:#211d19b8; border:1px solid #87735466; border-radius:5px; font:inherit; font-size:11px; }
+.reveal-controls[hidden] { display:none; }
+body.contemplating .aquarium-nav,body.contemplating .outside-chip,body.contemplating .debug-toggle,body.contemplating .debug-panel { display:none; }
+body.contemplating canvas { pointer-events:none; }
+@media(max-width:720px){.care-feedback{bottom:68px;font-size:10px;}}

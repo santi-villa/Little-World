@@ -1,3 +1,4 @@
+import { ambientTint } from '../art-direction';
 import decorData from '../../data/tank-decor.json';
 import type { OutsideView } from '../../world/weather';
 /**
@@ -50,7 +51,7 @@ type Point = { x: number; y: number };
 
 const ROOM_ID = 'dormitorio';
 /** Tinte de la habitación de noche (multiplica la imagen). */
-const NIGHT_TINT = 0x3a4472;
+const NIGHT_TINT = 0x424b68;
 /** Cuánta luz de día deja pasar cada clima. */
 const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
 /** Cuánto hay que mover el dedo para que deje de ser un toque (píxeles de pantalla). */
@@ -111,7 +112,7 @@ export class RoomScene {
   private seconds = 0;
 
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
-  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | CareId) => void) {
+  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | CareId, animalId?: number) => void) {
     const hole = asset(this.data.background)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
     this.window = {
       x: Math.floor(hole.x / PX),
@@ -265,7 +266,7 @@ export class RoomScene {
     if (this.mode === 'tank') {
       // Golpecito en el vidrio: los peces se asustan (no hay que hacerlo).
       if (inRect(this.tank.bounds, w.x, w.y)) {
-        this.tools('fish');
+        this.tools('fish', this.tank.fishAt(w.x,w.y) ?? undefined);
       }
       return;
     }
@@ -443,7 +444,7 @@ export class RoomScene {
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.
-    const tint = lerpColor(NIGHT_TINT, 0xffffff, light);
+    const tint = ambientTint(light);
     this.room.tint = tint;
     // Brisa: las plantas y la cortina se hamacan apenas (más con la ventana abierta).
     const breeze = (state.room.windowOpen ? 1.8 : 0.9) * (view.weather === 'storm' ? 1.2 : 1);

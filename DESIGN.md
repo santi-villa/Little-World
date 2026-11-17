@@ -921,3 +921,13 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - Tres composiciones de decoración visual guardables: Orilla natural, Jardín verde y Piedra y calma. Más especies del catálogo, plantas traseras y delanteras, raíces enterradas bajo una capa de sustrato y zona central libre.
 - Estas plantas son arte, todavía no absorben nutrientes ni crecen en la simulación. El selector lo explica.
 - Herramientas en el borde inferior en la habitación, sin tapar el acuario; clima y hora local en una tarjeta discreta. Controles HTML accesibles para acercar y volver, además de los gestos de canvas.
+
+### Pulido de observación, cuidado y arte
+
+- Luz crema y sombra azulada compartidas en `render/art-direction.ts`. Pigmentos de peces suavizados y sombras de contacto en la decoración. Guía de retoque de arte: `docs/ART-DIRECTION.md`.
+- Render de peces en dos capas entre madera/plantas, más hojas frontales que pueden ocultarlos. Fases de animación por individuo.
+- Alimentar cierra el panel y acerca la cámara para observar granos cayendo, nado hacia la comida y picoteo. El consumo real sigue siendo de la simulación; la animación no reduce hambre ni elimina comida por su cuenta.
+- Cada individuo tiene una preferencia visual de rincón estable por ID. La confianza al alimentarlo permite visitas al frente al explorar. La ficha muestra nombre, confianza y rincón; tocar un pez prioriza su ficha y deja su nombre sobre él temporalmente.
+- Barra simplificada: Acuario y Cuaderno; Agua aparece por avisos o de cerca. Diario, fichas, guía y decoración se agrupan en el cuaderno. El cuaderno físico y la biblioteca conservan sus funciones. Modo Contemplar con botón HTML para recuperar controles.
+- Resumen de ausencia con un próximo paso priorizado (retirar muertos, revisar agua, dar porción pequeña u observar). No recomendar compensar días de comida ni afirmar que todos están contentos si tienen hambre.
+- Escenario de referencia: betta inicial, semilla 42, exterior fijo de 23 °C. A 1 y 3 días sigue sano; a 7 días está vivo pero con hambre máxima y salud aproximada de 81%. No hay alimentación automática ni inmunidad fuera de línea.
