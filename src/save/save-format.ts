@@ -107,7 +107,7 @@ function validSim(value: unknown): value is SimState {
   return true;
 }
 function validPlayer(value: unknown): value is PlayerState {
-  return isRecord(value) && Number.isInteger(value.tutorial) && (value.tutorial as number) >= 0 &&
+  return isRecord(value) && (value.decorId === undefined || ['default','garden','stones'].includes(value.decorId as string)) && Number.isInteger(value.tutorial) && (value.tutorial as number) >= 0 &&
     (value.tutorial as number) <= 4 && Array.isArray(value.journal) && value.journal.length <= 100 &&
     value.journal.every(entry => isRecord(entry) && typeof entry.text === 'string' && entry.text.length <= 2000 &&
       typeof entry.timeMinutes === 'number' && Number.isFinite(entry.timeMinutes));

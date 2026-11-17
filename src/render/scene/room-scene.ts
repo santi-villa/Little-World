@@ -1,3 +1,5 @@
+import decorData from '../../data/tank-decor.json';
+import type { OutsideView } from '../../world/weather';
 /**
  * Escena de 1280x720: el dormitorio (imagen) con la pecera sobre el escritorio,
  * vista a través de una cámara con zoom y paneo.
@@ -28,7 +30,6 @@ import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
 import { daylight, lerpColor } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
-import { Hud } from '../ui/hud';
 import { CARE_BAR_HEIGHT, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
@@ -41,6 +42,8 @@ import { drawSky } from './window-view';
 /** Lo que la escena necesita además del estado de la simulación. */
 export interface SceneView {
   weather: Weather;
+  outside?: OutsideView;
+  decorId?: string;
 }
 
 type Point = { x: number; y: number };
@@ -75,7 +78,6 @@ export class RoomScene {
   private readonly camera = new Camera(this.world);
   private readonly data = roomData(ROOM_ID);
   private readonly skyBase = new Graphics();
-  private readonly night = new Sprite(tex('cielo-noche'));
   private readonly sky = new Graphics();
   private readonly bird = new Sprite(tex('pajaro'));
   /** Plantas y cortinas que se hamacan: rotación muy leve con el pivote arriba. */
@@ -89,7 +91,6 @@ export class RoomScene {
   private readonly glow = new Graphics();
   private readonly tank = new TankView();
   private readonly cat = new CatView();
-  private readonly hud = new Hud();
   private readonly ui = new SceneUi();
   /** Los vidrios de la ventana, en píxeles gordos. */
   private readonly window: { x: number; y: number; width: number; height: number };
@@ -102,15 +103,15 @@ export class RoomScene {
   /** null: la lámpara se prende sola cuando oscurece; si no, lo que eligió el jugador. */
   private lamp: boolean | null = null;
   private lampOn = false;
-  private state: SimState | null = null;
   /** Zoom de la vista del gato (sale de su zona en rooms.json). */
   private zoomCat = 2.2;
+  private decorId = '';
   private lightsKey = '';
   private lastSeconds = 0;
   private seconds = 0;
 
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
-  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | CareId) => void) {
+  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | CareId) => void) {
     const hole = asset(this.data.background)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
     this.window = {
       x: Math.floor(hole.x / PX),
@@ -120,9 +121,6 @@ export class RoomScene {
     };
     this.skyBase.scale.set(PX);
     this.sky.scale.set(PX);
-    // El cielo de noche cubre el hueco de la ventana (la pared tapa lo que sobra).
-    this.night.anchor.set(0.5);
-    this.night.position.set(hole.x + Math.round(hole.width / 2), hole.y + Math.round(hole.height / 2));
     this.bird.anchor.set(0.5, 1);
     this.bird.visible = false;
 
@@ -151,7 +149,6 @@ export class RoomScene {
 
     this.world.addChild(
       this.skyBase,
-      this.night,
       this.sky,
       this.bird,
       this.room,
@@ -163,7 +160,7 @@ export class RoomScene {
       this.flash,
       this.glow,
     );
-    this.container.addChild(this.world, this.hud.container, this.ui.container);
+    this.container.addChild(this.world, this.ui.container);
     this.roomView = { ...this.data.camera };
     this.camera.goTo(this.roomView, true);
   }
@@ -172,7 +169,12 @@ export class RoomScene {
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
     this.seconds = seconds;
-    this.state = state;
+    const decorId = view.decorId ?? 'default';
+    if (decorId !== this.decorId) {
+      this.decorId = decorId;
+      this.tank.setDecor(decorId === 'garden' ? decorData.garden : decorId === 'stones' ? decorData.stones : decorData.default);
+    }
+    if (document.body.dataset.view !== this.mode) document.body.dataset.view = this.mode;
     this.tank.update(state, derived, seconds);
     const light = this.drawRoom(state, derived, seconds, view);
     this.cat.update(
@@ -182,7 +184,6 @@ export class RoomScene {
     if (this.mode === 'cat' && !this.gesture?.dragging) this.focusOn(this.catFocus(), false);
     this.camera.update(dt);
     this.drawGlow(seconds);
-    this.hud.update(state);
     this.ui.update(this.mode, state, seconds, seconds - this.focusSince);
   }
 
@@ -294,9 +295,8 @@ export class RoomScene {
         if (zone.panel) this.tools(zone.panel === 'notebook' ? 'diary' : 'guide');
         break;
       case 'toggle-window': {
-        const open = !(this.state?.room.windowOpen ?? false);
-        this.act({ type: 'setWindow', open });
-        this.ui.say(open ? texts.scene.windowOpened : texts.scene.windowClosed);
+        this.enterFocus('window', { x: 660, y: 250, zoom: 1.5 });
+        this.tools('weather');
         break;
       }
       case 'toggle-lamp':
@@ -305,6 +305,10 @@ export class RoomScene {
         break;
     }
   }
+
+  showRoom(): void { this.exitFocus(); }
+
+  showTank(): void { this.enterFocus('tank', this.tankFocus(0.85)); }
 
   /** La pecera de cerca: ocupa `fill` de la pantalla, arriba de la barra de acciones. */
   private tankFocus(fill: number): CameraView {
@@ -423,7 +427,7 @@ export class RoomScene {
   private drawRoom(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): number {
     const tank = this.tank.bounds;
     // La hora puede venir del panel de debug (solo cambia lo que se ve).
-    const day = daylight(scenePreview.hour ?? derived.hour);
+    const day = scenePreview.hour === null && view.outside ? view.outside.daylight : daylight(scenePreview.hour ?? derived.hour);
     const light = day * WEATHER_LIGHT[view.weather];
     const night = 1 - light;
     // La lámpara: la que eligió el jugador o, si nunca la tocó, sola cuando oscurece.
@@ -432,12 +436,10 @@ export class RoomScene {
 
     // Ventana.
     this.skyBase.clear();
-    drawSky(this.skyBase, this.window, day, view.weather, seconds, 'base');
+    drawSky(this.skyBase, this.window, day, view.weather, seconds, 'base', view.outside);
     // De noche aparece la imagen del cielo estrellado, de a poco según la hora.
-    this.night.alpha = Math.min(1, (1 - day) * 1.15) * (view.weather === 'clear' ? 1 : view.weather === 'cloudy' ? 0.7 : 0.45);
-    this.night.visible = this.night.alpha > 0.01;
     this.sky.clear();
-    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds, 'front');
+    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds, 'front', view.outside);
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.

@@ -10,7 +10,7 @@ import { GAME_HEIGHT, GAME_WIDTH, attachViewport } from './render/viewport';
 import { SAVE_FORMAT_VERSION, createSave } from './save/save-format';
 import { deleteSave, readSave, writeSave } from './save/storage';
 import { MINUTES_PER_DAY, defaultConfig, derive } from './sim';
-import { FixedOutdoorTemperature, type OutdoorTemperatureSource } from './world/outdoor';
+import { BuenosAiresWeather } from './world/weather';
 import './styles.css';
 
 /** Autoguardado cada 1 minuto (además de al pasar a segundo plano). */
@@ -90,9 +90,18 @@ async function boot(): Promise<void> {
 
   const { game, savingWorks, note, lastTimestamp } = await loadGame();
   const welcome = new WelcomePanel(document.body);
-  // Por ahora el exterior es un valor fijo; el clima real va a implementar la misma interfaz.
-  const fixedOutdoor = new FixedOutdoorTemperature(game.outdoorC);
-  const outdoor: OutdoorTemperatureSource = fixedOutdoor;
+  // Buenos Aires: modeled current weather, solar times, cache and historical temperatures.
+  let weatherStorage: Storage | undefined;
+  try { weatherStorage = localStorage; } catch { /* Private mode: memory cache only. */ }
+  const outdoor = new BuenosAiresWeather(fetch, weatherStorage);
+  const syncWeather = (): void => {
+    const view = outdoor.view();
+    if (game.outdoorC !== view.temperatureC) game.setOutdoor(view.temperatureC);
+    if (game.weather !== view.weather) game.setWeather(view.weather);
+  };
+  syncWeather();
+  void outdoor.refresh().then(syncWeather);
+  window.setInterval(() => void outdoor.refresh().then(syncWeather), 30 * 60_000);
   /** Momento real hasta el que la simulación está al día. */
   let hiddenAt: number | null = null;
   /** Catch-up en curso: desde cuándo se está recuperando. */
@@ -105,14 +114,15 @@ async function boot(): Promise<void> {
    */
   const catchUpSince = async (sinceMs: number): Promise<void> => {
     const elapsedMs = Date.now() - sinceMs;
-    if (!(sinceMs > 0) || !(elapsedMs > 0)) return;
-    fixedOutdoor.temperatureC = game.outdoorC;
+    if (!(sinceMs > 0) || elapsedMs < 20_000 || game.speed <= 0) return;
+
     const maxMs = defaultConfig.clock.maxCatchUpDays * MINUTES_PER_DAY * 60_000;
     let hourly: number[] | undefined;
     try {
       hourly = await outdoor.hourlyC(sinceMs, Math.min(elapsedMs, maxMs) / 3_600_000);
     } catch (error) {
-      console.warn('Sin histórico de temperatura exterior; se usa el valor fijo.', error);
+      console.warn('Sin histórico de temperatura exterior; se usa el valor de referencia.', error);
+      game.note(texts.careUi.historico_estimado);
     }
     const report = game.catchUp(elapsedMs, hourly);
     if (!report) return;
@@ -120,7 +130,7 @@ async function boot(): Promise<void> {
       welcome.show(report.result.summary);
     }
   };
-  await catchUpSince(lastTimestamp);
+  const initialRecovery = catchUpSince(lastTimestamp);
 
   let lastSavedAt = 0;
   let saveNote = note;
@@ -154,12 +164,22 @@ async function boot(): Promise<void> {
   };
 
   await loadAssets();
-  const tools = new AquariumPanel(game);
+  const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom());
   const scene = new RoomScene((action) => void game.act(action), page => {
-    if (page === 'fish' || page === 'diary' || page === 'guide') tools.open(page);
+    if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor') tools.open(page);
     else tools.care(page);
   });
   app.stage.addChild(scene.container);
+  // Render the room while historical data is loading, instead of showing a blank screen.
+  scene.update(game.state, derive(game.state), performance.now() / 1000,
+    { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default' });
+  tools.setBusy(true);
+  const recovering = document.createElement('div');
+  recovering.className = 'recovery-status'; recovering.setAttribute('role', 'status');
+  recovering.textContent = texts.careUi.recuperando_acuario;
+  if (lastTimestamp > 0 && Date.now() - lastTimestamp >= 20_000) document.body.append(recovering);
+  await initialRecovery;
+  tools.setBusy(false); recovering.remove();
 
   const panel = new DebugPanel(game, document.body, {
     saveStatus,
@@ -208,7 +228,7 @@ async function boot(): Promise<void> {
       window.setTimeout(() => void save(), SAVE_AFTER_ACTION_MS);
     }
     const now = performance.now();
-    scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather });
+    scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default' });
     panel.update(now);
   });
 
@@ -230,6 +250,7 @@ async function boot(): Promise<void> {
     void catchUpSince(since).finally(() => {
       recoveringFrom = null;
       lastFrame = performance.now();
+      void outdoor.refresh().then(syncWeather);
     });
   };
   document.addEventListener('visibilitychange', () => {

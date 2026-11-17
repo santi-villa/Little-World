@@ -55,6 +55,8 @@ export interface TankDecorItem {
   /** Agrandar o achicar (1 = su tamaño natural, con el píxel del resto). */
   scale?: number;
   flip?: boolean;
+  height?: number;
+  layer?: string;
 }
 
 export interface TankDecor {
@@ -113,8 +115,10 @@ export class TankView {
   private readonly equip = new Graphics();
   private readonly inside = new Container();
   private readonly substrate = new TilingSprite({ texture: tex('sustrato-arena') });
+  private readonly foregroundSand = new TilingSprite({ texture: tex('sustrato-arena') });
   private readonly hardscape = new Container();
   private readonly plantLayer = new Container();
+  private readonly rearPlants = new Container();
   private plants: Plant[] = [];
   private readonly mid = new Graphics();
   private readonly fx = new Graphics();
@@ -131,7 +135,7 @@ export class TankView {
   private lastSeconds = 0;
 
   constructor() {
-    this.inside.addChild(this.substrate, this.hardscape, this.plantLayer, this.mid, this.fish.graphics, this.fx);
+    this.inside.addChild(this.substrate, this.rearPlants, this.hardscape, this.plantLayer, this.foregroundSand, this.mid, this.fish.graphics, this.fx);
     this.inside.mask = this.waterMask;
     this.art.addChild(this.water, this.glassBack, this.equip, this.inside, this.waterMask, this.glass, this.ledOff);
     this.container.addChild(this.art);
@@ -173,6 +177,7 @@ export class TankView {
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
     const tint = lerpColor(lit ? 0xffffff : 0x4a5a80, lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
     this.substrate.tint = tint;
+    this.foregroundSand.tint = tint;
     for (const child of this.hardscape.children) child.tint = tint;
     for (const plant of this.plants) plant.mesh.tint = tint;
     // Las aristas de atrás se ven a través del agua: toman su color.
@@ -241,7 +246,7 @@ export class TankView {
     // El agua llena el hueco; la evaporación la baja de a poco.
     const fullTop = top + SURFACE_GAP;
     const waterHeight = Math.round((bottom - fullTop) * clamp(derived.waterLevel, 0, 1));
-    const sandH = clamp(Math.round(height * 0.18), 16, 40);
+    const sandH = clamp(Math.round(height * 0.13), 12, 28);
     return {
       left,
       right: left + width,
@@ -258,7 +263,7 @@ export class TankView {
 
   /** Color del agua a una profundidad (0 superficie .. 1 fondo). */
   private waterColor(lit: boolean, tannins: number, depth: number): number {
-    const clear = lit ? lerpColor(0x40c6bf, 0x14606e, depth) : lerpColor(0x14434e, 0x0a2731, depth);
+    const clear = lit ? lerpColor(0x6caaa1, 0x294e50, depth) : lerpColor(0x14434e, 0x0a2731, depth);
     const amber = lit ? lerpColor(0xc08a34, 0x6a4418, depth) : lerpColor(0x4a3413, 0x2a1c0c, depth);
     return lerpColor(clear, amber, tannins * 0.6);
   }
@@ -362,9 +367,17 @@ export class TankView {
     this.substrate.position.set(geo.left, geo.bottom - geo.sandH);
     this.substrate.width = geo.width;
     this.substrate.height = geo.sandH;
+    // A foreground lip of substrate buries roots rather than leaving plants floating.
+    this.foregroundSand.texture = this.substrate.texture;
+    this.foregroundSand.tileScale.set(1 / unit);
+    this.foregroundSand.position.set(geo.left, geo.sandTop);
+    this.foregroundSand.width = geo.width;
+    this.foregroundSand.height = geo.bottom - geo.sandTop;
+    this.foregroundSand.tilePosition.y = -(geo.sandTop - (geo.bottom - geo.sandH));
 
     for (const child of this.hardscape.removeChildren()) child.destroy();
     for (const child of this.plantLayer.removeChildren()) child.destroy();
+    for (const child of this.rearPlants.removeChildren()) child.destroy();
     this.plants = [];
     for (const [index, item] of this.decor.items.entries()) {
       const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
@@ -373,7 +386,7 @@ export class TankView {
       const unit = artPx(name);
       // 1 píxel del dibujo = 1 píxel del vidrio. Las plantas, a lo sumo un tercio del agua.
       let scale = (item.scale ?? 1) / unit;
-      if (item.plant) scale = Math.min(scale, (geo.bottom - geo.top) / 3 / texture.height);
+      if (item.plant) scale = Math.min(scale, (geo.bottom - geo.top) * (item.height ?? 0.45) / texture.height);
       const w = texture.width * scale;
       const h = texture.height * scale;
       const cx = Math.round(clamp(geo.left + item.x * geo.width, geo.left + w / 2, geo.right - w / 2));
@@ -382,7 +395,7 @@ export class TankView {
         const mesh = new MeshPlane({ texture, verticesX: 2, verticesY: PLANT_ROWS });
         mesh.scale.set(item.flip ? -scale : scale, scale);
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
-        this.plantLayer.addChild(mesh);
+        (item.layer === 'back' ? this.rearPlants : this.plantLayer).addChild(mesh);
         const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
         this.plants.push({ mesh, rest: positions.slice(), unit, phase: index * 1.7 });
       } else {

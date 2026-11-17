@@ -1,3 +1,7 @@
+import decorData from '../../data/tank-decor.json';
+import { asset } from '../assets';
+import { buenosAiresDate } from '../../world/buenos-aires';
+import type { BuenosAiresWeather } from '../../world/weather';
 import allTexts from '../../data/texts.es.json';
 import type { Game } from '../../game';
 import { advice, suggestedFoodG } from '../../care';
@@ -7,7 +11,7 @@ import type { CareId } from './scene-ui';
 
 const careText = allTexts.careUi;
 
-type Page = 'status' | 'fish' | 'diary' | 'guide';
+type Page = 'status' | 'fish' | 'diary' | 'guide' | 'weather' | 'decor';
 const button = (label: string, run: () => void): HTMLButtonElement => {
   const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
   b.addEventListener('click', run); return b;
@@ -15,27 +19,35 @@ const button = (label: string, run: () => void): HTMLButtonElement => {
 
 /** Accessible HTML tools over the scene, also reachable without canvas gestures. */
 export class AquariumPanel {
+  private readonly navigation = document.createElement('nav');
   private readonly dialog = document.createElement('dialog');
   private readonly body = document.createElement('div');
   private readonly heading = document.createElement('h2');
   private readonly statusButton: HTMLButtonElement;
+  private readonly weatherButton: HTMLButtonElement;
+  private weatherKey = '';
   private page: Page | null = null;
   private lastKey = '';
   private opener: Element | null = null;
-  constructor(private readonly game: Game) {
-    const nav = document.createElement('nav');
+  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, focusTank: () => void, showRoom: () => void) {
+    const nav = this.navigation;
     nav.className = 'aquarium-nav'; nav.setAttribute('aria-label', careText.herramientas_del_acuario);
     this.statusButton = button(careText.agua, () => this.open('status'));
-    nav.append(this.statusButton, button(careText.peces, () => this.open('fish')),
-      button(careText.diario, () => this.open('diary')), button(careText.guia, () => this.open('guide')));
+    const returnRoom = button(careText.habitacion, showRoom); returnRoom.className = 'room-return';
+    const tankFocus = button(careText.acuario, focusTank); tankFocus.className = 'tank-focus';
+    nav.append(returnRoom, tankFocus, this.statusButton, button(careText.peces, () => this.open('fish')),
+      button(careText.diario, () => this.open('diary')), button(careText.decorar, () => this.open('decor')), button(careText.guia, () => this.open('guide')));
+    this.weatherButton = button(careText.buenos_aires, () => this.open('weather'));
+    this.weatherButton.className = 'outside-chip';
     this.dialog.className = 'aquarium-dialog';
     this.heading.id = 'aquarium-title'; this.dialog.setAttribute('aria-labelledby', this.heading.id);
     const close = button(careText.volver_al_acuario, () => this.close()); close.className = 'aquarium-close';
     this.dialog.append(this.heading, this.body, close);
     this.dialog.addEventListener('close', () => { this.page = null; if (this.opener instanceof HTMLElement) this.opener.focus(); });
-    document.body.append(nav, this.dialog);
-    if (game.player.tutorial < 4) this.open('guide');
+    document.body.append(nav, this.weatherButton, this.dialog);
+    // Let the room be the first screen; the guide is available from the toolbar.
   }
+  setBusy(busy: boolean): void { this.navigation.inert = busy; this.weatherButton.disabled = busy; }
   close(): void { this.dialog.close(); }
   open(page: Page): void {
     this.page = page; this.render();
@@ -51,6 +63,16 @@ export class AquariumPanel {
     this.game.dirty = true; this.game.saveSoon = true; this.render();
   }
   update(): void {
+    const view = this.climate.view();
+    const local = buenosAiresDate(view.nowMs);
+    const seasonLabel = { spring: careText.primavera, summer: careText.verano, autumn: careText.otono, winter: careText.invierno }[view.season];
+    const time = `${String(Math.floor(local.hour)).padStart(2,'0')}:${String(Math.floor(local.hour%1*60+1e-6)).padStart(2,'0')}`;
+    const weatherKey = `${time}|${view.source}|${view.temperatureC}|${view.weather}`;
+    if (this.weatherKey !== weatherKey) {
+      this.weatherKey = weatherKey;
+      this.weatherButton.textContent = fill(careText.buenos_aires_c, { p0: time, p1: Math.round(view.temperatureC), p2: seasonLabel, p3: view.source === 'seasonal' ? careText.sin_conexion : texts.weather[view.weather] });
+      if (this.page === 'weather') this.weather();
+    }
     const state = this.game.state;
     const count = state.alerts.length;
     const label = count ? fill(careText.agua_avisos, { p0: count }) : careText.agua_sin_alertas;
@@ -61,10 +83,54 @@ export class AquariumPanel {
     this.lastKey = key;
   }
   private render(): void {
-    if (this.page === 'fish') this.fish();
+    if (this.page === 'weather') this.weather();
+    else if (this.page === 'decor') this.decorate();
+    else if (this.page === 'fish') this.fish();
     else if (this.page === 'diary') this.diary();
     else if (this.page === 'guide') this.guide();
     else this.status();
+  }
+  private weather(): void {
+    const v=this.climate.view();
+    this.title(careText.por_la_ventana_buenos_aires);
+    const seasons={spring:careText.primavera,summer:careText.verano,autumn:careText.otono,winter:careText.invierno};
+    const clock=(ms:number):string=>new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(ms);
+    this.paragraph(fill(careText.c, { p0: seasons[v.season], p1: texts.weather[v.weather], p2: v.temperatureC.toFixed(1) }));
+    this.paragraph(fill(careText.viento_km_h_nubosidad_precipitacion_mm, { p0: Math.round(v.windKph), p1: Math.round(v.cloudCover), p2: v.precipitationMm.toFixed(1) }));
+    this.paragraph(fill(careText.amanecer_atardecer_hora_de_buenos_aires, { p0: clock(v.sunrise), p1: clock(v.sunset) }));
+    this.paragraph(v.source==='live' ? fill(careText.datos_de_open_meteo_de_las, { p0: clock(v.observedAt!) }) :
+      v.source==='cached' ? fill(careText.sin_una_lectura_reciente_mostrando_el, { p0: clock(v.observedAt!) }) :
+      careText.no_hay_datos_recientes_el_cielo);
+    this.paragraph(careText.la_temperatura_exterior_influye_en_la);
+    const refresh=button(careText.actualizar_clima,()=>{
+      refresh.disabled=true;refresh.textContent='Consultando…';
+      void this.climate.refresh(Date.now(),true).then(()=>{
+        const next=this.climate.view();this.game.setOutdoor(next.temperatureC);this.game.setWeather(next.weather);
+        if(this.page==='weather')this.weather();
+      });
+    });
+    this.body.append(refresh,button(this.game.state.room.windowOpen?careText.cerrar_ventana:careText.abrir_ventana,()=>this.act({type:'setWindow',open:!this.game.state.room.windowOpen})),button(careText.mirar_afuera,()=>this.close()));
+    const credit=document.createElement('a');credit.href='https://open-meteo.com/';credit.textContent=careText.datos_meteorologicos_open_meteo_cc_by;this.body.append(credit);
+  }
+  private decorate(): void {
+    this.title(careText.un_paisaje_para_tu_acuario);
+    this.paragraph(careText.elegi_una_composicion_con_las_plantas);
+    const descriptions={default:careText.arena_clara_una_rama_baja_y,garden:careText.vegetacion_en_varios_planos_hojas_anchas,stones:careText.rocas_agrupadas_grava_oscura_y_verdes};
+    for(const id of ['default','garden','stones'] as const){
+      const preset=decorData[id],card=document.createElement('section');card.className='decor-card';
+      const h=document.createElement('h3');h.textContent=preset.name;card.append(h);
+      const preview=document.createElement('div');preview.className='decor-specimens';preview.setAttribute('aria-hidden','true');
+      const names=new Set(preset.items.filter(i=>'plant' in i).map(i=>`${'plant' in i?i.plant:''}-${'stage' in i?i.stage:1}`));
+      for(const name of [...names].slice(0,4)){
+        const file=asset(name)?.file;if(!file)continue;
+        const img=document.createElement('img');img.src=`${import.meta.env.BASE_URL}assets/${file}`;img.alt='';preview.append(img);
+      }
+      card.append(preview);this.paragraph(descriptions[id],card);
+      const selected=(this.game.player.decorId??'default')===id;
+      const choose=button(selected?careText.composicion_actual:careText.usar_esta_composicion,()=>{
+        this.game.player.decorId=id;this.game.note(fill(careText.cambiaste_el_paisaje_del_acuario, { p0: preset.name }));this.decorate();
+      });choose.disabled=selected;card.append(choose);this.body.append(card);
+    }
   }
   private status(): void {
     const s = this.game.state;
@@ -116,7 +182,7 @@ export class AquariumPanel {
       action = () => ({ type: 'waterChange', fraction: Number(select.value), conditioned: true, vacuum: true, temperatureC: this.game.state.water.temperatureC });
     } else if (id === 'cleanFilter') {
       enabled = s.filter.mediaCapacity > 0 && s.filter.clog >= defaultConfig.thresholds.filterClogged;
-      this.paragraph(fill(careText.obstruccion, { p0: Math.round(s.filter.clog * 100), p1: enabled ? 'El caudal necesita ayuda.' : 'No hace falta limpiar ahora.' }));
+      this.paragraph(fill(careText.obstruccion, { p0: Math.round(s.filter.clog * 100), p1: enabled ? careText.el_caudal_necesita_ayuda : careText.no_hace_falta_limpiar_ahora }));
       this.paragraph(careText.el_material_aloja_bacterias_utiles_solo);
       action = () => ({ type: 'cleanFilter', method: 'tankWater' });
     } else if (id === 'topOff') {
@@ -148,7 +214,7 @@ export class AquariumPanel {
       const card = document.createElement('section');
       const species = findSpecies(a.speciesId);
       const h = document.createElement('h3'); h.textContent = a.name || species?.name || a.speciesId; card.append(h);
-      this.paragraph(fill(careText.dias, { p0: species?.name ?? a.speciesId, p1: Math.floor(a.ageDays), p2: a.alive ? texts.moods[a.mood] : 'Falleció' }), card);
+      this.paragraph(fill(careText.dias, { p0: species?.name ?? a.speciesId, p1: Math.floor(a.ageDays), p2: a.alive ? texts.moods[a.mood] : careText.fallecio }), card);
       this.paragraph(fill(careText.hambre_estres_salud, { p0: Math.round(a.hunger * 100), p1: Math.round(a.stress), p2: Math.round(a.health) }), card);
       this.paragraph(a.feedingTrust > 0.4 ? careText.ya_esta_aprendiendo_que_tu_presencia : careText.todavia_se_esta_acostumbrando_a_vos, card);
       const form = document.createElement('form');
@@ -158,7 +224,7 @@ export class AquariumPanel {
       form.append(input, submit);
       form.addEventListener('submit', event => {
         event.preventDefault(); this.game.act({ type: 'nameAnimal', id: a.id, name: input.value });
-        this.game.note(fill(careText.ya_tiene_su_lugar_en_el, { p0: input.value.trim().slice(0, 24) || species?.name || 'Tu pez' }));
+        this.game.note(fill(careText.ya_tiene_su_lugar_en_el, { p0: input.value.trim().slice(0, 24) || species?.name || careText.tu_pez }));
         if (this.game.player.tutorial === 1) { this.nextGuide(); this.open('guide'); } else this.fish();
       });
       card.append(form); this.body.append(card);

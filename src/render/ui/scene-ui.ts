@@ -23,7 +23,7 @@ export const CARE_BAR_HEIGHT = BAR * U;
 const BOX = 0x0a0d18;
 
 export type CareId = keyof typeof texts.scene.care;
-export type UiMode = 'room' | 'tank' | 'cat';
+export type UiMode = 'room' | 'tank' | 'cat' | 'window';
 
 /** Acciones de cuidado de la vista de pecera. */
 const CARE: { id: CareId; when?: (state: SimState) => boolean }[] = [
@@ -107,8 +107,9 @@ export class SceneUi {
       if (focusAge < 4) {
         const w = textWidth(t.swipeHint) + 8;
         const x = Math.round((W - w) / 2);
-        g.rect(x, 6, w, 11).fill({ color: BOX, alpha: 0.55 });
-        drawPixelText(g, t.swipeHint, x + 4, 9, INK, 1);
+        const hintY = mode === 'tank' ? H - BAR - 14 : 6;
+        g.rect(x, hintY, w, 11).fill({ color: BOX, alpha: 0.55 });
+        drawPixelText(g, t.swipeHint, x + 4, hintY + 3, INK, 1);
       }
     }
 

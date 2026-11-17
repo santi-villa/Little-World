@@ -1,3 +1,13 @@
+# Actualización visual y clima de Buenos Aires
+
+La habitación abre completa y sin modal automático. Hay zoom de pecera y ventana al tocar sus zonas; se vuelve con Habitación. La ventana muestra datos y controla su apertura. El gato sigue decorativo.
+
+Se conectó Open-Meteo (actual, horarios solares e histórico), con caché, referencia estacional explícita sin red y estaciones del hemisferio sur. Se reemplazó el cielo rígido por un paisaje con profundidad, nubes suaves y árboles estacionales.
+
+La pecera ahora tiene plantas en varios planos, raíces enterradas y tres composiciones visuales guardables. La química de plantas, su crecimiento y la decoración libre siguen pendientes. Las notas históricas de abajo pueden describir versiones anteriores.
+
+---
+
 # Actualización: primera experiencia y gato
 
 El gato ahora es decorativo: duerme en su cama y las caricias muestran corazones.

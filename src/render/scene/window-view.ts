@@ -7,6 +7,7 @@
 
 import type { Graphics } from 'pixi.js';
 import type { Weather } from '../../sim';
+import type { OutsideView } from '../../world/weather';
 import { lerpColor, scatter } from '../pixel-utils';
 
 /** Cuánto tapa el cielo cada clima (0 despejado .. 1 cerrado). */
@@ -35,9 +36,10 @@ export function drawSky(
   t: number,
   /** 'base': solo el degradé del cielo; 'front': estrellas, nubes, árboles, lluvia y rayos. */
   part: 'base' | 'front' = 'front',
+  outside?: OutsideView,
 ): number {
   const { x, y, width: W, height: H } = window;
-  const ov = OVERCAST[weather];
+  const ov = outside ? Math.max(weather === 'storm' ? 0.9 : weather === 'rain' ? 0.7 : 0, outside.cloudCover / 100) : OVERCAST[weather];
   const night = 1 - day;
   const right = x + W;
   const bottom = y + H;
@@ -56,12 +58,12 @@ export function drawSky(
   // y con el horizonte anaranjado al amanecer y al atardecer.
   const greyTop = lerpColor(0x0a0d18, weather === 'storm' ? 0x4a5262 : 0x6f7a8c, day);
   const greyLow = lerpColor(0x1a1f2c, weather === 'storm' ? 0x6a7280 : 0xa3adb8, day);
-  const twilight = Math.sin(day * Math.PI);
-  let top = lerpColor(lerpColor(0x070b1c, 0x4a98de, day), greyTop, ov);
-  let low = lerpColor(lerpColor(0x18223f, 0xb4def2, day), greyLow, ov);
+  const twilight = outside?.twilight ?? Math.sin(day * Math.PI);
+  let top = lerpColor(lerpColor(0x070b1c, 0x70a9c6, day), greyTop, ov);
+  let low = lerpColor(lerpColor(0x18223f, 0xd0e3dc, day), greyLow, ov);
   top = lerpColor(top, 0x6a5a9a, twilight * 0.4 * (1 - ov));
   low = lerpColor(low, 0xf2a25c, twilight * 0.7 * (1 - ov));
-  const bands = 9;
+  const bands = 24;
   const skyAt = (k: number): number => lerpColor(top, low, k);
   for (let i = 0; part === 'base' && i < bands; i++) {
     const y0 = y + Math.round((i * H) / bands);
@@ -87,46 +89,85 @@ export function drawSky(
     }
   }
 
-  // Nubes que pasan.
-  const clouds = weather === 'clear' ? 3 : weather === 'cloudy' ? 7 : 10;
-  const cloudLight = lerpColor(lerpColor(0x2a3350, 0xf4f8fc, day), lerpColor(0x232838, weather === 'storm' ? 0x5a6170 : 0xc4cad4, day), ov);
-  const cloudDark = lerpColor(cloudLight, 0x10141f, 0.22);
-  const cloudAlpha = weather === 'clear' ? 0.55 + 0.3 * day : 0.9;
-  for (let pass = 0; pass < 2; pass++) {
-    let any = false;
-    for (let i = 0; i < clouds; i++) {
-      const w = 40 + scatter(i, 37) * 56;
-      const speed = (2 + scatter(i, 38) * 3) * (weather === 'storm' ? 3 : 1);
-      const cx = x - 60 + ((scatter(i, 33) * (W + 120) + t * speed) % (W + 120));
-      const cy = y + 12 + scatter(i, 39) * H * (ov > 0.5 ? 0.5 : 0.38);
-      if (pass === 0) {
-        any = rect(cx + 2, cy + 4, w - 4, 4) || any; // panza en sombra
-      } else {
-        any = rect(cx, cy, w, 5) || any;
-        any = rect(cx + w * 0.12, cy - 4, w * 0.6, 4) || any;
-        any = rect(cx + w * 0.3, cy - 7, w * 0.3, 3) || any;
-        any = rect(cx + w * 0.55, cy - 6, w * 0.2, 2) || any;
+  // Sol o luna en arco: la luz sigue el amanecer/atardecer de Buenos Aires.
+  const progress = outside?.sunProgress ?? 0.5;
+  if (day > 0.05 && ov < 0.9) {
+    const sx = x + W * (0.12 + progress * 0.76), sy = y + H * (0.65 - Math.sin(progress * Math.PI) * 0.5);
+    for (let r = 16; r >= 8; r -= 4) {
+      for (let row = -r; row <= r; row += 2) {
+        const half = Math.round(Math.sqrt(Math.max(0,r*r-row*row))/2)*2;
+        rect(sx-half,sy+row,half*2,2);
       }
+      g.fill({color: twilight > 0.5 ? 0xffc78e : 0xfff0bc, alpha:r===8 ? 0.85*(1-ov) : 0.07*(1-ov)});
     }
-    if (any) g.fill({ color: pass === 0 ? cloudDark : cloudLight, alpha: cloudAlpha });
+  } else if (day < 0.15 && ov < 0.7) {
+    const moonX=x+W*0.7, moonY=y+H*0.2;
+    for(let row=-7;row<=7;row++){
+      const half=Math.round(Math.sqrt(Math.max(0,49-row*row)));
+      rect(moonX-half,moonY+row,half*2,1);
+    }
+    g.fill({color:0xe9e3bd,alpha:0.85*(1-ov)});
+    // A soft crescent cutout rather than another bright lamp in the sky.
+    for(let row=-7;row<=7;row++){
+      const half=Math.round(Math.sqrt(Math.max(0,49-row*row)));
+      rect(moonX-half+5,moonY+row-2,half*2,1);
+    }
+    g.fill(skyAt(0.2));
   }
 
-  // Arboleda: dos planos de siluetas; con tormenta se sacuden.
-  const sway = weather === 'storm' ? Math.sin(t * 2.2) * 2 : weather === 'rain' ? Math.sin(t * 1.1) : 0;
-  const farTree = lerpColor(lerpColor(0x0d1524, 0x5f8a6a, day), lerpColor(0x0c111c, 0x5a6a6c, day), ov);
-  const nearTree = lerpColor(lerpColor(0x070b14, 0x34593f, day), lerpColor(0x070a12, 0x364540, day), ov);
-  for (let i = 0; i < W; i += 2) {
-    const k = i + sway * 0.6;
-    const h = 44 + 12 * Math.sin(k * 0.045 + 1) + 9 * Math.sin(k * 0.12) + 8 * scatter(Math.floor(k / 4), 91);
-    g.rect(x + i, bottom - Math.round(h), 2, Math.round(h));
+  // Nubes de bordes escalonados, con profundidad y viento real.
+  const clouds = Math.round(2 + ov*7);
+  const wind = Math.max(0.3,Math.min(3,(outside?.windKph??10)/14));
+  const cloudLight = lerpColor(lerpColor(0x343d56,0xf2eede,day),lerpColor(0x242c40,0xa4adb4,day),ov);
+  const cloudDark=lerpColor(cloudLight,0x526174,0.22);
+  for(let i=0;i<clouds;i++) {
+    const w=42+scatter(i,37)*54, h=9+scatter(i,74)*9;
+    const cx=x-100+((scatter(i,33)*(W+200)+t*(0.4+scatter(i,38))*wind)%(W+200));
+    const cy=y+H*(0.1+scatter(i,39)*0.34);
+    for(let pass=0;pass<2;pass++) {
+      for(let row=-Math.round(h);row<=4;row+=2){
+        const normalized=(row+h)/(h+4);
+        const half=w*0.5*Math.sqrt(Math.max(0,1-(normalized-0.7)**2/0.5));
+        const lobes=Math.sin(normalized*9+i)*3;
+        rect(cx-half+lobes,cy+row+(pass===0?3:0),Math.max(2,half*2),2);
+      }
+      g.fill({color:pass===0?cloudDark:cloudLight,alpha:(weather==='clear'?0.45:0.68)*(pass===0?0.5:1)});
+    }
   }
-  g.fill(farTree);
-  for (let i = 0; i < W; i += 2) {
-    const k = i + sway;
-    const h = 22 + 10 * Math.sin(k * 0.07 + 4) + 7 * Math.sin(k * 0.19 + 2) + 7 * scatter(Math.floor(k / 3), 92);
-    g.rect(x + i, bottom - Math.round(h), 2, Math.round(h));
+
+  // Un barrio lejano, detrás de las copas: siluetas bajas, terrazas y antenas.
+  const building=lerpColor(0x141b2b,0x8b9b9e,day);
+  for(let i=0;i<18;i++){
+    const bx=x+i*(W/17)-6, bw=10+scatter(i,110)*14, bh=22+scatter(i,111)*25;
+    rect(bx,bottom-bh,bw,bh);
+    rect(bx+2,bottom-bh-2,bw-4,2);
+    if(i%4===0){rect(bx+4,bottom-bh-10,1,10);rect(bx+1,bottom-bh-8,7,1);}
   }
-  g.fill(nearTree);
+  g.fill({color:building,alpha:0.85});
+
+  // Árboles en tres planos. Las estaciones cambian las hojas, no el tamaño del paisaje.
+  const season=outside?.season??'spring';
+  const foliage={summer:[0x668568,0x345a49],autumn:[0xa8956c,0x706947],winter:[0x7d8881,0x4c655b],spring:[0x7e9a78,0x446e59]}[season];
+  for(let layer=0;layer<2;layer++){
+    const color=lerpColor(layer===0?0x14212b:0x0e1b25,foliage[layer]??0x446e59,day);
+    const count=layer===0?13:9;
+    for(let i=0;i<count;i++){
+      const cx=x+(i+0.2)*(W/(count-1)),h=20+scatter(i+layer*20,91)*26;
+      const radius=12+scatter(i,92)*12;
+      const sway=Math.sin(t*0.7+i)*(outside?.windKph??10)/35;
+      rect(cx-2,bottom-h,3,h);
+      for(let row=-radius;row<radius;row+=2){
+        const half=Math.sqrt(Math.max(0,radius*radius-row*row));
+        rect(cx-half+sway,bottom-h+row,half*2,2);
+      }
+    }
+    g.fill({color,alpha:layer===0?0.8:1});
+  }
+  // Jacarandás de primavera: acentos lilas muy discretos, sin teñir toda la ciudad.
+  if(season==='spring' && day>0.2){
+    for(let i=0;i<24;i++)rect(x+scatter(i,141)*W,bottom-18-scatter(i,142)*20,2,1);
+    g.fill({color:0xa58bb8,alpha:0.55*day});
+  }
 
   // Luces lejanas de noche.
   if (day < 0.5) {
@@ -165,8 +206,8 @@ export function drawSky(
     }
 
     // Lluvia cayendo (inclinada con tormenta).
-    const drops = storm ? 130 : 70;
-    const slant = storm ? 0.35 : 0.08;
+    const drops = Math.round(Math.min(150, 20 + (outside?.precipitationMm ?? (storm ? 5 : 1)) * 18));
+    const slant = Math.min(0.45, 0.05 + (outside?.windKph ?? (storm ? 35 : 8)) / 100);
     for (let i = 0; i < drops; i++) {
       const fall = (scatter(i, 35) * H + t * (150 + 70 * scatter(i, 36))) % H;
       const dx = x + ((scatter(i, 34) * W - fall * slant + W) % W);

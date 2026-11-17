@@ -91,3 +91,17 @@ describe('guardados dañados', () => {
     if (result.status === 'ok') expect(result.save.player.tutorial).toBe(4);
   });
 });
+
+describe('preferencias visuales', () => {
+  it('guarda la composición sin modificar la simulación ni aceptar IDs desconocidos', () => {
+    const game = Game.newTank(17);
+    const before = structuredClone(game.state);
+    game.player.decorId = 'garden';
+    const raw = createSave(game.state, game.settings, 100, game.player);
+    const loaded = parseSave(raw);
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') expect(loaded.save.player.decorId).toBe('garden');
+    expect(game.state).toEqual(before);
+    expect(parseSave({ ...raw, player: { ...raw.player, decorId: '__invalid__' } }).status).toBe('invalid');
+  });
+});

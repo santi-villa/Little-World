@@ -200,12 +200,15 @@ Cómo está hecho:
 
 ### Fuente
 
-Open-Meteo, endpoint de pronóstico:
-- `current`: `temperature_2m`, `weather_code`, `is_day`, `cloud_cover`, `precipitation`, `wind_speed_10m`
-- `daily`: `sunrise`, `sunset`
-- `hourly` con `past_days` para el catch-up offline
+Implementado con Open-Meteo para el centro de Buenos Aires (-34.6037, -58.3816), sin geolocalización ni credenciales.
 
-Ubicación: pedir permiso de geolocalización. Si se niega, elegir ciudad a mano. Se guarda localmente y se refresca cada 30 minutos. Sin internet: se usa el último clima conocido.
+- `world/weather.ts`: temperatura actual, código WMO, nubosidad, precipitación y viento; refresco cada 30 minutos y al volver del segundo plano si corresponde.
+- `world/buenos-aires.ts`: calendario porteño independiente de la zona horaria del dispositivo, estaciones meteorológicas del hemisferio sur y cálculo solar de referencia.
+- Amanecer y atardecer de la API cuando hay datos; aproximación astronómica cuando no hay conexión. El cielo usa la hora real de Buenos Aires incluso si se acelera la simulación en debug.
+- Caché local opcional: datos recientes, último dato con aviso o referencia estacional explícita si pasaron más de 24 horas. Nunca presentar la referencia como clima actual.
+- Histórico de temperatura: forecast reciente y archivo para días anteriores, unido por timestamps UTC e interpolado por hora. Si faltan datos o falla la red, se informa en el diario que la ausencia se estimó.
+- La temperatura recibida llega al entorno de la simulación; la habitación y el agua conservan su inercia térmica. El clima histórico completo (lluvia/viento por hora) queda pendiente.
+- Crédito visible a Open-Meteo y su licencia CC BY 4.0. Sin analíticas ni envío de partidas.
 
 ### Efectos visuales
 
@@ -910,3 +913,11 @@ Cada fase termina con algo jugable y publicado en GitHub Pages.
 - El diario conserva las últimas 100 entradas entre sesiones y explica cuidados y alertas sin afirmar causas únicas.
 - Guardado v3: progreso del tutorial y diario separados de la simulación, migración de v1/v2 y validación estructural antes de cargar.
 - El reloj en vivo usa tiempo monotónico sin recortar cuadros lentos. En segundo plano no actualiza; al regresar recupera solo mediante catch-up.
+
+### Revisión visual: habitación, paisaje y pecera
+
+- Vista inicial completa a zoom 1, sin modal automático. Guía disponible en la barra. Tocar la pecera o Acuario acerca; Habitación vuelve a la vista general. Ventana abre el clima con control de apertura real; gato mantiene sus caricias cosméticas.
+- Cielo en tonos suaves, sol/luna, nubes escalonadas con viento, barrio lejano y árboles por estación. Jacarandá discreto en primavera, colores apagados en invierno, sin nieve estacional ficticia.
+- Tres composiciones de decoración visual guardables: Orilla natural, Jardín verde y Piedra y calma. Más especies del catálogo, plantas traseras y delanteras, raíces enterradas bajo una capa de sustrato y zona central libre.
+- Estas plantas son arte, todavía no absorben nutrientes ni crecen en la simulación. El selector lo explica.
+- Herramientas en el borde inferior en la habitación, sin tapar el acuario; clima y hora local en una tarjeta discreta. Controles HTML accesibles para acercar y volver, además de los gestos de canvas.

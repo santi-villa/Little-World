@@ -1,3 +1,4 @@
+import { buenosAiresDate } from './world/buenos-aires';
 import allTexts from './data/texts.es.json';
 import { createCat } from './sim/cat';
 import { advice } from './care';
@@ -51,7 +52,7 @@ const MIN_CATCH_UP_MS = 20_000;
 
 /** Minuto del día según el reloj del dispositivo. */
 function localMinuteOfDay(now: Date): number {
-  return now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  return buenosAiresDate(now.getTime()).hour * 60 + now.getSeconds() / 60;
 }
 
 export interface CatchUpReport {
