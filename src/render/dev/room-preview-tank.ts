@@ -35,7 +35,7 @@ export function buildPreviewTank(textures: PreviewTextures, bettaArt: Awaited<Re
   const game = new Game(state);
   game.enableGrains();
 
-  const fish = new FishLayer((id, facing) => new IllustratedBetta(id, facing, bettaArt));
+  const fish = new FishLayer((id, facing, species) => species === 'betta' ? new IllustratedBetta(id, facing, bettaArt) : undefined);
   const bubbles = new BubbleParticles(22);
   const interior = new Container({ label: 'room-preview-interior' });
   const frontMask = new Graphics().rect(x, y, width, height).fill(0xffffff);

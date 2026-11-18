@@ -194,8 +194,8 @@ export class TankView {
     this.mirrorUntil=this.lastSeconds+8;
   }
 
-  constructor(private readonly illustrated = false, betta?: ConstructorParameters<typeof FishLayer>[0]) {
-    this.fish = new FishLayer(betta);
+  constructor(private readonly illustrated = false, paintedFish?: ConstructorParameters<typeof FishLayer>[0]) {
+    this.fish = new FishLayer(paintedFish);
     if (illustrated) { this.optics = new IllustratedOptics(); this.bed = new AquariumBed(); this.paintedLid = new IllustratedLid(); }
     try{if(localStorage.getItem("lw-tank-glass")==="round")tankAppearance.shape="round";}catch{/* Storage can be unavailable. */}
     if (illustrated) {

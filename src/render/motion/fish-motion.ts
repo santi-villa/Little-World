@@ -1,3 +1,4 @@
+import { companionProfile, type CompanionProfile } from './illustrated-companions';
 import ecosystem from '../../data/ecosystem.json';
 import type {WaterVelocity} from './water-flow';
 import visual from '../../data/aquarium-visual.json';
@@ -60,6 +61,7 @@ export interface MotionAnimal {
 export interface MotionInput {
   /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
   bettaPrototype?: boolean;
+  illustratedCompanions?: boolean;
   renderDepth?:boolean;
   mirror?:{x:number;y:number;z:number};
   water?:WaterVelocity;
@@ -158,8 +160,8 @@ export class FishMotion {
     return this.time;
   }
 
-  private spawn(animal: MotionAnimal, bounds: Bounds): FishBody {
-    const [top, bottom] = zoneBand(animal.species);
+  private spawn(animal: MotionAnimal, bounds: Bounds, companion?: CompanionProfile): FishBody {
+    const [top, bottom] = companion?.band ?? zoneBand(animal.species);
     const r = this.random;
     const heading = r() < 0.5 ? 0 : Math.PI;
     const body: FishBody = {
@@ -182,8 +184,24 @@ export class FishMotion {
     return body;
   }
 
-  private pickGoal(body: FishBody, animal: MotionAnimal, bounds: Bounds): void {
+  private pickGoal(body: FishBody, animal: MotionAnimal, bounds: Bounds, companion?: CompanionProfile, habitat?: Habitat): void {
     const r = this.random;
+    if (companion) {
+      const [top, bottom] = companion.band;
+      const cory = animal.species.id === 'corydoras_paleatus';
+      const features = habitat?.features;
+      const feature = cory && features?.length && r() < 0.58
+        ? features[Math.floor(r() * features.length)] : undefined;
+      const shortHop = (0.085 + r() * 0.19) * (r() > 0.5 ? 1 : -1);
+      const x = feature
+        ? feature.x + (feature.x < 0.5 ? 0.07 : -0.07)
+        : cory ? body.x / bounds.width + shortHop : 0.13 + r() * 0.74;
+      body.goalX = bounds.width * Math.max(0.09, Math.min(0.91, x));
+      body.goalY = bounds.height * (top + (bottom - top) * r());
+      body.goalUntil = this.time + companion.goalSeconds[0] + (companion.goalSeconds[1] - companion.goalSeconds[0]) * r();
+      body.targetPlane = feature ? Math.max(0.5, Math.min(1.7, feature.z * 2 + 0.46)) : 0.72 + r() * 0.94;
+      return;
+    }
     let [top, bottom] = zoneBand(animal.species);
     if(animal.species.id==='betta' && r()<.35)[top,bottom]=[.12,.82];
     // Salidas ocasionales de su zona.
@@ -195,11 +213,11 @@ export class FishMotion {
     if (r() < 0.4) body.targetPlane = Math.floor(r() * 3);
   }
 
-  private schoolGoal(species: Species, bounds: Bounds): SchoolGoal {
+  private schoolGoal(species: Species, bounds: Bounds, companion?: CompanionProfile): SchoolGoal {
     let goal = this.schools.get(species.id);
     if (!goal || this.time >= goal.until) {
       const r = this.random;
-      const [top, bottom] = zoneBand(species);
+      const [top, bottom] = companion?.band ?? zoneBand(species);
       goal = {
         x: bounds.width * (0.12 + 0.76 * r()),
         y: bounds.height * (top + (bottom - top) * r()),
@@ -220,7 +238,7 @@ export class FishMotion {
     const present = new Set<number>();
     for (const animal of animals) {
       present.add(animal.id);
-      if (!this.bodies.has(animal.id)) this.bodies.set(animal.id, this.spawn(animal, bounds));
+      if (!this.bodies.has(animal.id)) this.bodies.set(animal.id, this.spawn(animal, bounds, input.illustratedCompanions ? companionProfile(animal.species.id) : undefined));
     }
     for (const id of this.bodies.keys()) if (!present.has(id)){this.bodies.delete(id);this.bettas.delete(id);}
     if (!(dt > 0)) return;
@@ -242,6 +260,9 @@ export class FishMotion {
       const body = this.bodies.get(animal.id) as FishBody;
       const sp = animal.species;
       const limits = limitsFor(sp);
+      const companion = input.illustratedCompanions ? companionProfile(sp.id) : undefined;
+      const cory = !!companion && sp.id === 'corydoras_paleatus';
+      if (companion) limits.maxTurn *= companion.turn;
       const group=sp.zone==='bottom'?'bottom':sp.traits.includes('slow')?'slow':groupStyle(sp)!=='none'?'school':'active';
       const profile=ecosystem.motionGroups[group];
       const condition=(animal.condition??1);if(input.water){limits.maxSpeed*=profile.cruise;limits.maxAccel*=profile.acceleration;}
@@ -264,8 +285,8 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       if(sp.id==='betta' && input.bettaPrototype){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,{...input,trackingTargets:this.bodies},this.time,r);continue;}
 
       const crawler = sp.category !== 'fish';
-      const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
-      const [bandTop, bandBottom] = zoneBand(sp);
+      const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (companion?.cruise ?? 1) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
+      const [bandTop, bandBottom] = companion?.band ?? zoneBand(sp);
       let desired: Vec = { x: 0, y: 0 };
       let boost = 1;
 
@@ -291,7 +312,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
         case 'rest': {
           // Los que respiran aire descansan arriba; el resto, cerca del fondo.
           const leaf=input.habitat && sp.traits.includes('labyrinth')?habitatTarget(input.habitat.leaves,body.x,body.y,bounds.width,depth):null;
-          const y = leaf?.y ?? (sp.traits.includes('labyrinth') ? depth * 0.08 : depth * 0.86);
+          const y = leaf?.y ?? depth * (companion?.rest ?? (sp.traits.includes('labyrinth') ? 0.08 : 0.86));
           if (body.goalUntil < this.time || Math.abs(body.goalY - y) > 1) {
             body.goalX = leaf?.x ?? Math.min(bounds.width * 0.92, Math.max(bounds.width * 0.08, body.x));
             body.goalY = y;
@@ -307,7 +328,8 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
           // Los rincones del fondo, en el plano de atrás.
           const x = body.x < bounds.width / 2 ? bounds.width * 0.07 : bounds.width * 0.93;
           const refuge=input.habitat?habitatTarget(input.habitat.refuges,body.x,body.y,bounds.width,depth):null;
-          desired = arrive(body, refuge?.x??x, refuge?.y??depth*.9, limits.maxSpeed*.6, 3);
+          const shelterY = cory ? Math.max(depth * 0.87, refuge?.y ?? 0) : refuge?.y ?? depth * 0.9;
+          desired = arrive(body, refuge?.x ?? x, shelterY, limits.maxSpeed * 0.6, 3);
           body.targetPlane = PLANE_FAR;
           break;
         }
@@ -365,19 +387,26 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
         case 'school':
         case 'explore':
         default: {
-          if (animal.intent === 'school' && style !== 'none' && mates.length > 1) {
-            const goal = this.schoolGoal(sp, bounds);
+          if (animal.intent === 'school' && style !== 'none' && mates.length > 1 && !cory) {
+            const goal = this.schoolGoal(sp, bounds, companion);
             body.targetPlane = goal.plane;
             desired = arrive(body, goal.x, goal.y, cruise, 6);
           } else {
-            if(sp.id==='betta' && this.time<(body.pauseUntil??0)){desired={x:0,y:0};break;}
-            const arrived=length(body.goalX-body.x,body.goalY-body.y)<2;
-            if(sp.id==='betta' && arrived && body.goalUntil>=0){body.pauseUntil=this.time+.5+1.2*r();body.goalUntil=-1;desired={x:0,y:0};break;}
-            if (this.time >= body.goalUntil || arrived) {
-              this.pickGoal(body, animal, bounds);if(input.water)body.goalUntil=this.time+(body.goalUntil-this.time)*profile.goalSeconds;
+            const canPause = sp.id === 'betta' || !!companion;
+            if (canPause && this.time < (body.pauseUntil ?? 0)) break;
+            const arrived = length(body.goalX - body.x, body.goalY - body.y) < (cory ? 1.45 : 2);
+            if (canPause && arrived && body.goalUntil >= 0) {
+              const [min, max] = companion?.pause ?? [0.5, 1.7];
+              body.pauseUntil = this.time + min + (max - min) * r();
+              body.goalUntil = -1;
+              break;
             }
-            const toGoal = arrive(body, body.goalX, body.goalY, cruise, 5);
-            const drift = wander(body, cruise * 0.5, 1.5, dt, r);
+            if (this.time >= body.goalUntil || arrived) {
+              this.pickGoal(body, animal, bounds, companion, input.habitat);
+              if (input.water && !companion) body.goalUntil = this.time + (body.goalUntil - this.time) * profile.goalSeconds;
+            }
+            const toGoal = arrive(body, body.goalX, body.goalY, cruise, cory ? 3.2 : 5);
+            const drift = wander(body, cruise * (companion?.drift ?? 0.5), 1.5, dt, r);
             desired = { x: toGoal.x + drift.x, y: toGoal.y + drift.y };
           }
           break;
@@ -419,7 +448,9 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const wall = containment(body, bounds, Math.max(2, animal.sizeCm), limits.maxSpeed);
       desired.x += wall.x;
       if (animal.intent !== 'eat' && animal.intent !== 'gasp' && animal.intent !== 'rest') {
-        desired.y += wall.y;
+        // Keep normal horizontal containment, with a smaller vertical buffer
+        // so a bottom dweller can actually reach the substrate.
+        desired.y += cory ? containment(body, bounds, 1.65, limits.maxSpeed * 0.48).y : wall.y;
         // Tira suave hacia su zona cuando anda paseando.
         if (animal.intent === 'explore' || animal.intent === 'school') {
           const y = body.y / depth;
@@ -453,7 +484,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       if(input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.x=safe.x;body.y=safe.y;}
       if(['explore','school'].includes(animal.intent)){
         body.slowSeconds=Math.hypot(body.vx,body.vy)<.12?(body.slowSeconds??0)+dt:0;
-        if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body,animal,bounds);body.slowSeconds=0;}
+        if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body, animal, bounds, companion, input.habitat);body.slowSeconds=0;}
       }
       if(input.water?.constrain){const p=input.water.constrain(body.x,body.y,animal.sizeCm*.15);body.x=p.x;body.y=p.y;}
       // Cambio de plano suave.

@@ -451,3 +451,26 @@ it('el betta mantiene el grano que venía siguiendo y vuelve a recorrer el acuar
   expect(fish.goalX).not.toBe(closer.x);
   expect(Math.hypot(fish.vx, fish.vy)).toBeGreaterThan(0);
 });
+
+it('la corydora patrulla el fondo mientras el neón cubre más agua arriba', () => {
+  const motion = new FishMotion(64);
+  const list = [...animals('corydoras_paleatus', 1, 'explore'), ...animals('neon_tetra', 1, 'explore', 2)];
+  const data = input(list, {
+    illustratedCompanions: true,
+    renderDepth: true,
+    habitat: { obstacles: [], leaves: [], refuges: [], features: [{ x: 0.3, y: 0.57, z: 0.35 }] },
+  });
+  let coryY = 0, neonY = 0, coryDistance = 0, neonDistance = 0, samples = 0;
+  run(motion, data, 42, () => {
+    const [cory, neon] = bodiesOf(motion, list);
+    coryY += cory!.y;
+    neonY += neon!.y;
+    coryDistance += Math.hypot(cory!.vx, cory!.vy) * DT;
+    neonDistance += Math.hypot(neon!.vx, neon!.vy) * DT;
+    samples++;
+  });
+  expect(coryY / samples).toBeGreaterThan(BOUNDS.height * 0.78);
+  expect(neonY / samples).toBeLessThan(BOUNDS.height * 0.57);
+  expect(coryDistance).toBeGreaterThan(BOUNDS.width * 0.25);
+  expect(neonDistance).toBeGreaterThan(coryDistance * 1.5);
+});

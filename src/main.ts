@@ -69,10 +69,23 @@ async function loadGame(): Promise<LoadedGame> {
   }
 }
 
-async function boot(illustrated: boolean): Promise<void> {
+function fishPreviewGame(): LoadedGame {
+  const game = Game.newTank(416, 'rect_65');
+  game.act({ type: 'addAnimals', speciesId: 'corydoras_paleatus', count: 1 });
+  game.act({ type: 'addAnimals', speciesId: 'neon_tetra', count: 1 });
+  // The specimens are already acclimated in this temporary observation tank.
+  for (const animal of game.state.animals) {
+    animal.ageDays = defaultConfig.fish.adultAgeDays;
+    animal.intent = 'explore';
+    animal.intentUntil = game.state.timeMinutes + 15;
+  }
+  return { game, savingWorks: false, note: '', lastTimestamp: 0 };
+}
+
+async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   const stage = document.getElementById('stage');
   if (!stage) throw new Error('Falta #stage');
-  document.title = texts.title;
+  document.title = fishPreview ? 'Peces ilustrados · Little World' : texts.title;
   const hint = document.querySelector('#rotate-hint p');
   if (hint) hint.textContent = texts.rotateHint;
 
@@ -98,7 +111,7 @@ async function boot(illustrated: boolean): Promise<void> {
   attachViewport(app.canvas, stage);
   if (illustrated) app.canvas.style.imageRendering = 'auto';
 
-  const { game, savingWorks, note, lastTimestamp } = await loadGame();
+  const { game, savingWorks, note, lastTimestamp } = fishPreview ? fishPreviewGame() : await loadGame();
   const welcome = new WelcomePanel(document.body);
   // Buenos Aires: modeled current weather, solar times, cache and historical temperatures.
   let weatherStorage: Storage | undefined;
@@ -166,15 +179,17 @@ async function boot(illustrated: boolean): Promise<void> {
     }
   };
 
-  beforeAppUpdate(async()=>{
-    await initialRecovery;
-    // Wait for an in-flight save before requesting a final snapshot.
-    while(saving)await new Promise(resolve=>window.setTimeout(resolve,25));
-    game.dirty=true;
-    await save();
-    if(game.dirty||!savingWorks)throw new Error('No se pudo confirmar el guardado');
-  });
-  startAppUpdates();
+  if (!fishPreview) {
+    beforeAppUpdate(async () => {
+      await initialRecovery;
+      // Wait for an in-flight save before requesting a final snapshot.
+      while (saving) await new Promise(resolve => window.setTimeout(resolve, 25));
+      game.dirty = true;
+      await save();
+      if (game.dirty || !savingWorks) throw new Error('No se pudo confirmar el guardado');
+    });
+    startAppUpdates();
+  }
 
   const saveStatus = (): string => {
     if (!savingWorks) return texts.save.unavailable;
@@ -184,8 +199,8 @@ async function boot(illustrated: boolean): Promise<void> {
     return `${prefix} · ${fill(texts.save.ago, { seconds })}`;
   };
 
-  const [bettaRenderer] = await Promise.all([
-    illustrated ? import('./render/scene/illustrated-fish').then(({ loadBettaRenderer }) => loadBettaRenderer()) : undefined,
+  const [paintedFishRenderer] = await Promise.all([
+    illustrated ? import('./render/scene/illustrated-fish').then(({ loadIllustratedFishRenderer }) => loadIllustratedFishRenderer()) : undefined,
     loadAssets(illustrated),
   ]);
   // UI de papel y madera: arte en variables CSS, cursores y nombres al tocar largo.
@@ -205,7 +220,7 @@ async function boot(illustrated: boolean): Promise<void> {
     if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
-  }, illustrated, bettaRenderer);
+  }, illustrated, paintedFishRenderer);
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   tools.onObserveAnimal=id=>scene.showFish(id);
   tools.onMirror=id=>scene.showMirror(id);
@@ -227,7 +242,7 @@ async function boot(illustrated: boolean): Promise<void> {
 
   // An explicit flag also lets a production build be inspected without
   // putting debug controls in the normal player experience.
-  const debug = import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+  const debug = !fishPreview && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'));
   document.body.classList.toggle('has-debug-tools', debug);
   const panel = debug ? new DebugPanel(game, document.body, {
     saveStatus,
@@ -389,7 +404,7 @@ const entry = query.has('room-preview')
   ? import('./render/dev/room-preview').then(({ openRoomPreview }) => openRoomPreview())
   : import.meta.env.DEV && query.has('betta-lab')
     ? import('./render/dev/betta-comparison').then(({ openBettaComparison }) => openBettaComparison({ standalone: true }))
-    : boot(!query.has('classic-room'));
+    : boot(!query.has('classic-room') || query.has('fish-preview'), query.has('fish-preview'));
 entry.catch((error) => {
   console.error(error);
   const message = document.createElement('pre');

@@ -1,5 +1,6 @@
 import config from "../../data/illustrated-betta.json";
 import type { BettaDynamics } from "./betta-dynamics";
+import type { CompanionProfile } from "./illustrated-companions";
 import type { FishBody } from "./fish-motion";
 import { angleDiff } from "./steering";
 
@@ -17,6 +18,7 @@ export interface IllustratedInput {
   condition: number;
   current: { x: number; y: number };
   food?: MouthTarget;
+  swim?: { speed: number; resting: boolean; pitch: number };
 }
 const clamp = (x: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, x));
@@ -46,7 +48,7 @@ export class IllustratedBettaPose {
   private nibbleAt = -Infinity;
   private pectoralPhase = 0;
   private breathPhase = 0;
-  constructor(facing = 1, seed = 0) {
+  constructor(facing = 1, seed = 0, private readonly companion?: CompanionProfile) {
     this.yaw = facing < 0 ? Math.PI : 0;
     this.phase = seed * 2.399;
     this.fins = {
@@ -79,10 +81,10 @@ export class IllustratedBettaPose {
     );
     this.previousSpeed = speed;
     this.previousHeading = b.heading;
-    const resting = input.motion?.mode === "sleep",
+    const resting = input.swim?.resting ?? input.motion?.mode === "sleep",
       startled = input.motion?.mode === "startle",
       burst = input.motion?.stroke === "burst";
-    const effortTarget = input.alive
+    let effortTarget = input.alive
       ? resting
         ? 0.01
         : clamp(
@@ -105,6 +107,10 @@ export class IllustratedBettaPose {
             1,
           ) * input.condition
       : 0;
+    const companion = this.companion;
+    if (companion && input.swim && input.alive && !resting) {
+      effortTarget = clamp(input.swim.speed * 0.93 + Math.max(0, acceleration) / L * 0.085, 0, 1) * input.condition;
+    }
     let remaining = elapsed;
     while (remaining > 1e-8) {
       const h = Math.min(c.stepSeconds, remaining);
@@ -113,7 +119,7 @@ export class IllustratedBettaPose {
       this.frequency = ease(
         this.frequency,
         input.alive
-          ? c.baseHz + this.effort * (startled ? c.startleHz : c.strokeHz)
+          ? (companion?.frequencies[0] ?? c.baseHz) + this.effort * (companion?.frequencies[1] ?? (startled ? c.startleHz : c.strokeHz))
           : 0,
         h,
         c.frequencyEase,
@@ -126,7 +132,7 @@ export class IllustratedBettaPose {
       const targetYaw = b.facing < 0 ? Math.PI : 0;
       if (input.alive)
         this.yaw +=
-          angleDiff(targetYaw, this.yaw) * (1 - Math.exp(-h * c.turnEase));
+          angleDiff(targetYaw, this.yaw) * (1 - Math.exp(-h * (companion?.turnEase ?? c.turnEase)));
       const foodClose =
         !!input.food && input.food.distance < input.lengthCm * 0.65;
       const foodPitch = foodClose
@@ -141,11 +147,11 @@ export class IllustratedBettaPose {
         : undefined;
       this.pitch = ease(
         this.pitch,
-        input.alive ? (foodPitch ?? input.motion?.pitch ?? 0) : 0,
+        input.alive ? (foodPitch ?? input.motion?.pitch ?? input.swim?.pitch ?? 0) : 0,
         h,
         c.pitchEase,
       );
-      const amplitude = resting ? 0.002 : 0.012 + 0.095 * this.effort;
+      const amplitude = resting ? 0.002 : (0.012 + 0.095 * this.effort) * (companion?.bend ?? 1);
       const wave = Math.sin(this.phase),
         curve = clamp(this.turnRate * 0.05, -0.13, 0.13);
       this.head = ease(
@@ -274,9 +280,9 @@ export function skinBettaPoint(
   x: number,
   y: number,
   p: IllustratedBettaPose,
+  r: typeof config.rig = config.rig,
 ): { x: number; y: number } {
-  const r = config.rig,
-    headAngle = p.head,
+  const headAngle = p.head,
     bodyAngle = headAngle + p.body,
     rearAngle = bodyAngle + p.rear;
   const bodyPivot = rotate(r.rear - r.head, 0, bodyAngle);

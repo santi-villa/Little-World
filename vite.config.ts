@@ -45,9 +45,15 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         // json incluido: manifest.json de los assets tiene que venir de la misma versión que sus PNG.
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}', 'art/*.jpg'],
         cleanupOutdatedCaches: true,
-        globIgnores: ['assets/**/*.png', 'assets/manifest.json'],
+        // Exclude the original public PNG copies. The hashed fish textures
+        // are part of the same bundle as their meshes and must work offline.
+        globIgnores: [
+          'assets/**/!(betta-illustrated-atlas-*|betta-front-head-*|corydoras-illustrated-*|neon-tetra-illustrated-*).png',
+          'assets/manifest.json',
+        ],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
     }),
   ],

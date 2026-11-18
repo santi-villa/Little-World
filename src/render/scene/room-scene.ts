@@ -143,11 +143,11 @@ export class RoomScene {
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
   constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | 'status' | CareId, animalId?: number) => void,
     private readonly illustrated = false,
-    betta?: ConstructorParameters<typeof TankView>[1],
+    paintedFish?: ConstructorParameters<typeof TankView>[1],
   ) {
     this.data = roomData(illustrated ? 'illustrated-bedroom' : ROOM_ID);
     this.room = new Sprite(tex(this.data.background));
-    this.tank = new TankView(illustrated, betta);
+    this.tank = new TankView(illustrated, paintedFish);
     this.cat = new CatView(illustrated ? illustratedRoom.cat : undefined, illustrated);
     if (illustrated) {
       this.room.width = GAME_WIDTH;
