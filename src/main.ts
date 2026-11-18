@@ -360,9 +360,12 @@ async function boot(): Promise<void> {
   });
 }
 
-const entry=import.meta.env.DEV&&new URL(location.href).searchParams.has('betta-lab')
-  ? import('./render/dev/betta-comparison').then(({openBettaComparison})=>openBettaComparison({standalone:true}))
-  : boot();
+const query = new URL(location.href).searchParams;
+const entry = query.has('room-preview')
+  ? import('./render/dev/room-preview').then(({ openRoomPreview }) => openRoomPreview())
+  : import.meta.env.DEV && query.has('betta-lab')
+    ? import('./render/dev/betta-comparison').then(({ openBettaComparison }) => openBettaComparison({ standalone: true }))
+    : boot();
 entry.catch((error) => {
   console.error(error);
   const message = document.createElement('pre');

@@ -10,6 +10,8 @@ import { Container } from 'pixi.js';
 import type { HandInput } from '../motion/hand';
 import { drawPixelText, textWidth } from '../ui/pixel-font';
 import { ART } from '../art-direction';
+import type { IllustratedBetta } from '../dev/illustrated-betta';
+type BettaFactory = (id: number, facing: number) => IllustratedBetta | undefined;
 /**
  * Animales y comida dentro del agua, dibujados con formas simples de colores
  * (placeholders hasta que haya sprites). El movimiento sale de FishMotion;
@@ -41,9 +43,14 @@ function hex(color: string): number {
 
 export class FishLayer {
   private bettaExperiment?:import('../dev/betta-experiment').BettaExperiment;
-  private readonly illustratedBettas=new Map<number,import('../dev/illustrated-betta').IllustratedBetta>();
+  private readonly illustratedBettas=new Map<number,IllustratedBetta>();
   private devPanel?:import('../motion/betta-debug').BettaDebug;
-  constructor(){if(import.meta.env.DEV)void import('../motion/betta-debug').then(({BettaDebug})=>{this.devPanel=new BettaDebug();});if(import.meta.env.DEV)void import('../dev/betta-experiment').then(({BettaExperiment})=>{this.bettaExperiment=new BettaExperiment();});}
+  constructor(private readonly createPreviewBetta?: BettaFactory) {
+    if (import.meta.env.DEV && !createPreviewBetta) {
+      void import('../motion/betta-debug').then(({ BettaDebug }) => { this.devPanel = new BettaDebug(); });
+      void import('../dev/betta-experiment').then(({ BettaExperiment }) => { this.bettaExperiment = new BettaExperiment(); });
+    }
+  }
 
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
@@ -267,19 +274,38 @@ export class FishLayer {
     const dir = body.facing;
 
     if(sp.id==='betta'){
-      let fish=this.codedBettas.get(animal.id);if(!fish){fish=new CodeBetta(animal.id,body.facing,sp);this.codedBettas.set(animal.id,fish);}
-      const parent=body.plane<1.2?this.artBack:this.artFront;if(fish.container.parent!==parent)parent.addChild(fish.container);
-      const motion=this.motion.bettas.get(animal.id);
-      fish.container.visible=true;
-      fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,motion,animal.condition);fish.container.tint=tint(0xffffff);
-      if(import.meta.env.DEV&&(this.bettaExperiment?.illustrated||this.illustratedBettas.has(animal.id))){
-        let trial=this.illustratedBettas.get(animal.id);
-        if(!trial){trial=this.bettaExperiment?.create(animal.id,body.facing);if(trial)this.illustratedBettas.set(animal.id,trial);}
-        if(trial){
-          const parent=body.plane<1.2?this.artBack:this.artFront;if(trial.container.parent!==parent)parent.addChild(trial.container);trial.container.visible=!!this.bettaExperiment?.illustrated;fish.container.visible=!trial.container.visible;
-          const grain=this.food.nearest(body.x,body.y,[0,1]),distance=grain?Math.hypot(body.x-grain.x,body.y-grain.y,((grain.z??body.plane/2)-body.plane/2)*this.water.width*.5):Infinity;
-          trial.update({body,motion:this.motion.bettas.get(animal.id),lengthCm:animal.visualSizeCm??animal.sizeCm,alive:animal.alive,condition:animal.condition??1,current:this.water.getWaterVelocity(body.x,body.y),food:animal.intent==='eat'&&grain?{x:grain.x,y:grain.y,distance}:undefined},cx,cy,len,this.dt,lightOn,finDamage);trial.container.tint=tint(0xffffff);
+      const parent = body.plane < 1.2 ? this.artBack : this.artFront;
+      const motion = this.motion.bettas.get(animal.id);
+      const showIllustrated = !!this.createPreviewBetta || (import.meta.env.DEV && !!this.bettaExperiment?.illustrated);
+      let trial = showIllustrated ? this.illustratedBettas.get(animal.id) : undefined;
+      if (showIllustrated && !trial) {
+        trial = this.createPreviewBetta?.(animal.id, body.facing) ?? this.bettaExperiment?.create(animal.id, body.facing);
+        if (trial) this.illustratedBettas.set(animal.id, trial);
+      }
+      if (trial) {
+        if (trial.container.parent !== parent) parent.addChild(trial.container);
+        trial.container.visible = true;
+        const grain = this.food.nearest(body.x, body.y, [0, 1]);
+        const distance = grain
+          ? Math.hypot(body.x - grain.x, body.y - grain.y, ((grain.z ?? body.plane / 2) - body.plane / 2) * this.water.width * 0.5)
+          : Infinity;
+        trial.update({
+          body, motion, lengthCm: animal.visualSizeCm ?? animal.sizeCm,
+          alive: animal.alive, condition: animal.condition ?? 1,
+          current: this.water.getWaterVelocity(body.x, body.y),
+          food: animal.intent === 'eat' && grain ? { x: grain.x, y: grain.y, distance } : undefined,
+        }, cx, cy, len, this.dt, lightOn, finDamage);
+        trial.container.tint = tint(0xffffff);
+      } else {
+        let fish = this.codedBettas.get(animal.id);
+        if (!fish) {
+          fish = new CodeBetta(animal.id, body.facing, sp);
+          this.codedBettas.set(animal.id, fish);
         }
+        if (fish.container.parent !== parent) parent.addChild(fish.container);
+        fish.container.visible = true;
+        fish.update(body, cx, cy, len, this.dt, sp.swim.speedCmS, animal.intent, animal.alive, lightOn, finDamage, motion, animal.condition);
+        fish.container.tint = tint(0xffffff);
       }
       if(import.meta.env.DEV)this.devPanel?.draw(this.foodGraphics,body,motion,cx,cy,this.pxPerCm);
       if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
