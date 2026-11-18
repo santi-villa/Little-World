@@ -92,6 +92,10 @@ export class RoomScene {
   private readonly glow = new Graphics();
   private readonly handOverlay=new Graphics();
   private readonly tank = new TankView();
+  private hybrid?:import('../dev/hybrid-tank-dev').HybridTankDev;
+  private readonly focusShade=new Graphics();
+  private get tankBounds(){return this.hybrid?.bounds??this.tank.bounds;}
+  private tankPoint(p:Point):Point{return this.hybrid?.toTankPoint(p)??p;}
   private readonly cat = new CatView();
   private readonly ui = new SceneUi();
   /** Los vidrios de la ventana, en píxeles gordos. */
@@ -165,6 +169,7 @@ export class RoomScene {
       this.room,
       decor,
       this.anim,
+      this.focusShade,
       this.tank.container,
       this.handOverlay,
       this.cat.container,
@@ -175,6 +180,9 @@ export class RoomScene {
     this.container.addChild(this.world);
     this.roomView = { ...this.data.camera };
     this.camera.goTo(this.roomView, true);
+    if(import.meta.env.DEV)void import('../dev/hybrid-tank-dev').then(({HybridTankDev})=>{
+      const index=this.world.getChildIndex(this.tank.container);this.hybrid=new HybridTankDev(this.tank);this.world.addChildAt(this.hybrid.container,index);this.hybrid.setFocus(this.mode==='tank');
+    });
   }
 
   update(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): void {
@@ -187,13 +195,17 @@ export class RoomScene {
       this.decorId = decorId;
       this.tank.setDecor(decorId === 'garden' ? decorData.garden : decorId === 'stones' ? decorData.stones : decorData.default);
     }
-    if (document.body.dataset.view !== this.mode) document.body.dataset.view = this.mode;
+
     const hand=this.hand;
     this.tank.setHand(this.mode==='tank' && hand ? {x:hand.x*state.tank.lengthCm,y:hand.y*(this.tank.waterBounds.height/Math.max(1,this.tank.waterBounds.width))*state.tank.lengthCm,speed:hand.speed,age:seconds-hand.at}:null);
     document.body.dataset.handTool=this.handTool;
     this.tank.fish.bettaStyle=view.bettaStyle??'code';
     this.tank.update(state, derived, seconds);
-    if(this.followingId!==null){const p=this.tank.fishPoint(this.followingId),animal=state.animals.find(a=>a.id===this.followingId);if(!p||!animal?.alive)this.showTank();else this.focusOn({x:p.x,y:p.y,zoom:this.camera.target.zoom},false);}
+    this.hybrid?.update(state,derived,dt);
+    this.focusShade.clear();const dim=this.hybrid?.roomDim??0;if(dim>0)this.focusShade.rect(0,0,GAME_WIDTH,GAME_HEIGHT).fill({color:0x061c24,alpha:dim});
+    const uiMode=this.mode==='tank'&&this.hybrid?.active&&!this.hybrid.ready?'room':this.mode;
+    if(document.body.dataset.view!==uiMode)document.body.dataset.view=uiMode;
+    if(this.followingId!==null&&!this.hybrid?.moving){const p=this.tank.fishPoint(this.followingId),animal=state.animals.find(a=>a.id===this.followingId);if(!p||!animal?.alive)this.showTank();else this.focusOn({x:p.x,y:p.y,zoom:this.camera.target.zoom},false);}
 
     this.handOverlay.clear();
     if(this.mode==='tank' && hand && seconds-hand.at<2){
@@ -233,7 +245,7 @@ export class RoomScene {
 
   pointerLeave():void {this.hand=null;this.tank.setHand(null);}
   private normalized(p:Point):{x:number;y:number}|null {
-    const w=this.camera.toWorld(p.x,p.y),r=this.tank.waterBounds;
+    const w=this.tankPoint(this.camera.toWorld(p.x,p.y)),r=this.tank.waterBounds;
     if(!inRect(r,w.x,w.y))return null;
     return {x:(w.x-r.x)/r.width,y:(w.y-r.y)/r.height};
   }
@@ -313,7 +325,10 @@ export class RoomScene {
       return;
     }
 
-    const w = this.camera.toWorld(p.x, p.y);
+    const worldPoint=this.camera.toWorld(p.x,p.y);
+    if(this.mode==='tank'&&this.hybrid?.active&&!this.hybrid.ready)return;
+    if(this.mode==='room'&&this.hybrid?.active&&this.hybrid.contains(worldPoint)){this.showTank();return;}
+    const w = this.tankPoint(worldPoint);
     if (this.mode === 'tank') {
       const r=this.tank.waterBounds,state=this.state;
       if(!state)return;
@@ -346,14 +361,14 @@ export class RoomScene {
       return;
     }
     if (this.mode === 'cat') {
-      if (this.cat.hit(w.x, w.y)) this.petCat();
+      if (this.cat.hit(worldPoint.x, worldPoint.y)) this.petCat();
       return;
     }
 
     if(this.mode==='room'){const id=this.tank.fishAt(w.x,w.y);if(id!==null){this.showFish(id);this.fishDetails();return;}}
 
-    const live = { tank: this.tank.bounds, cat: this.cat.rect };
-    const zone = this.data.zones.find((z) => inRect(zoneRect(z, live), w.x, w.y));
+    const live = { tank: this.tankBounds, cat: this.cat.rect };
+    const zone = this.data.zones.find((z) => inRect(zoneRect(z, live), worldPoint.x, worldPoint.y));
     if (!zone) return;
     this.glowZone = { zone, since: this.seconds };
     this.runZone(zone);
@@ -422,19 +437,19 @@ export class RoomScene {
       const tool={food:'pinch',sponge:'sponge',observe:'lens',tap:'tap',bucket:'bucket',kit:'point',filter:'point'} as const;
       if(this.handTool!=='hand')return tool[this.handTool];
     }
-    const w=this.camera.toWorld(p.x,p.y);
-    if(this.cat.hit(w.x,w.y))return 'pet';
+    const worldPoint=this.camera.toWorld(p.x,p.y),w=this.tankPoint(worldPoint);
+    if(this.cat.hit(worldPoint.x,worldPoint.y))return 'pet';
     if(this.mode==='tank')return this.tank.fishAt(w.x,w.y)!==null?'point':'open';
     if(this.mode==='room'){
-      const live={tank:this.tank.bounds,cat:this.cat.rect};
-      if(this.data.zones.some(z=>inRect(zoneRect(z,live),w.x,w.y)))return 'point';
+      const live={tank:this.tankBounds,cat:this.cat.rect};
+      if(this.data.zones.some(z=>inRect(zoneRect(z,live),worldPoint.x,worldPoint.y)))return 'point';
     }
     return 'open';
   }
 
   /** El nombre de lo que hay en ese punto (toque largo o hover). */
   describe(p:Point):string|null {
-    const w=this.camera.toWorld(p.x,p.y);
+    const worldPoint=this.camera.toWorld(p.x,p.y),w=this.tankPoint(worldPoint);
     if(this.mode==='tank'){
       const id=this.tank.fishAt(w.x,w.y);
       const animal=id===null?undefined:this.state?.animals.find(a=>a.id===id);
@@ -442,9 +457,9 @@ export class RoomScene {
       if(this.handTool!=='hand')return texts.ui.tools[this.handTool];
       return null;
     }
-    if(this.cat.hit(w.x,w.y))return texts.ui.zones.cat;
-    const live={tank:this.tank.bounds,cat:this.cat.rect};
-    const zone=this.data.zones.find(z=>inRect(zoneRect(z,live),w.x,w.y));
+    if(this.cat.hit(worldPoint.x,worldPoint.y))return texts.ui.zones.cat;
+    const live={tank:this.tankBounds,cat:this.cat.rect};
+    const zone=this.data.zones.find(z=>inRect(zoneRect(z,live),worldPoint.x,worldPoint.y));
     return zone?(texts.ui.zones as Record<string,string>)[zone.id]??null:null;
   }
 
@@ -472,9 +487,11 @@ export class RoomScene {
 
   private enterFocus(mode: UiMode, view: CameraView): void {
     if (this.mode === 'room') this.roomView = { ...this.camera.target };
+    const projected=this.hybrid?.active&&(mode==='tank'||this.mode==='tank');
+    this.hybrid?.setFocus(mode==='tank');
     this.mode = mode;
     this.focusSince = this.seconds;
-    this.focusOn(view, true);
+    if(projected)this.camera.goTo(view,false,this.hybrid!.duration);else this.focusOn(view, true);
   }
 
   private focusOn(view: CameraView, snap: boolean): void {
@@ -490,7 +507,8 @@ export class RoomScene {
     this.followingId=null;
     if (this.mode === 'room') return;
     this.mode = 'room';this.handTool='hand';this.pointerLeave();
-    this.camera.goTo(this.roomView);
+    const duration=this.hybrid?.active?this.hybrid.duration:undefined;this.hybrid?.setFocus(false);
+    this.camera.goTo(this.roomView,false,duration);
   }
 
   /** Acaricia al gato: la simulación lo registra y el gato pasa a los mimos. */
@@ -518,7 +536,7 @@ export class RoomScene {
       return;
     }
     const k = 1 - age / GLOW_SECONDS;
-    const r = zoneRect(this.glowZone.zone, { tank: this.tank.bounds, cat: this.cat.rect });
+    const r = zoneRect(this.glowZone.zone, { tank: this.tankBounds, cat: this.cat.rect });
     const x = Math.round(r.x);
     const y = Math.round(r.y);
     const w = Math.round(r.width);
@@ -530,7 +548,7 @@ export class RoomScene {
 
   /** Dibuja la habitación y devuelve cuánta luz de día hay (0 noche .. 1 pleno día). */
   private drawRoom(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): number {
-    const tank = this.tank.bounds;
+    const tank = this.tankBounds;
     // La hora puede venir del panel de debug (solo cambia lo que se ve).
     const day = scenePreview.hour === null && view.outside ? view.outside.daylight : daylight(scenePreview.hour ?? derived.hour);
     const light = day * WEATHER_LIGHT[view.weather];

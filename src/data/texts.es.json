@@ -694,5 +694,26 @@
         "description": "Un golpe de vidrio usa el susto y la ráfaga existentes; después vuelve al planeo."
       }
     }
+  },
+  "hybridTank": {
+    "panel": "Pecera híbrida · desarrollo",
+    "mode": "Sistema de pecera",
+    "current": "A · Sistema actual",
+    "hybrid": "B · Volumen híbrido",
+    "positionX": "Posición horizontal",
+    "positionY": "Posición vertical",
+    "scale": "Escala en la habitación",
+    "depth": "Profundidad aparente",
+    "angle": "Ángulo lateral",
+    "reflection": "Reflejos",
+    "illumination": "Luz del acuario",
+    "duration": "Duración del acercamiento",
+    "export": "Exportar parámetros JSON",
+    "reset": "Restablecer parámetros",
+    "parameters": "Configuración visual de pecera híbrida",
+    "note": "Un mismo acuario vivo. Los ajustes no cambian la partida.",
+    "round": "El vidrio redondo conserva la vista original en este prototipo.",
+    "status": "Frente vivo · sin textura intermedia",
+    "exportHelp": "Archivo para reemplazar src/data/hybrid-tank.json después de revisar los ajustes."
   }
 }

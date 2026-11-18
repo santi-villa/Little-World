@@ -180,6 +180,9 @@ export class TankView {
     this.container.addChild(this.art);
   }
 
+  /** La carcasa experimental rectangular conserva el render original de las redondas. */
+  get isRound():boolean{return this.round;}
+
   /** Rectángulo de la pecera entera, con tapa y base (para ubicar al gato y los toques). */
   get bounds(): TankRect {
     return this.outer;
@@ -329,7 +332,7 @@ export class TankView {
   }
 
   /** Color del agua a una profundidad (0 superficie .. 1 fondo). */
-  private waterColor(lit: boolean, tannins: number, depth: number): number {
+  waterColor(lit: boolean, tannins: number, depth: number): number {
     const clear = lit ? lerpColor(0x6caaa1, 0x294e50, depth) : lerpColor(0x14434e, 0x0a2731, depth);
     const amber = lit ? lerpColor(0xc08a34, 0x6a4418, depth) : lerpColor(0x4a3413, 0x2a1c0c, depth);
     return lerpColor(clear, amber, tannins * 0.6);

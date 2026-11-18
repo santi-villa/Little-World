@@ -53,3 +53,7 @@ La revisión final también ajustó la invalidación del hábitat al cambiar el 
 ## Comparación de betta ilustrado
 
 La rama experimental agrega un render optativo de desarrollo para el betta y un laboratorio aislado. No modifica la química, FoodGrain, BettaDynamics, FishMotion ni el render de otras especies. La animación lee corriente y partículas reales; no introduce otro consumo ni otro comportamiento. Recursos y limitaciones en [BETTA-ILUSTRADO.md](BETTA-ILUSTRADO.md).
+
+## Prototipo de carcasa híbrida
+
+`experiment/pecera-hibrida` agrega una presentación exterior en desarrollo, sin modificar corrientes, mallas de plantas, peces, alimentación ni química. El único TankView se proyecta sobre el frente y vuelve a identidad al acercarse; no hay un segundo acuario ni un render texture actualizado a otro ritmo. Detalles en [PECERA-HIBRIDA.md](PECERA-HIBRIDA.md).

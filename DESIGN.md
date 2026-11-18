@@ -998,3 +998,7 @@ El alimento choca con siluetas alfa de rocas/maderas y sus espesores aproximados
 En la rama `experiment/betta-ilustrado-articulado` se prepara una alternativa exclusivamente de desarrollo: IllustratedBetta usa un atlas pintado nuevo, partes articuladas, mallas y resortes visuales. El betta actual sigue por defecto y CodeBetta conserva su implementación. No cambia la identidad visual general, otras especies, parámetros físicos ni guardados.
 
 El laboratorio `/Little-World/?betta-lab` compara ambos renderizadores a partir del mismo cuerpo FishMotion/BettaDynamics y del alimento real en una sesión descartable que no toca la partida guardada. El selector del acuario normal tampoco persiste. La nueva textura usa filtrado lineal propio para evaluar un estilo ilustrado; el arte existente conserva su filtrado. Instrucciones, detalle de recursos, validación y límites: `docs/BETTA-ILUSTRADO.md`.
+
+### Prototipo de pecera híbrida con transición
+
+La rama `experiment/pecera-hibrida` agrega una opción de desarrollo A/B. Mantiene un único TankView vivo, proyectado mediante una transformación afín leve, con carcasa lateral/superior y sombras en PixiJS. El contenido actual y la simulación no se duplican ni se reemplazan. Al entrar, la proyección converge a identidad junto con una transición de cámara de duración configurable; vuelve al revés al salir. El modo actual sigue por defecto y el vidrio redondo conserva su render original. Parámetros de presentación en `src/data/hybrid-tank.json`; alcance, técnica, pruebas y límites en `docs/PECERA-HIBRIDA.md`.

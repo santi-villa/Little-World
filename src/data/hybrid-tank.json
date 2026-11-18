@@ -1,0 +1,29 @@
+{
+  "mode": "current",
+  "referenceWidth": 388,
+  "placement": {
+    "x": -32,
+    "y": 0,
+    "scale": 0.98
+  },
+  "geometry": {
+    "depth": 1,
+    "angleDeg": 12,
+    "surfacePitch": 0.08,
+    "frontSlope": 0.045,
+    "rim": 0.02,
+    "glassThickness": 0.004,
+    "capTop": 0.12,
+    "capBottom": 0.2,
+    "lidLift": 0.1
+  },
+  "appearance": {
+    "reflection": 0.3,
+    "illumination": 0.45,
+    "roomDim": 0.18,
+    "transitionGlint": 0.055
+  },
+  "transition": {
+    "seconds": 1.15
+  }
+}
