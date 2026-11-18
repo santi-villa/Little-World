@@ -1,3 +1,5 @@
+import foodTypes from '../../data/food-types.json';
+import type {FoodKind} from '../../sim/food-grains';
 import {tankAppearance} from '../tank/tank-layout';
 import {showRoomStudy} from '../scene/room-study';
 import type { HandTool } from '../hand-tools';
@@ -65,6 +67,7 @@ export class AquariumPanel {
     document.body.append(nav, this.dialog);
     // Let the room be the first screen; the guide is available from the toolbar.
   }
+  onMirror:(id:number)=>void=()=>undefined;
   onObserveAnimal:(id:number)=>void=()=>undefined;
   openAnimal(id:number):void {
     this.selectedAnimal=id;this.open('fish');
@@ -138,6 +141,8 @@ export class AquariumPanel {
   }
   private decorate(): void {
     this.title(careText.un_paisaje_para_tu_acuario);
+    const foodLabel=document.createElement('label'),food=document.createElement('select');foodLabel.textContent=texts.granular.food+' ';food.setAttribute('aria-label',texts.granular.food);for(const [key,profile]of Object.entries(foodTypes)){const option=document.createElement('option');option.value=key;option.textContent=profile.label;food.append(option);}food.value=this.game.state.food.kind??'pellets';food.onchange=()=>{this.game.state.food.kind=food.value as FoodKind;this.game.dirty=true;this.game.saveSoon=true;};foodLabel.append(food);this.body.append(foodLabel);
+
     const glassLabel=document.createElement('label'),glass=document.createElement('select');glassLabel.textContent=texts.aquariumVisual.glass+' ';glass.setAttribute('aria-label',texts.aquariumVisual.glass);
     for(const [value,label]of [['model',texts.aquariumVisual.model],['round',texts.aquariumVisual.round]]){const option=document.createElement('option');option.value=value!;option.textContent=label!;glass.append(option);}glass.value=tankAppearance.shape;
     glass.onchange=()=>{tankAppearance.shape=glass.value as 'model'|'round';try{localStorage.setItem('lw-tank-glass',glass.value);}catch{/* Optional visual preference. */}};glassLabel.append(glass);this.body.append(glassLabel);this.paragraph(texts.aquariumVisual.glassNote);
@@ -261,6 +266,10 @@ export class AquariumPanel {
       this.paragraph(fill(careText.su_rincon_habitual_esta_a_la, { p0: favoriteCorner(a.id)==='left'?careText.izquierda:careText.derecha, p1: Math.round(a.feedingTrust*100) }),card);
       if(a.alive && a.intent==='rest')this.paragraph(careText.esta_descansando_dale_espacio_y_mantene,card);
       if(a.alive && a.intent==='hide')this.paragraph(careText.esta_buscando_refugio_evita_intervenir_de,card);
+      if(a.alive&&a.speciesId==='betta'){
+        card.append(button(texts.granular.mirror,()=>{this.close();this.onMirror(a.id);}));
+        this.paragraph(texts.granular.mirrorHelp,card);
+      }
       const form = document.createElement('form');
       const input = document.createElement('input'); input.maxLength = 24; input.value = a.name ?? ''; input.placeholder = careText.un_nombre_para_tu_pez;
       input.setAttribute('aria-label', fill(careText.nombre_de, { p0: species?.name ?? 'animal', p1: a.id }));

@@ -18,6 +18,7 @@ export interface OutdoorSeries {
 }
 
 export interface SimEnvironment {
+  feedingGrains?:Readonly<Record<number,readonly number[]>>;
   /** Optional live observation: bitmask of food layers reached per animal. Offline uses species access. */
   feedingContacts?:Readonly<Record<number,number>>;
   outdoor?: OutdoorSeries;

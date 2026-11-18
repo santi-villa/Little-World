@@ -1,3 +1,4 @@
+import type {FoodKind,FoodGrain} from './food-grains';
 /**
  * Estado completo de la simulación. Es JSON puro (sin clases ni funciones)
  * para poder guardarlo tal cual y portarlo a otro motor.
@@ -195,6 +196,9 @@ export interface AnimalState {
 
 /** Comida en el agua. Lo que llega al fondo pasa a organics.foodG. */
 export interface FoodState {
+  kind?:FoodKind;
+  grains?:FoodGrain[];
+  nextGrainId?:number;
   x?: number;
   /** Flotando en la superficie, gramos. */
   surfaceG: number;
@@ -354,7 +358,7 @@ export interface StepResult {
 }
 
 export type SimAction =
-  | { type: 'feed'; grams: number; x?: number }
+  | { type: 'feed'; grams: number; x?: number;kind?:FoodKind }
   | {
       type: 'waterChange';
       fraction: number;

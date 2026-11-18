@@ -633,5 +633,10 @@
     "round": "Vidrio redondo",
     "glassNote": "La apariencia del vidrio no cambia la capacidad ni los habitantes de tu pecera.",
     "remove": "Retirar animales muertos"
+  },
+  "granular": {
+    "food": "Alimento de la mano",
+    "mirror": "Acercar espejo durante 8 segundos",
+    "mirrorHelp": "El espejo se retira solo. Si el betta se acerca, puede desplegar sus aletas."
   }
 }

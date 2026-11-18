@@ -1,0 +1,42 @@
+{
+  "pellets": {
+    "label": "Pellets",
+    "floatMinutes": 2,
+    "sinkMinutes": 2,
+    "radiusCm": 0.09,
+    "mass": 1.2,
+    "drag": 3.5,
+    "sinkCmS": 0.18,
+    "color": "#dda35b"
+  },
+  "flakes": {
+    "label": "Escamas",
+    "floatMinutes": 5,
+    "sinkMinutes": 4,
+    "radiusCm": 0.13,
+    "mass": 0.5,
+    "drag": 5,
+    "sinkCmS": 0.065,
+    "color": "#edbb72"
+  },
+  "sinking": {
+    "label": "Pastillas de fondo",
+    "floatMinutes": 0,
+    "sinkMinutes": 0.7,
+    "radiusCm": 0.14,
+    "mass": 1.8,
+    "drag": 2.8,
+    "sinkCmS": 0.35,
+    "color": "#b89d62"
+  },
+  "live": {
+    "label": "Alimento vivo",
+    "floatMinutes": 0.4,
+    "sinkMinutes": 8,
+    "radiusCm": 0.08,
+    "mass": 0.6,
+    "drag": 4,
+    "sinkCmS": 0.04,
+    "color": "#c6856f"
+  }
+}

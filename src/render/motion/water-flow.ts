@@ -1,7 +1,10 @@
+import {sweepSolids,solidAt} from './solid-contact';
 import config from '../../data/ecosystem.json';
 import type { Habitat } from './habitat';
 export interface WaterVelocity {
   getWaterVelocity(x: number, y: number): { x: number; y: number };
+  foodContact?(from:{x:number;y:number},to:{x:number;y:number},z:number,radius:number):{x:number;y:number;key:string}|null;
+  foodSupported?(key:string,x:number,y:number,z:number,radius:number):boolean;
   constrain?(x: number, y: number, margin: number): { x: number; y: number };
 }
 /** Analytic recirculation in cm/s. No gravity, randomness or fluid solver. */
@@ -45,6 +48,14 @@ export class WaterFlow implements WaterVelocity {
       }
     }
     return { x: px, y: py };
+  }
+  foodContact(from:{x:number;y:number},to:{x:number;y:number},z:number,radius:number){
+    const hit=sweepSolids(this.habitat?.solids??[],{x:from.x/this.width,y:from.y/this.height},{x:to.x/this.width,y:to.y/this.height},z,radius/this.height,radius/this.width);
+    return hit?{x:hit.x*this.width,y:hit.y*this.height,key:hit.key}:null;
+  }
+  foodSupported(key:string,x:number,y:number,z:number,radius:number):boolean{
+    const solid=this.habitat?.solids?.find(s=>s.key===key);
+    return !!solid&&solidAt(solid,x/this.width,(y+radius*1.1)/this.height,z,radius/this.width);
   }
   getWaterVelocity(x: number, y: number): { x: number; y: number } {
     if (this.strength === 0) return { x: 0, y: 0 };

@@ -1,52 +1,51 @@
-# Corrientes y observación del acuario
+# Corrientes, alimento y observación del acuario
 
-La implementación amplía el juego existente. Reutiliza el catálogo de especies, FishMotion/boids, BettaDynamics, hábitat elíptico, plantas PNG con malla y resortes, peces procedurales, cámara, necesidades y alimentación química. `src/data/ecosystem.json` centraliza perfiles vegetales, grupos de movimiento, corriente, cámara y presupuestos de partículas.
+## Estado actual
 
-## Sistemas conectados
+Se reutilizan FishMotion, BettaDynamics, la química y necesidades existentes, peces procedurales y plantas PNG con mallas y resortes. La corriente común se configura en `src/data/ecosystem.json`; los alimentos, en `src/data/food-types.json`.
 
-- WaterFlow consulta velocidad en cm/s mediante un campo analítico de recirculación, ajustado por caudal efectivo, volumen, tamaño, forma y atenuación cerca de obstáculos. Sin filtro efectivo no hay circulación generada. Peces, plantas, comida, burbujas y motas consultan el mismo campo. No es CFD ni modela presión o turbulencia 3D.
-- PlantMotion conserva raíces fijas y usa perfiles para anubias, vallisneria, helecho, musgo, ludwigia y cryptocoryne. La corriente inclina de manera sostenida y el ruido ambiental es mínimo. Las perturbaciones locales y los impulsos limitados retornan mediante amortiguación.
-- FoodParticles mantiene identificador, posición, velocidad, tamaño, masa relativa, flotabilidad, arrastre, fase, edad y orientación. Conserva las trayectorias durante cada sesión, asienta al llegar al fondo y no utiliza una animación cíclica de caída. Su presupuesto es 96 representantes (48 en pantalla pequeña). Cada representante lleva gramos y los totales se reconcilian con superficie, columna y fondo de la química. No agrega ni consume alimento por sí mismo.
-- La fase física y la capa química son distintas: un representante puede asentarse antes de que la química transfiera sus gramos al fondo. No vuelve arriba; su capa de acceso conserva el modelo químico hasta la transferencia real. Las reducciones de cantidad se reflejan en pesos o retiro de representantes. Se etiqueta consumo cuando coincide con disminución real de hambre y contacto; sin esa evidencia, el retiro no presume una causa.
-- El motor de movimiento busca los representantes accesibles. En vivo, Game acumula contactos por animal/capa entre pasos y los entrega como entrada opcional a la simulación. Solo esas capas permiten comer. La simulación determina cantidades y hambre. En saltos manuales y catch-up se conserva el acceso por especie, sin depender de posiciones del render. No se agregan campos al guardado ni RNG del navegador a src/sim.
-- BubbleParticles emite únicamente con caudal efectivo, limita presupuesto y elimina burbujas en la superficie. Variaciones deterministas de tamaño y ascenso, corriente lateral y radio pequeño. Las luces, motas y estela de corydoras se reducen y condicionan a residuos/comportamiento.
-- La rueda hace zoom continuo anclado al cursor. Dos dedos hacen zoom con pinza; los controles se mantienen dentro de la habitación. El scroll de paneles no llega al canvas. Acuario o tecla 0 recuperan el encuadre.
-- Un clic con mano/lupa sigue al pez y abre su ficha. Las herramientas conservan sus acciones. El selector dentro de la ficha cambia de individuo sin cerrar el cuaderno.
-- Los perfiles de grupos diferencian crucero, aceleración, tiempo de objetivos y respuesta a corriente. Se mantienen cardumen, compatibilidad, estrés, enfermedad, muerte, profundidad y crecimiento. El betta conserva su perfil propio y atiende persecución/cortejo, curiosidad, refugio y respiración. Los opérculos y el picoteo tienen movimientos pequeños en el modelo procedural.
+### Comida y guardado v4
 
-## Límites y tareas posteriores
+Cada paquete de alimento tiene ID, tipo, gramos, capa, posición normalizada x/y/z, velocidad en cm/s, orientación, edad y tiempos de hundimiento. IndexedDB conserva estos campos, incluido el objeto sobre el que descansa. El formato v4 acepta partidas v1–v3; al abrir, primero recupera el tiempo ausente y después convierte los pools antiguos en paquetes. Rechaza IDs repetidos, cantidades incompatibles y coordenadas inválidas. Clonar el estado también copia los paquetes.
 
-Las partículas son representantes de pools químicos, no granos químicos individuales: no hay correspondencia uno a uno entre una boca y un grano, ni trazabilidad exacta entre consumo y descomposición. No se persisten sus coordenadas; al abrir se reconstruyen desde cantidades guardadas, con posiciones de fondo estables dentro de esa nueva sesión. Persistir trayectorias requeriría versionar estado visual y reconciliarlo con el catch-up.
+La mano permite elegir pellets, escamas, pastillas de fondo o alimento vivo, con flotación, hundimiento, tamaño, arrastre y color propios. El alimento vivo recibe una pequeña propulsión visual: no es un animal criado ni un cultivo. Se conserva el balance nutricional del juego para todos los tipos.
 
-No se implementa colisión de cada grano con cada rama/roca: el contacto físico principal es el sustrato. El campo atenúa obstáculos, pero no resuelve remolinos detrás de geometría detallada. Las paredes redondas usan una elipse aproximada. La profundidad sigue siendo 2.5D; no hay colisiones tridimensionales completas.
+La simulación es la autoridad sobre la masa. En vivo se acumulan IDs alcanzados por cada animal, con distancia que incluye profundidad. Las mordidas descuentan gramos del paquete concreto y reducen el hambre con el modelo existente. Varias bocas reparten la disponibilidad sin duplicar masa. El render no inventa consumo. Descomposición, sifonado/cambio de agua y fuentes orgánicas se reconcilian con el mismo registro. Fuera de línea o al acelerar se usa acceso por especie/capa, porque no hay trayectorias renderizadas; no se pretende una simulación espacial offline exacta.
 
-Los perfiles de alimentos distintos (escamas, pellets, alimento vivo) requieren distinguir el tipo de alimento en la simulación: hoy existe un perfil genérico con variaciones de masa.
+El registro admite hasta 512 paquetes. Al saturarlo, combina dos del mismo tipo/capa para liberar un lugar y conserva la masa, aunque pierde la identidad de uno. Son paquetes medibles de comida, no cada fragmento microscópico. Se simulan todos; se dibuja una muestra determinista limitada a 96 (48 en pantallas pequeñas). La persistencia corresponde al último guardado confirmado, no a cada fotograma.
 
-Las motas suspendidas siguen siendo una representación analítica económica influida por el campo, no sedimento granular persistente. Los reflejos y rayos son aproximaciones gráficas, sin iluminación física ni cáusticas calculadas. Las anatomías específicas más detalladas y aletas adicionales siguen pendientes. El espejo real/flare necesita un objeto válido de la escena; no se inventa un estímulo permanente.
+### Colisiones y profundidad
 
-Se prioriza integración coherente y presupuestos acotados. No se mide rendimiento en teléfonos físicos con esta entrega; deben evaluarse cardúmenes grandes y cambios prolongados de calidad de agua. Los resultados de validación final se registran después de completar la implementación.
+Rocas y maderas generan una máscara de alfa de hasta 64×64 a partir del arte existente, con agujeros transparentes y un espesor asignado. Un barrido entre posiciones evita saltarse ramas finas; el alimento puede apoyarse arriba y caer si se retira/cambia el objeto. Si la lectura del PNG no está disponible se usa una silueta elíptica. El contorno es aproximado y de resolución limitada.
 
-## Archivos principales de esta entrega
+Los peces buscan el alimento en profundidad y los obstáculos centrales solo los apartan dentro de su espesor. Se conservan aproximaciones elípticas para sus cuerpos y para paredes redondas; esto no es colisión de mallas 3D ni de cada aleta contra cada hoja. La profundidad es 2.5D.
 
-Nuevos:
-- `src/data/ecosystem.json`: parámetros compartidos y perfiles.
-- `src/render/motion/water-flow.ts`: campo de circulación y límite redondo.
-- `src/render/motion/food-particles.ts`: representantes físicos de comida.
-- `src/render/motion/bubble-particles.ts`: microburbujas por emisor.
-- `tests/ecosystem.test.ts`: invariantes físicas, conservación, alimentación y cámara.
+### Agua, plantas y animales
 
-Modificados:
-- `src/render/motion/plant-motion.ts`, `fish-motion.ts`, `betta-dynamics.ts`: perfiles, corrientes, objetivos alimenticios e interacciones.
-- `src/render/tank/fish-layer.ts`, `tank-view.ts`, `code-betta.ts`: integración y dibujo, partículas, reducción de movimiento/velo y animación fina.
-- `src/render/camera.ts`, `src/render/scene/room-scene.ts`, `src/main.ts`: rueda, pinza, selección directa y contactos en vivo.
-- `src/render/ui/aquarium-panel.ts`, `src/data/texts.es.json`: selector de individuo dentro de la ficha.
-- `src/game.ts`, `src/sim/environment.ts`, `feeding.ts`, `step.ts`: entrada opcional de contacto sin duplicar química.
-- `DESIGN.md`, `PENDIENTE.md`: decisiones actuales y pendientes.
+WaterFlow consulta un campo analítico en cm/s, ajustado por caudal efectivo, volumen, forma y obstáculos. Peces, plantas, comida, microburbujas y sedimento comparten ese campo. Sin filtro no hay recirculación generada. Las plantas mantienen raíz fija, perfiles propios y amortiguación, con impulsos locales al paso de peces.
 
-## Validación final
+Las motas ahora conservan posiciones/velocidades durante la sesión, se asientan y reciben impulsos locales de corydoras que comen cerca. No reaparecen arriba en un bucle. El presupuesto deriva de la suciedad; no constituye un segundo balance químico. Sus coordenadas no se guardan: son una representación ambiental, a diferencia del alimento. Burbujas con presupuesto fijo, emisión por caudal y eliminación en superficie.
 
-La implementación prevista se completó antes del primer test. La suite completa pasó 248 pruebas en 21 archivos; al agregar las comprobaciones específicas de contacto químico y relleno, el archivo de ecosistema pasó sus 9 pruebas finales. `npm run typecheck` y `npm run build` completaron correctamente, incluida la PWA.
+Rayos y cáusticas del sustrato comparten pendientes de ondas superficiales y concentración de rayos aproximada. No son iluminación física, trazado de fotones ni CFD. Se conservan los colores del acuario y la luz apagada reduce efectos.
 
-Chromium: rueda y recuperación de encuadre; un clic abre ficha; cambio de individuo dentro de la ficha; scroll del cuaderno sin mover cámara; comida con tapa abierta sin abrir fichas; presentación de escritorio y celular horizontal; pinza mediante eventos táctiles; sin errores JavaScript observados. Se revisaron capturas de día y noche y se guardó un video en `/workspace/artifacts/ecosistema/recorrido.mp4`. Estas comprobaciones no equivalen a pruebas en hardware móvil físico ni a validar todos los comportamientos del catálogo durante varias horas.
+El modelo procedural añade pelvis y aletas pareadas, radios largos en peces altos, barbillones/boca en peces de fondo, ondulación corporal en kuhli y apertura de opérculos del betta al desplegar. Se mantienen los 23 perfiles, crecimiento, enfermedad, muerte y giros con volumen. No se reemplazan los peces activos por imágenes.
 
-También se comprobó la apertura directa de la ficha al tocar un pez desde el encuadre de habitación. Se retiraron parámetros antiguos de tamaño de comida/burbujas que habían quedado sin uso en aquarium-visual.json, para evitar dos configuraciones contradictorias.
+La ficha del betta permite acercar un espejo visible durante ocho segundos; se retira solo. El pez considera su posición, profundidad, cercanía y estado antes de investigar/desplegar aletas. Dormido, asustado o enfermo no se fuerza esa respuesta. No hay un reflejo permanente ni una segunda simulación de estrés añadida.
+
+Rueda y pinza, encuadre completo inicial, seguimiento individual, ficha y selector de animal, modo Contemplar y herramientas manuales se conservan.
+
+## Límites pendientes
+
+- CFD/turbulencia volumétrica, iluminación física y colisiones completas de mallas 3D.
+- Anatomía y materiales con fidelidad biológica/artística completa; revisión manual del arte PNG para unificar paleta, luz y grilla (ver ART-DIRECTION.md).
+- Crecimiento y química vegetal, colocación libre de decoración y cultivo de alimento vivo: no forman parte de la física visual incorporada.
+- Sonido ambiental definitivo: falta la pista del usuario.
+- Mediciones en teléfonos físicos y observación durante horas de todas las especies. La emulación permite revisar controles y límites, no afirmar rendimiento real en esos equipos.
+
+## Validación de esta ampliación
+
+La implementación se completó antes de ejecutar pruebas. La ronda final pasó 260 pruebas en 22 archivos, incluidas nueve comprobaciones nuevas de consumo por ID y reparto entre peces, conservación de masa, compatibilidad v3/v4, posiciones y copia profunda, validación de datos corruptos, límite de paquetes, alimentos distintos, aspirado/descomposición, avance sin render, contornos/huecos/profundidad, apoyo y retiro de roca, sedimento y respuesta condicional al espejo. Compilación con typecheck y generación PWA correctas.
+
+El recorrido en Chromium comprobó inicio en habitación completa, peces procedurales, espejo temporal, selector de alimento de la mano, comida, guardado v4 y recarga conservando el registro completo, rueda y regreso al encuadre, selector visible en 667×375 y pinza táctil por CDP. No se observaron errores JavaScript. El primer intento del selector móvil necesitaba esperar el siguiente fotograma de UI; se corrigió esa espera en el recorrido y pasó sin cambiar la interfaz. Capturas y video en `/workspace/artifacts/ecosistema-completo`.
+
+La revisión final también ajustó la invalidación del hábitat al cambiar el nivel del agua para mantener los contornos relativos a la superficie. No se midió hardware móvil físico ni se observó todo el catálogo durante horas.

@@ -1,3 +1,5 @@
+import foodTypes from '../data/food-types.json';
+import {FOOD_GRAIN_LIMIT} from '../sim/food-grains';
 import { GLASS_CELLS } from '../sim/glass';
 /**
  * Formato de guardado, con versión.
@@ -10,7 +12,7 @@ import { GLASS_CELLS } from '../sim/glass';
 import { ALERT_IDS, INTENTS, CAT_BEHAVIORS, applyAction, createNewTank, createCat, defaultConfig, findSpecies, type SimState, type Weather } from '../sim';
 import { createPlayer, type PlayerState } from '../player';
 
-export const SAVE_FORMAT_VERSION = 3;
+export const SAVE_FORMAT_VERSION = 4;
 
 export interface GameSettings {
   /** Minutos simulados por segundo real (0 = pausa). */
@@ -44,6 +46,7 @@ export type Migration = (save: Record<string, unknown>) => Record<string, unknow
 
 /** MIGRATIONS[N] convierte de la versión N a la N+1. */
 export const MIGRATIONS: Record<number, Migration> = {
+  3:(save)=>({...save}),
   2: (save) => ({ ...save, player: createPlayer() }),
   // v1 -> v2: llegan los animales, la comida en el agua y el gato.
   1: (save) => {
@@ -93,6 +96,16 @@ function validSim(value: unknown): value is SimState {
     !['bed','sunbeam','tank_lid','tank_front','windowsill','bowl','floor','away'].includes(sim.cat.spot) ||
     !sim.alerts.every(id => ALERT_IDS.includes(id))) return false;
   if(sim.food.x!==undefined && (typeof sim.food.x!=='number'||!Number.isFinite(sim.food.x)||sim.food.x<0||sim.food.x>1))return false;
+  if(sim.food.kind!==undefined&&!Object.hasOwn(foodTypes,sim.food.kind))return false;
+  if(sim.food.grains!==undefined){
+    if(!Array.isArray(sim.food.grains)||sim.food.grains.length>FOOD_GRAIN_LIMIT||!Number.isSafeInteger(sim.food.nextGrainId)||sim.food.nextGrainId!<1)return false;
+    const grainIds=new Set<number>(),totals=[0,0,0];
+    for(const g of sim.food.grains){
+      if(!isRecord(g)||!Number.isSafeInteger(g.id)||g.id<1||g.id>=sim.food.nextGrainId!||grainIds.has(g.id)||!Object.hasOwn(foodTypes,g.kind)||![0,1,2].includes(g.layer)||![g.grams,g.x,g.y,g.vx,g.vy,g.angle,g.ageMinutes,g.sinkAt,g.bottomAt,g.z].every(n=>typeof n==='number'&&Number.isFinite(n))||g.grams<0||g.x<0||g.x>1||g.y<-.1||g.y>1||g.z<0||g.z>1||g.ageMinutes<0||g.sinkAt<0||g.bottomAt<g.sinkAt||g.restingOn!==undefined&&(typeof g.restingOn!=='string'||g.restingOn.length>200))return false;
+      grainIds.add(g.id);totals[g.layer]!+=g.grams;
+    }
+    if([sim.food.surfaceG,sim.food.sinkingG,sim.organics.foodG].some((n,i)=>Math.abs(n-totals[i]!)>1e-8))return false;
+  }
   const cells=sim.algae.glassCells;
   if(cells!==undefined && (!Array.isArray(cells)||cells.length!==GLASS_CELLS||!cells.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1)))return false;
   const ids = new Set<number>();

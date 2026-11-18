@@ -1,3 +1,4 @@
+import {enableFoodGrains,depositFoodGrains,reconcileFoodGrains,publishFoodGrains} from './food-grains';
 import { scrubGlass } from './glass';
 /**
  * Acciones del jugador sobre la pecera. Igual que step(), son puras:
@@ -80,8 +81,9 @@ export function applyAction(
     case 'feed': {
       // La comida cae a la superficie; feeding.ts la hunde y reparte.
       const grams = Math.max(0, action.grams);
-      next.food.surfaceG += grams;
       if(action.x!==undefined && Number.isFinite(action.x))next.food.x=clamp(action.x,0,1);
+      if(action.kind!==undefined||next.food.grains){enableFoodGrains(next);next.food.kind=action.kind??next.food.kind??'pellets';depositFoodGrains(next,grams,next.food.kind);publishFoodGrains(next);}else next.food.surfaceG += grams;
+
       events.push({ type: 'fed', timeMinutes, grams });
       if (grams > 0 && next.animals.length > 0) {
         // Aprenden que el jugador trae comida, y van enseguida a buscarla.
@@ -317,5 +319,6 @@ export function applyAction(
 
   updatePh(next, config);
   events.push(...updateAlerts(next, config));
+  reconcileFoodGrains(next);
   return { state: next, events };
 }

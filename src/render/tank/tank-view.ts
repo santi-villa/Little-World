@@ -1,3 +1,6 @@
+import {Sediment} from '../motion/sediment';
+import {surfaceSlope,causticStrips} from '../motion/water-light';
+import {textureSilhouette} from './alpha-mask';
 import ecosystem from '../../data/ecosystem.json';
 import {WaterFlow} from '../motion/water-flow';
 import {BubbleParticles} from '../motion/bubble-particles';
@@ -122,6 +125,7 @@ export class TankView {
   /** Vidrio e interior, en coordenadas de la imagen del vidrio. */
   private readonly art = new Container();
   readonly flow=new WaterFlow();
+  private sediment=new Sediment(typeof window!=='undefined'&&window.innerWidth<800?32:64);
   private bubbles=new BubbleParticles(typeof window!=="undefined"&&window.innerWidth<800?ecosystem.bubbles.mobileMax:ecosystem.bubbles.max);
   readonly fish = new FishLayer();
   private readonly wet=new Container();
@@ -158,6 +162,14 @@ export class TankView {
   private waterKey = '';
   private equipKey = '';
   private lastSeconds = 0;
+  private mirrorUntil=0;
+  private mirrorAnchor={x:.5,y:.4,z:.5};
+  showMirror(id:number):void{
+    if(this.lastSeconds<this.mirrorUntil)return;
+    const b=this.fish.motion.bodies.get(id);if(!b)return;
+    this.mirrorAnchor={x:clamp(b.x/this.flow.width+.08,.1,.9),y:clamp(b.y/this.flow.height,.15,.8),z:b.plane/2};
+    this.mirrorUntil=this.lastSeconds+8;
+  }
 
   constructor() {
     try{if(localStorage.getItem("lw-tank-glass")==="round")tankAppearance.shape="round";}catch{/* Storage can be unavailable. */}
@@ -239,6 +251,7 @@ export class TankView {
     }
 
     this.fish.habitat=this.habitat;
+    this.fish.mirror=seconds<this.mirrorUntil?{x:this.mirrorAnchor.x*this.flow.width,y:this.mirrorAnchor.y*this.flow.height,z:this.mirrorAnchor.z}:undefined;
 
     const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
     this.drawMid(state, derived, geo, shade, seconds);
@@ -415,7 +428,7 @@ export class TankView {
 
   /** Arma el sustrato, las maderas, las rocas y las plantas desde los datos. */
   private buildDecor(geo: Geo): void {
-    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${JSON.stringify(this.decor)}`;
+    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${geo.waterTop},${geo.sandTop},${JSON.stringify(this.decor)}`;
     if (key === this.decorKey) return;
     this.decorKey = key;
 
@@ -472,7 +485,9 @@ export class TankView {
         sprite.scale.set(item.flip ? -scale : scale, scale);
         sprite.position.set(cx, baseY);
         this.hardscape.addChild(sprite);
-        this.habitat.obstacles.push({x:(cx-geo.left)/geo.width,y:Math.min(.95,(baseY-h*.38-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2)),rx:w*.27/geo.width,ry:h*.22/Math.max(1,geo.sandTop-geo.waterTop-2)});
+        const slab=item.layer==='back'?.2:item.layer==='front'?.8:.5;
+        this.habitat.solids!.push({key:name+':'+index,x:(cx-w/2-geo.left)/geo.width,y:(baseY-h-geo.waterTop-2)/this.waterArea.height,width:w/geo.width,height:h/this.waterArea.height,z:slab,depth:.42,...textureSilhouette(texture,!!item.flip)});
+        this.habitat.obstacles.push({z:slab,depth:.42,x:(cx-geo.left)/geo.width,y:Math.min(.95,(baseY-h*.38-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2)),rx:w*.27/geo.width,ry:h*.22/Math.max(1,geo.sandTop-geo.waterTop-2)});
       }
     }
   }
@@ -509,8 +524,6 @@ export class TankView {
       g.rect(left + 1 + Math.floor(scatter(i, 3) * (width - 3)), sandTop - 1 + Math.floor(scatter(i, 4) * 4), 2, 1);
     }
     if (detritus > 0) g.fill(shade(0x4a3a26));
-    for(const animal of state.animals){if(!animal.alive||animal.intent!=='eat'||!animal.speciesId.includes('cory'))continue;const body=this.fish.motion.bodies.get(animal.id);if(!body||body.y<this.flow.height*.75)continue;const scale=this.inner.width/this.flow.width;
-      for(let j=0;j<3;j++){const age=(seconds*.25+j/3)%1,current=this.flow.getWaterVelocity(body.x,body.y);g.rect(left+body.x*scale+(j-1)*2+current.x*age*scale,sandTop-age*5,1,1).fill({color:0xb5b69a,alpha:(1-age)*.2});}}
     this.bubbles.update(Math.max(0,seconds-this.lastSeconds),this.flow.width,this.flow.height,this.flow.strength,this.flow);
     const scale=this.inner.width/this.flow.width;
     for(const bubble of this.bubbles.particles){const x=left+bubble.x*scale,y=waterTop+2+bubble.y*scale,r=Math.max(.4,bubble.radius*scale);g.circle(x,y,r).stroke({color:0xe3f8f6,width:.7,alpha:derived.lightOn?.6:.25});}
@@ -539,7 +552,7 @@ export class TankView {
         const baseX = left + ((i + 0.5) * width) / rays + Math.sin(seconds * 0.15 + i * 2) * 10;
         const wd = 8 + 10 * scatter(i, 81);
         const alpha = ecosystem.water.rayAlpha + 0.01 * Math.sin(seconds * 0.6 + i * 1.9);
-        const slant = 0.4 * ((baseX - mid) / width) + 0.05;
+        const slant = 0.4 * ((baseX - mid) / width) + surfaceSlope((baseX-left)/width,seconds);
         const len = (waterHeight - sandH * 0.5) * (0.6 + 0.35 * scatter(i, 82));
         const half = Math.round(len * 0.55);
         let pending = 0;
@@ -559,18 +572,15 @@ export class TankView {
       }
     }
 
-    // Partículas en suspensión, a la deriva.
-    const column = Math.max(1, waterHeight - sandH - 3);
+    // Persistent local trajectories, shared current and brief bottom-foraging wakes.
     const turbidity=Math.min(1,state.organics.detritusG*.3+state.algae.glass*.2);
-    const specks = Math.round(ecosystem.water.cleanSpecks+turbidity*ecosystem.water.dirtySpecks);
-    for (let i = 0; i < specks; i++) {
-      const drift = (i % 3 === 0 ? -1 : 1) * (0.5 + scatter(i, 83));
-      const py = (((scatter(i, 84) * column + seconds * drift) % column) + column) % column;
-      const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 6;
-      const driftFlow=this.flow.getWaterVelocity((px-left)/(this.inner.width/this.flow.width),py/(this.inner.width/this.flow.width));
-      g.rect(clamp(px+driftFlow.x*4,left,right-1),waterTop+2+py+driftFlow.y,1,1);
+    const foragers=state.animals.filter(a=>a.alive&&a.intent==='eat'&&a.speciesId.includes('cory')).flatMap(a=>{const b=this.fish.motion.bodies.get(a.id);return b?[{x:b.x,y:b.y,speed:Math.hypot(b.vx,b.vy)}]:[];});
+    this.sediment.update(seconds-this.lastSeconds,ecosystem.water.cleanSpecks+turbidity*ecosystem.water.dirtySpecks,this.flow.width,this.flow.height,this.flow,foragers);
+    for(const p of this.sediment.particles)g.circle(left+p.x/this.flow.width*width,this.waterArea.y+p.y/this.flow.height*this.waterArea.height,.55);
+    if(this.sediment.particles.length)g.fill({color:0xeafff4,alpha:lit?.2:.1});
+    if(lit)for(const strip of causticStrips(seconds,window.innerWidth<800?12:22)){
+      g.ellipse(left+strip.x*width,geo.sandTop+2,width*.025,1.4).fill({color:0xdaf6ce,alpha:strip.intensity*.08});
     }
-    if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.2 : 0.1 });
 
     // Brillos que corren por la superficie.
     let run = 0;
@@ -589,6 +599,12 @@ export class TankView {
     }
     if (glints > 0) g.fill({ color: 0xffffff, alpha: lit ? ecosystem.water.surfaceAlpha : 0.12 });
 
+    if(seconds<this.mirrorUntil){
+      const x=left+this.mirrorAnchor.x*width,y=this.waterArea.y+this.mirrorAnchor.y*this.waterArea.height,w=width*.07,h=this.waterArea.height*.24;
+      g.roundRect(x-w/2,y-h/2,w,h,2).fill({color:0x65787d,alpha:.95}).stroke({color:0xc6d4cc,width:1.4});
+      g.poly([x-w*.35,y-h*.4,x+w*.2,y-h*.4,x-w*.1,y+h*.4,x-w*.35,y+h*.4]).fill({color:0xe1f9f3,alpha:.4});
+      g.ellipse(x,y,w*.24,h*.12).fill({color:0xb17387,alpha:.4});
+    }
     // Capa de algas en el vidrio.
     const algaeSpecks = Math.round(width * 1.6);
     const algaeArea = Math.max(1, waterHeight - sandH - 4);

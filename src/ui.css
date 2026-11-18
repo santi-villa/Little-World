@@ -497,3 +497,6 @@ body.following-fish .hud-paper,body.following-fish .aquarium-nav>button:not(:las
 body.contemplating #debug,body.contemplating .app-update{display:none!important}
 body.contemplating .repair-app,body.contemplating .debug-panel{display:none!important}
 body.following-fish .repair-app,body.following-fish .debug-toggle{display:none}
+
+.tool-tray .tray-food-type {position:absolute;bottom:calc(100% + 8px);left:12px;max-width:180px;padding:5px 9px;background:#e9dbb9;color:#403227;border:2px solid #705039;border-radius:4px;font:inherit;pointer-events:auto;}
+.tool-tray .tray-food-type[hidden]{display:none;}

@@ -1,3 +1,4 @@
+import foodTypes from '../../data/food-types.json';
 import ecosystem from '../../data/ecosystem.json';
 import {WaterFlow} from '../motion/water-flow';
 import {FoodParticles} from '../motion/food-particles';
@@ -51,8 +52,10 @@ export class FishLayer {
   readonly artFront=new Container();
   water:WaterFlow=new WaterFlow();
   readonly food=new FoodParticles(typeof window!=="undefined"&&window.innerWidth<800?ecosystem.food.mobileParticles:ecosystem.food.maxParticles);
+  readonly grainContacts:Record<number,number[]>={};
   readonly feedingContacts:Record<number,number>={};
   habitat:Habitat=emptyHabitat();
+  mirror?:{x:number;y:number;z:number};
   hand:HandInput|null=null;
   readonly foodGraphics = new Graphics();
   private ink = this.graphics;
@@ -94,6 +97,7 @@ export class FishLayer {
     return null;
   }
 
+  get foodPositions(){return this.food.kinematics(this.water.width,this.water.height);}
   pointFor(id:number){return this.positions.get(id)??null;}
 
   /**
@@ -119,8 +123,9 @@ export class FishLayer {
       this.foodXCm = bounds.width * (state.food.x ?? (0.25 + 0.5 * Math.random()));
     }
     this.lastSurfaceG=state.food.surfaceG;
+    for(const key of Object.keys(this.grainContacts))delete this.grainContacts[Number(key)];
     let consumedLayers=0;for(const a of state.animals){if(a.hunger<(this.hunger.get(a.id)??a.hunger))consumedLayers|=this.feedingContacts[a.id]??0;this.hunger.set(a.id,a.hunger);}
-    this.food.update(dtSeconds,{surface:state.food.surfaceG,sinking:state.food.sinkingG,bottom:state.organics.foodG,x:this.foodXCm,consumedLayers},bounds.width,bounds.height,this.water);
+    this.food.update(dtSeconds,{surface:state.food.surfaceG,sinking:state.food.sinkingG,bottom:state.organics.foodG,x:this.foodXCm,consumedLayers,grains:state.food.grains},bounds.width,bounds.height,this.water);
     for(const key of Object.keys(this.feedingContacts))delete this.feedingContacts[Number(key)];
 
     const species = new Map<number, Species>();
@@ -155,11 +160,12 @@ export class FishLayer {
         sinking: state.food.sinkingG > 1e-4,
         bottom: state.organics.foodG > 1e-3,
         x: this.foodXCm,
-        targets:this.food.particles.filter(p=>p.phase!=="falling").map(p=>({x:p.x,y:p.y,layer:p.layer})),
+        targets:this.food.particles.filter(p=>p.phase!=="falling").map(p=>({x:p.x,y:p.y,layer:p.layer,z:p.z})),
       },
       scare: this.scare,
       hand:this.hand,
       habitat:this.habitat,
+      mirror:this.mirror,
       catAtGlass: cat === 'watch_fish' || cat === 'tap_glass',
     });
 
@@ -204,8 +210,8 @@ export class FishLayer {
 
   private drawFood(state: SimState, area: TankRect, pxPerCm: number, _seconds: number): void {
     const g=this.foodGraphics;
-    for(const p of this.food.particles){const x=area.x+p.x*pxPerCm,y=area.y+p.y*pxPerCm,size=Math.max(1.2,p.size*pxPerCm);if(p.id%3===0){const co=Math.cos(p.angle),si=Math.sin(p.angle);g.poly([[-size,-size*.5],[size,-size*.5],[size,size*.5],[-size,size*.5]].flatMap(([dx,dy])=>[x+dx!*co-dy!*si,y+dx!*si+dy!*co])).fill({color:0xe7b66b,alpha:.95});}else g.ellipse(x,y,size,size*.65).fill({color:p.layer===2?0xb79059:0xe7b66b,alpha:.95});g.rect(x-size*.3,y-size*.3,.6,.6).fill(0xf7dca1);}
-    for(const a of state.animals){if(!a.alive)continue;const body=this.motion.bodies.get(a.id);if(!body)continue;const sp=getSpecies(a.speciesId),layers=defaultConfig.food.access[sp.zone].map((value,i)=>value>0?i:-1),p=this.food.nearest(body.x,body.y,layers);if(!p)continue;const reach=Math.max(.5,sp.adultSizeCm*(visual.juvenileFraction+(1-visual.juvenileFraction)*Math.min(1,Math.max(0,a.ageDays-defaultConfig.fish.newAnimalAgeDays)/visual.growthDays))*ecosystem.food.reachBodyLengths);if(Math.hypot(body.x-p.x,body.y-p.y)<reach)this.feedingContacts[a.id]=(this.feedingContacts[a.id]??0)|(1<<p.layer);}
+    for(const [i,p] of this.food.particles.entries()){if(this.food.particles.length>this.food.budget&&i%Math.ceil(this.food.particles.length/this.food.budget)!==0)continue;const x=area.x+p.x*pxPerCm,y=area.y+p.y*pxPerCm,size=Math.max(1.2,p.size*pxPerCm);if(p.id%3===0){const co=Math.cos(p.angle),si=Math.sin(p.angle);g.poly([[-size,-size*.5],[size,-size*.5],[size,size*.5],[-size,size*.5]].flatMap(([dx,dy])=>[x+dx!*co-dy!*si,y+dx!*si+dy!*co])).fill({color:p.kind?Number.parseInt(foodTypes[p.kind].color.slice(1),16):0xe7b66b,alpha:.95});}else g.ellipse(x,y,size,size*.65).fill({color:p.kind?Number.parseInt(foodTypes[p.kind].color.slice(1),16):p.layer===2?0xb79059:0xe7b66b,alpha:.95});g.rect(x-size*.3,y-size*.3,.6,.6).fill(0xf7dca1);}
+    for(const a of state.animals){if(!a.alive)continue;const body=this.motion.bodies.get(a.id);if(!body)continue;const sp=getSpecies(a.speciesId),layers=defaultConfig.food.access[sp.zone].map((value,i)=>value>0?i:-1),p=this.food.nearest(body.x,body.y,layers);if(!p)continue;const reach=Math.max(.5,sp.adultSizeCm*(visual.juvenileFraction+(1-visual.juvenileFraction)*Math.min(1,Math.max(0,a.ageDays-defaultConfig.fish.newAnimalAgeDays)/visual.growthDays))*ecosystem.food.reachBodyLengths);for(const grain of this.food.particles){if(!layers.includes(grain.layer)||grain.phase==='falling')continue;if(Math.hypot(body.x-grain.x,body.y-grain.y,((grain.z??body.plane/2)-body.plane/2)*state.tank.widthCm)<reach){this.feedingContacts[a.id]=(this.feedingContacts[a.id]??0)|(1<<grain.layer);(this.grainContacts[a.id]??=[]).push(grain.id);}}}
   }
 
   private drawAnimal(

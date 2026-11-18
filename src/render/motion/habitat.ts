@@ -1,16 +1,20 @@
+import type {HabitatSolid} from './solid-contact';
 /** Measurements normalized to the swimming area; independent of sprites and screen size. */
 export interface HabitatObstacle {
   x: number;
   y: number;
+  z?:number;depth?:number;
   rx: number;
   ry: number;
 }
 export interface Habitat {
+  solids?:HabitatSolid[];
   obstacles: HabitatObstacle[];
   refuges: { x: number; y: number }[];
   leaves: { x: number; y: number }[];
 }
 export const emptyHabitat = (): Habitat => ({
+  solids: [],
   obstacles: [],
   refuges: [],
   leaves: [],
@@ -22,11 +26,13 @@ export function resolveHabitat(
   width: number,
   height: number,
   margin = 0,
+  z?:number,
 ): { x: number; y: number } {
   let px = x,
     py = y;
   for (let pass = 0; pass < 6; pass++)
     for (const o of h.obstacles) {
+      if(z!==undefined&&o.z!==undefined&&Math.abs(z-o.z)>(o.depth??.4)/2)continue;
       const rx = o.rx * width + margin,
         ry = o.ry * height + margin,
         cx = o.x * width,

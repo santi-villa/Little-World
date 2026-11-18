@@ -83,12 +83,16 @@ export class BettaDynamics {
       this.modeUntil = Infinity;
     } else if (food && (a.intent === 'eat' || time < this.foodUntil)) {
       this.mode = 'food';
-      const targets=(input.food.targets??[]).filter(p=>p.layer!==2),closest=targets.reduce<{x:number;y:number}|undefined>((best,p)=>!best||Math.hypot(p.x-b.x,p.y-b.y)<Math.hypot(best.x-b.x,best.y-b.y)?p:best,undefined);
+      const targets=(input.food.targets??[]).filter(p=>p.layer!==2),closest=targets.reduce<{x:number;y:number;z?:number}|undefined>((best,p)=>!best||Math.hypot(p.x-b.x,p.y-b.y,((p.z??b.plane/2)-b.plane/2)*bounds.width*.5)<Math.hypot(best.x-b.x,best.y-b.y,((best.z??b.plane/2)-b.plane/2)*bounds.width*.5)?p:best,undefined);
+      if(closest?.z!==undefined)b.targetPlane=closest.z*2;
       b.goalX = closest?.x??input.food.x;
       b.goalY = closest?.y??
         bounds.height * (input.food.surface ? c.surfaceFraction : c.zoneBottom);
     } else if ((a.intent==='chase'||a.intent==='court')&&input.trackingTargets?.has(a.targetId??-1)){const target=input.trackingTargets.get(a.targetId!)!;this.mode='investigate';b.goalX=target.x+(a.intent==='court'?Math.cos(time+b.phase)*L:0);b.goalY=target.y+(a.intent==='court'?Math.sin(time+b.phase)*L:0);this.modeUntil=time+1;
     } else if (input.hand&&input.hand.age<1&&input.hand.speed<15&&(a.feedingTrust??0)>.4&&a.fright<.1&&Math.sin(time*.07+b.phase)>.92){this.mode='investigate';b.goalX=input.hand.x;b.goalY=input.hand.y;this.modeUntil=time+1;
+    } else if(input.mirror&&a.fright<.1&&(a.condition??1)>.7&&Math.hypot(b.x-input.mirror.x,b.y-input.mirror.y)<L*5){
+      b.goalX=input.mirror.x;b.goalY=input.mirror.y;b.targetPlane=input.mirror.z*2;
+      if(Math.hypot(b.x-b.goalX,b.y-b.goalY)<L*3&&Math.abs(b.plane/2-input.mirror.z)<.25){this.mode='flare';}else this.mode='investigate';
     } else if (time < this.flareUntil) {
       this.mode = 'flare';
     } else if (this.mode === 'breathe') {
@@ -193,6 +197,7 @@ export class BettaDynamics {
           Math.sin(b.heading) * thrust +
           (['food', 'breathe'].includes(this.mode) ? 0 : wall.y);
       for (const o of input.habitat?.obstacles ?? []) {
+        if(input.renderDepth&&o.z!==undefined&&Math.abs(b.plane/2-o.z)>(o.depth??.4)/2)continue;
         const rx = o.rx * bounds.width + L * c.wallLengths,
           ry = o.ry * bounds.height + L * c.wallLengths,
           dx = (b.x - o.x * bounds.width) / rx,
@@ -226,6 +231,7 @@ export class BettaDynamics {
         bounds.width,
         bounds.height,
         ['breathe', 'food'].includes(this.mode) ? 0 : L * c.collisionMargin,
+        input.renderDepth?b.plane/2:undefined,
       );
       b.x = safe.x;
       b.y = safe.y;

@@ -139,13 +139,14 @@ async function boot(): Promise<void> {
       welcome.show(report.result.summary);
     }
   };
-  const initialRecovery = catchUpSince(lastTimestamp);
+  const initialRecovery = catchUpSince(lastTimestamp).then(()=>game.enableGrains());
 
   let lastSavedAt = 0;
   let saveNote = note;
   let saving = false;
 
   const save = async (): Promise<void> => {
+    game.flushGrains();
     if (!savingWorks || saving || !game.dirty) return;
     saving = true;
     game.dirty = false;
@@ -187,6 +188,7 @@ async function boot(): Promise<void> {
   initUiArt();
   enableTips();
   const tray = new ToolTray((tool) => scene.selectTool(tool), () => scene.toggleLid());
+  tray.onFoodKind=kind=>{game.state.food.kind=kind;game.dirty=true;game.saveSoon=true;};
   const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom(), (tool) => {
     const why = scene.selectTool(tool);
     if (why) tray.reject(tool, why);
@@ -199,6 +201,7 @@ async function boot(): Promise<void> {
   });
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   tools.onObserveAnimal=id=>scene.showFish(id);
+  tools.onMirror=id=>scene.showMirror(id);
   scene.onReject = (tool, reason) => tray.reject(tool, reason);
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
@@ -297,12 +300,12 @@ async function boot(): Promise<void> {
     const frame = performance.now();
     const elapsed = (frame - lastFrame) / 1000;
     lastFrame = frame;
-    game.observeFeedingContacts(scene.feedingContacts);
+    game.observeFeedingContacts(scene.feedingContacts);game.observeGrains(scene.foodPositions,scene.grainContacts);
     if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
     tools.update();
     fishFocus.update(game.state.animals.find(a=>a.id===scene.followingId));
     hud.update(game.state, game.weather, derive(game.state).hour);
-    tray.update(scene.activeTool, game.state.tank.hasLid);
+    tray.update(scene.activeTool, game.state.tank.hasLid,game.state.food.kind);
     // La cámara deja la pecera arriba de la bandeja: su alto, en píxeles del juego.
     const trayHeight = tray.height;
     if (trayHeight > 0) {

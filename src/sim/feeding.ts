@@ -1,3 +1,4 @@
+import {reconcileFoodGrains,publishFoodGrains} from './food-grains';
 /**
  * Alimentación. La comida cae a la superficie, flota un rato, se hunde y
  * termina en el fondo. Cada animal come de las capas a las que llega según su
@@ -51,7 +52,9 @@ export function stepFood(
   ctx: TankContext,
   config: SimConfig,
   contacts?:Readonly<Record<number,number>>,
+  grainContacts?:Readonly<Record<number,readonly number[]>>,
 ): void {
+  if(state.food.grains){stepGrainFood(state,dtMinutes,ctx,config,contacts,grainContacts);return;}
   const food = state.food;
   const organics = state.organics;
   const inColumn = food.surfaceG + food.sinkingG;
@@ -133,4 +136,25 @@ export function stepFood(
     food.surfaceG = 0;
     food.sinkingG = 0;
   }
+}
+
+/** Exact bites withdraw grams from identified grains; no second hunger or chemistry model. */
+function stepGrainFood(state:SimState,dtMinutes:number,ctx:TankContext,config:SimConfig,contacts:Readonly<Record<number,number>>|undefined,grainContacts:Readonly<Record<number,readonly number[]>>|undefined):void{
+ reconcileFoodGrains(state);const grains=state.food.grains!,f=config.fish,substeps=Math.max(1,Math.ceil(dtMinutes)),h=dtMinutes/substeps,spatial=grainContacts!==undefined&&dtMinutes<=1;
+ const needs=new Float64Array(state.animals.length),meals=new Float64Array(state.animals.length);
+ const ids=grainContacts?new Map(Object.entries(grainContacts).map(([id,list])=>[Number(id),new Set(list)])):undefined;
+ for(let step=0;step<substeps;step++){
+  for(const g of grains){g.ageMinutes+=h;if(g.layer===0&&g.ageMinutes>=g.sinkAt){g.layer=1;g.y=Math.max(0,g.y);}if(g.layer===1&&!spatial&&g.ageMinutes>=g.bottomAt){g.layer=2;g.y=1;g.vx=0;g.vy=0;}}
+  state.animals.forEach((a,i)=>{needs[i]=0;if(!a.alive||a.hunger<=.02||a.stress>85||a.fright>.5)return;const sp=ctx.species[i]!,ration=sp.bioload*sizeFactor(a,config)*f.foodGPerBioloadPerDay;meals[i]=ration/f.hungerPerDay;needs[i]=Math.min(a.hunger*meals[i]!,ration/f.mealMinutes*Math.min(2,Math.max(.3,sp.swim.speedCmS/f.referenceSpeedCmS))*(a.intent==='rest'?.3:1)*h);});
+  for(const g of grains){if(g.grams<=EPSILON_G)continue;let demand=0;const eligible=(i:number)=>{
+    const a=state.animals[i]!;if(ids&&!ids.get(a.id)?.has(g.id))return 0;if(contacts!==undefined&&((contacts[a.id]??0)&(1<<g.layer))===0)return 0;
+    return needs[i]!*layerAccess(ctx.species[i]!,a,g.layer,config);
+   };
+   for(let i=0;i<needs.length;i++)demand+=eligible(i);if(demand<=0)continue;const share=Math.min(1,g.grams/demand);let eaten=0;
+   // All shares use the same pre-bite demand, preserving fair allocation among nearby fish.
+   for(let i=0;i<needs.length;i++){const amount=eligible(i)*share;if(amount<=0)continue;needs[i]=Math.max(0,needs[i]!-amount);state.animals[i]!.hunger=Math.max(0,state.animals[i]!.hunger-amount/meals[i]!);eaten+=amount;}
+   g.grams=Math.max(0,g.grams-eaten);
+  }
+ }
+ publishFoodGrains(state);
 }

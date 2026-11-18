@@ -1,3 +1,5 @@
+import foodTypes from '../../data/food-types.json';
+import type {FoodKind} from '../../sim/food-grains';
 /**
  * Bandeja de herramientas de la vista pecera: la bandeja de madera de
  * marcos-ui.png con los íconos de iconos-acciones.jpg. Tocar una herramienta la
@@ -27,6 +29,8 @@ export class ToolTray {
   private readonly buttons = new Map<HandTool, HTMLButtonElement>();
   private readonly drop: HTMLButtonElement;
   private readonly lid: HTMLButtonElement;
+  private readonly foodSelect=document.createElement('select');
+  onFoodKind:(kind:FoodKind)=>void=()=>undefined;
 
   /** @param choose Elegir una herramienta (devuelve el motivo si no se puede, o null). */
   constructor(choose: (tool: HandTool) => string | null, toggleLid: () => void) {
@@ -56,6 +60,10 @@ export class ToolTray {
       this.buttons.set(tool, button);
       this.root.append(button);
     }
+    this.foodSelect.className='tray-food-type';this.foodSelect.setAttribute('aria-label',texts.granular.food);
+    for(const [kind,profile]of Object.entries(foodTypes)){const option=document.createElement('option');option.value=kind;option.textContent=profile.label;this.foodSelect.append(option);}
+    this.foodSelect.addEventListener('change',()=>this.onFoodKind(this.foodSelect.value as FoodKind));
+    this.root.append(this.foodSelect);
     this.lid = woodButton(texts.ui.openLid, toggleLid);
     this.drop = woodButton(texts.ui.drop, () => choose('hand'), 'tray-drop');
     this.root.append(this.lid, this.drop);
@@ -73,7 +81,9 @@ export class ToolTray {
     showNote(reason);
   }
 
-  update(active: HandTool, lidClosed: boolean): void {
+  update(active: HandTool, lidClosed: boolean,foodKind:FoodKind='pellets'): void {
+    this.foodSelect.hidden=active!=='food';
+    if(this.foodSelect.value!==foodKind)this.foodSelect.value=foodKind;
     for (const [tool, button] of this.buttons) {
       const pressed = String(tool === active);
       if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);

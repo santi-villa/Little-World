@@ -986,3 +986,9 @@ Contemplar conserva el encuadre y el seguimiento, oculta HUD, herramientas, cont
 El agua tiene una corriente analítica compartida consultable en centímetros; afecta peces con resistencia por grupo, plantas con perfiles propios, comida persistente y microburbujas. Las cantidades siguen perteneciendo a la química. En vivo, una entrada opcional de contacto por capa limita la alimentación a peces que llegaron; offline y saltos de tiempo conservan la abstracción por especie para no depender del render. El guardado mantiene compatibilidad.
 
 Un clic en un pez ahora abre inmediatamente su ficha y conserva enfoque suave; sustituye el paso anterior de clic para seguir y segundo clic para información. Rueda del mouse y pinza ajustan zoom sin interferir con paneles. Las plantas permanecen casi quietas sin corriente y el movimiento responde principalmente a fuerzas e impulsos. Implementación, parámetros y límites: docs/ECOSISTEMA.md.
+
+### Alimento persistente, contornos y espejo
+
+El guardado v4 incorpora paquetes alimenticios con identidad, gramos, coordenadas y velocidad; es compatible con v1–v3. La química consume el paquete alcanzado y el render observa sus gramos. Offline conserva el acceso por especie/capa. Hasta 512 paquetes; al llegar al límite se combina identidad preservando masa. La mano elige cuatro tipos sin alimentar automáticamente.
+
+El alimento choca con siluetas alfa de rocas/maderas y sus espesores aproximados. Peces buscan profundidad y esquivan núcleos solo dentro de ese plano; no se simulan mallas 3D completas. El espejo temporal es un objeto visible y localizado: un betta cercano y activo puede desplegar aletas, y el espejo se retira solo. Las motas tienen trayectorias locales; rayos y cáusticas usan las mismas ondas analíticas. Documentación vigente y límites en docs/ECOSISTEMA.md; las descripciones históricas anteriores de pools sin coordenadas ya no describen el modo activo.

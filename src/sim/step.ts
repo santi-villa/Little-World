@@ -1,3 +1,4 @@
+import {reconcileFoodGrains} from './food-grains';
 /**
  * Punto de entrada de la simulación.
  *
@@ -49,7 +50,7 @@ function singleStep(
   // Seres vivos: el gato, y los animales de la pecera (comen, excretan, deciden).
   stepCat(state, dtMinutes, rng, config, env, events);
   if (state.animals.length > 0) {
-    stepFood(state, dtMinutes, ctx, config,env.feedingContacts);
+    stepFood(state, dtMinutes, ctx, config,env.feedingContacts,env.feedingGrains);
     stepAnimals(state, dtMinutes, ctx, config, events);
     if (ctx.stale) ctx = buildContext(state, config);
     const hoursCrossed =
@@ -61,7 +62,7 @@ function singleStep(
     }
     decideIntents(state, ctx, rng, config, env);
   } else {
-    stepFood(state, dtMinutes, ctx, config,env.feedingContacts);
+    stepFood(state, dtMinutes, ctx, config,env.feedingContacts,env.feedingGrains);
   }
 
   // Química y biología.
@@ -80,6 +81,7 @@ function singleStep(
     events.push({ type: 'cycle_lost', timeMinutes: state.timeMinutes });
   }
   for (const event of updateAlerts(state, config)) events.push(event);
+  reconcileFoodGrains(state);
   return ctx;
 }
 

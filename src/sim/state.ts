@@ -137,7 +137,7 @@ export function cloneState(state: SimState): SimState {
     cycle: { ...state.cycle },
     animals: state.animals.map(cloneAnimal),
     nextAnimalId: state.nextAnimalId,
-    food: { ...state.food },
+    food: { ...state.food, ...(state.food.grains ? {grains:state.food.grains.map(g=>({...g}))} : {}) },
     cat: { ...state.cat, needs: { ...state.cat.needs } },
     alerts: [...state.alerts],
   };

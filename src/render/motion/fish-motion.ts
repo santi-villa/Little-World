@@ -61,6 +61,7 @@ export interface MotionInput {
   /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
   bettaPrototype?: boolean;
   renderDepth?:boolean;
+  mirror?:{x:number;y:number;z:number};
   water?:WaterVelocity;
   trackingTargets?:ReadonlyMap<number,{x:number;y:number}>;
   habitat?:Habitat;
@@ -69,7 +70,7 @@ export interface MotionInput {
   bounds: Bounds;
   animals: readonly MotionAnimal[];
   /** Dónde hay comida ahora. */
-  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number;targets?:readonly {x:number;y:number;layer:number}[] };
+  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number;targets?:readonly {x:number;y:number;layer:number;z?:number}[] };
   /** Golpe reciente en el vidrio (posición en cm) o null. */
   scare: Vec | null;
   /** El gato está pegado al vidrio. */
@@ -248,7 +249,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const depth = bounds.height;
 
       if(input.renderDepth&&animal.alive){
-        if(this.time>=(body.depthAt??0)){body.targetPlane=animal.intent==='eat'?2:animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
+        if(this.time>=(body.depthAt??0)){if(animal.intent!=='eat')body.targetPlane=animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
         body.plane+=(body.targetPlane-body.plane)*(1-Math.exp(-dt*visual.depthTravelSpeed));
       }
       if (!animal.alive) {
@@ -281,8 +282,9 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
           // Cada uno picotea en su lugarcito alrededor de la comida.
           const spread = Math.min(2, bounds.width * 0.05);
           const x = input.food.x + (Math.sin(body.phase) + 0.15 * Math.sin(this.time * 0.7 + body.phase)) * spread;
-          let foodTarget:{x:number;y:number}|undefined,distance=Infinity;
-          for(const target of input.food.targets??[]){if((access==='surface'&&target.layer===2)||(access==='bottom'&&target.layer===0))continue;const d=Math.hypot(body.x-target.x,body.y-target.y);if(d<distance){distance=d;foodTarget=target;}}
+          let foodTarget:{x:number;y:number;z?:number}|undefined,distance=Infinity;
+          for(const target of input.food.targets??[]){if((access==='surface'&&target.layer===2)||(access==='bottom'&&target.layer===0))continue;const d=Math.hypot(body.x-target.x,body.y-target.y,((target.z??body.plane/2)-body.plane/2)*bounds.width*.5);if(d<distance){distance=d;foodTarget=target;}}
+          if(foodTarget?.z!==undefined)body.targetPlane=foodTarget.z*2;
           desired = arrive(body, foodTarget?.x??x, foodTarget?.y??y, limits.maxSpeed * 0.9, 1.5);
           break;
         }
@@ -435,9 +437,9 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       }
 
       if(input.habitat){
-        const ahead=resolveHabitat(body.x+desired.x,body.y+desired.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));
+        const ahead=resolveHabitat(body.x+desired.x,body.y+desired.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);
         desired.x+=(ahead.x-body.x-desired.x)*2;desired.y+=(ahead.y-body.y-desired.y)*2;
-        const goal=resolveHabitat(body.goalX,body.goalY,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));body.goalX=goal.x;body.goalY=goal.y;
+        const goal=resolveHabitat(body.goalX,body.goalY,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.goalX=goal.x;body.goalY=goal.y;
       }
       if(input.water){const current=input.water.getWaterVelocity(body.x,body.y),coupling=ecosystem.flow.fishCoupling*profile.currentResistance;desired.x+=current.x*coupling;desired.y+=current.y*coupling;}
       const speedLimit = limits.maxSpeed * boost;
@@ -448,7 +450,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       }
       integrate(body, desired.x, desired.y, { ...limits, maxSpeed: speedLimit }, dt, bounds);
 
-      if(input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));body.x=safe.x;body.y=safe.y;}
+      if(input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.x=safe.x;body.y=safe.y;}
       if(['explore','school'].includes(animal.intent)){
         body.slowSeconds=Math.hypot(body.vx,body.vy)<.12?(body.slowSeconds??0)+dt:0;
         if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body,animal,bounds);body.slowSeconds=0;}

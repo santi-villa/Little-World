@@ -1,3 +1,4 @@
+import {enableFoodGrains,applyGrainKinematics,type GrainKinematics} from './sim/food-grains';
 import { buenosAiresDate } from './world/buenos-aires';
 import allTexts from './data/texts.es.json';
 import { createCat } from './sim/cat';
@@ -78,6 +79,10 @@ export class Game {
   lastCatchUp: CatchUpReport | null = null;
   private lastGlassNote=-Infinity;
   private pendingMinutes = 0;
+  private grainContacts:Record<number,number[]>={};private grainPositions:readonly GrainKinematics[]=[];
+  enableGrains():void{enableFoodGrains(this.state);this.dirty=true;}
+  observeGrains(positions:readonly GrainKinematics[],contacts:Readonly<Record<number,readonly number[]>>):void{this.grainPositions=positions;for(const [id,values]of Object.entries(contacts)){const set=new Set(this.grainContacts[Number(id)]??[]);for(const value of values)set.add(value);this.grainContacts[Number(id)]=[...set];}}
+  flushGrains():void{if(this.state.food.grains&&this.grainPositions.length){applyGrainKinematics(this.state,this.grainPositions);this.dirty=true;}}
   private feedingContacts:Record<number,number>={};
   observeFeedingContacts(contacts:Readonly<Record<number,number>>):void{for(const [id,mask]of Object.entries(contacts))this.feedingContacts[Number(id)]=(this.feedingContacts[Number(id)]??0)|mask;}
 
@@ -127,9 +132,9 @@ export class Game {
 
   /** Avanza la simulación `minutes` minutos de una. */
   advance(minutes: number,live=false): void {
-    const env=this.environment();if(live)env.feedingContacts=this.feedingContacts;
+    this.flushGrains();const env=this.environment();if(live){env.feedingContacts=this.feedingContacts;env.feedingGrains=this.grainContacts;}
     const result = step(this.state, minutes, defaultConfig, env);
-    this.feedingContacts={};
+    this.feedingContacts={};this.grainContacts={};this.grainPositions=[];
     this.state = result.state;
     this.record(result.events);
     this.dirty = true;
@@ -148,6 +153,7 @@ export class Game {
    */
   catchUp(elapsedMs: number, hourlyC?: readonly number[]): CatchUpReport | null {
     if (this.speed <= 0 || !(elapsedMs >= MIN_CATCH_UP_MS)) return null;
+    this.flushGrains();
     const startedAt = performance.now();
     const result = catchUp(this.state, elapsedMs / 60_000, defaultConfig, {
       outdoor:
@@ -158,6 +164,7 @@ export class Game {
     });
     const report = { result, durationMs: performance.now() - startedAt };
     this.state = result.state;
+    this.grainPositions=[];this.grainContacts={};this.feedingContacts={};
     this.record(result.events);
     this.lastCatchUp = report;
     this.pendingMinutes = 0;
@@ -167,6 +174,7 @@ export class Game {
   }
 
   act(action: SimAction): SimEvent[] {
+    this.flushGrains();if(action.type==='feed')action={...action,kind:action.kind??this.state.food.kind??'pellets'};
     if(action.type==='feed' && action.grams>0 && this.player.tutorial===2)this.player.tutorial=3;
     const result = applyAction(this.state, action);
     this.state = result.state;
@@ -197,7 +205,9 @@ export class Game {
 
   reset(seed: number | string, tankId?: string, now: Date = new Date()): void {
     const fresh = Game.newTank(seed, tankId, now);
+    this.grainPositions=[];this.grainContacts={};this.feedingContacts={};
     this.state = fresh.state;
+    this.enableGrains();
     this.player = fresh.player;
     this.speed = DEFAULT_SPEED;
     this.log.length = 0;

@@ -104,9 +104,12 @@ export class RoomScene {
   private lastTap=-100;
   private mode: UiMode = 'room';
   followingId:number|null=null;
+  get grainContacts(){return this.tank.fish.grainContacts;}
+  get foodPositions(){return this.tank.fish.foodPositions;}
   get feedingContacts(){return this.tank.fish.feedingContacts;}
   zoomAt(p:Point,factor:number):void{this.followingId=null;this.gesture=null;this.camera.zoomAt(p.x,p.y,factor);}
   showFish(id:number):void {const p=this.tank.fishPoint(id);if(!p)return;this.followingId=id;this.handTool='hand';this.enterFocus('tank',{x:p.x,y:p.y,zoom:Math.max(3,Math.min(12,120/Math.max(1,p.length)))});}
+  showMirror(id:number):void{this.showTank();this.tank.showMirror(id);}
   fishDetails():void {if(this.followingId!==null)this.tools('fish',this.followingId);}
   /** Vista de la habitación a la que se vuelve al salir de una vista de cerca. */
   private roomView: CameraView;

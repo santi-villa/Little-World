@@ -99,10 +99,11 @@ export class CodeBetta {
       : Number.parseInt(sp!.accent.slice(1), 16);
     const dark = lerpColor(main, 0x152e36, 0.35),
       light = lerpColor(main, 0xd6dfc5, 0.17);
+    const eelWave=(px:number)=>eel&&alive?Math.sin(t-(34-px)*.09)*(34-px)/62*(2+6*p.effort):0;
     const point = (px: number, py: number, pz = 0): Point3 => ({
       x: px+(px>29?nibble:0),
       y: py * bodyHeight,
-      z: pz,
+      z: pz+eelWave(px),
     });
     const face = (points: Point3[], color: number, alpha = 1) =>
       faces.push({ points, color, alpha });
@@ -188,10 +189,22 @@ export class CodeBetta {
           0.95,
         );
       }
+    // Distinct fin attachments: paired pelvic fins, angelfish rays, catfish barbels and raised gill covers.
+    for(const side of [-1,1]){
+      const flick=alive?Math.sin(this.animationSeconds*5+side)*2:0;
+      face([point(1,7,side*4),point(-9,betta?18:12,side*(7+flick)),point(-3,8,side*6)],accent,.78);
+      if(tall)face([point(12,8,side*3),point(3,30,side*4+flick),point(10,11,side*4)],light,.85);
+      if(betta&&motion?.mode==='flare')face([point(17,-6,side*6),point(12,-3,side*12),point(13,7,side*11),point(18,5,side*6)],lerpColor(main,0x382348,.3),.95);
+      if(eel||sp?.id.includes('cory'))for(const offset of [-1,1])face([point(33,2,side*2),point(39,4+offset*2,side*5),point(34,3,side*2)],light,.85);
+      if(sp?.id==='ancistrus'){
+        face([point(27,0,side*3),point(37,2,side*4),point(32,6,side*5)],dark);
+        face([point(8,1,side*4),point(-9,10,side*15),point(-14,2,side*7)],accent,.8);
+      }
+    }
     // Pectorals, eyes and gills live on both sides and are depth sorted with the body.
     for (const side of [-1, 1]) {
       const z = side * 6.2,
-        flap = Math.sin(this.animationSeconds*cBetta.pectoralHz*Math.PI*2 + side) * 4;
+        flap = alive?Math.sin(this.animationSeconds*cBetta.pectoralHz*Math.PI*2 + side) * 4:0;
       face(
         [
           point(12, 0, z),
@@ -228,7 +241,7 @@ export class CodeBetta {
             point(16, -7, z),
             point(14, 1, z + side * 0.2),
             point(16, 6, z),
-            point(16.8, 1, z + side * (0.2+Math.sin(this.animationSeconds*2)*.25)),
+            point(16.8, 1, z + side * (0.2+(alive?Math.sin(this.animationSeconds*2)*.25:0))),
           ],
           0x193b50,
         );
