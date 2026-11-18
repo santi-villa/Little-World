@@ -28,6 +28,7 @@ const ease = (current: number, target: number, dt: number, rate: number) =>
 export class IllustratedBettaPose {
   yaw: number;
   pitch = 0;
+  bob = 0;
   phase = 0;
   effort = 0;
   frequency = 0;
@@ -44,12 +45,17 @@ export class IllustratedBettaPose {
   readonly fins: Record<FinName, Float64Array>;
   private velocities: Record<FinName, Float64Array>;
   private previousSpeed: number | undefined;
+  private yawGoal: number;
+  private direction: number;
   private previousHeading: number | undefined;
   private nibbleAt = -Infinity;
   private pectoralPhase = 0;
   private breathPhase = 0;
   constructor(facing = 1, seed = 0, private readonly companion?: CompanionProfile) {
-    this.yaw = facing < 0 ? Math.PI : 0;
+    this.direction = facing < 0 ? -1 : 1;
+    this.yawGoal = this.yaw = this.direction < 0 ? Math.PI : 0;
+    this.pectoralPhase = seed * 1.819;
+    this.breathPhase = seed * 0.47;
     this.phase = seed * 2.399;
     this.fins = {
       tail: new Float64Array(config.pose.finNodes),
@@ -111,6 +117,14 @@ export class IllustratedBettaPose {
     if (companion && input.swim && input.alive && !resting) {
       effortTarget = clamp(input.swim.speed * 0.93 + Math.max(0, acceleration) / L * 0.085, 0, 1) * input.condition;
     }
+    const direction = b.facing < 0 ? -1 : 1;
+    if (input.alive && direction !== this.direction) {
+      const target = direction < 0 ? Math.PI : 0;
+      let turn = angleDiff(target, this.yaw);
+      if (Math.abs(turn) > Math.PI - 0.08 && angular < -0.08 && turn > 0) turn -= Math.PI * 2;
+      this.yawGoal = this.yaw + turn;
+      this.direction = direction;
+    }
     let remaining = elapsed;
     while (remaining > 1e-8) {
       const h = Math.min(c.stepSeconds, remaining);
@@ -129,10 +143,13 @@ export class IllustratedBettaPose {
         this.phase += h * this.frequency * Math.PI * 2;
       }
       this.turnRate = ease(this.turnRate, input.alive ? angular : 0, h, 6);
-      const targetYaw = b.facing < 0 ? Math.PI : 0;
-      if (input.alive)
-        this.yaw +=
-          angleDiff(targetYaw, this.yaw) * (1 - Math.exp(-h * (companion?.turnEase ?? c.turnEase)));
+      if (input.alive) this.yaw = ease(this.yaw, this.yawGoal, h, companion?.turnEase ?? c.turnEase);
+      // A fraction of a model unit, independent from the swimming trajectory.
+      const [lift, tempo] = companion?.bob ?? [0.72, 2.25];
+      this.bob = ease(this.bob, input.alive
+        ? Math.sin(this.seconds * tempo + this.breathPhase * 0.37) * lift *
+          (resting ? 0.32 : 0.56 + this.effort * 0.32)
+        : 0, h, 5);
       const foodClose =
         !!input.food && input.food.distance < input.lengthCm * 0.65;
       const foodPitch = foodClose

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SwimSpace } from '../src/render/motion/swim-space';
 import {
   FishMotion,
   PLANE_FAR,
@@ -456,7 +457,7 @@ it('la corydora patrulla el fondo mientras el neón cubre más agua arriba', () 
   const motion = new FishMotion(64);
   const list = [...animals('corydoras_paleatus', 1, 'explore'), ...animals('neon_tetra', 1, 'explore', 2)];
   const data = input(list, {
-    illustratedCompanions: true,
+    illustratedSwimming: true,
     renderDepth: true,
     habitat: { obstacles: [], leaves: [], refuges: [], features: [{ x: 0.3, y: 0.57, z: 0.35 }] },
   });
@@ -473,4 +474,76 @@ it('la corydora patrulla el fondo mientras el neón cubre más agua arriba', () 
   expect(neonY / samples).toBeLessThan(BOUNDS.height * 0.57);
   expect(coryDistance).toBeGreaterThan(BOUNDS.width * 0.25);
   expect(neonDistance).toBeGreaterThan(coryDistance * 1.5);
+});
+
+const routineSolid = {
+  key: 'driftwood',
+  x: 0.41, y: 0.59, width: 0.18, height: 0.4, z: 0.5, depth: 0.39,
+  columns: 4, rows: 4, alpha: [0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+};
+
+it('los tres peces recorren la misma ruta física a 30, 60 y 144 FPS sin entrar en la madera', () => {
+  const simulate = (fps: number) => {
+    const motion = new FishMotion(208);
+    const list = [...animals('betta', 1, 'explore'), ...animals('corydoras_paleatus', 1, 'explore', 2),
+      ...animals('neon_tetra', 1, 'explore', 3)];
+    const habitat = { obstacles: [], leaves: [], refuges: [], solids: [routineSolid],
+      features: [{ x: 0.36, y: 0.65, z: 0.52 }, { x: 0.31, y: 0.28, z: 0.36 }] };
+    const data = input(list, { illustratedSwimming: true, renderDepth: true, bettaPrototype: true, habitat });
+    const space = new SwimSpace(BOUNDS, habitat.solids);
+    const traveled = [0, 0, 0];
+    motion.update(0, data);
+    for (let frame = 0; frame < 25 * fps; frame++) {
+      const before = bodiesOf(motion, list).map(body => ({ x: body.x, y: body.y }));
+      motion.update(1 / fps, data);
+      for (const [i, animal] of list.entries()) {
+        const body = motion.bodies.get(animal.id)!;
+        expect(space.clear(body, animal.sizeCm, i === 1)).toBe(true);
+        const step = Math.hypot(body.x - before[i]!.x, body.y - before[i]!.y);
+        expect(step).toBeLessThanOrEqual(1);
+        traveled[i]! += step;
+        expect(Number.isFinite(motion.renderBody(body).heading)).toBe(true);
+      }
+    }
+    for (const distance of traveled) expect(distance).toBeGreaterThan(10);
+    return bodiesOf(motion, list).map(({ x, y, plane }) => ({ x, y, plane }));
+  };
+  const normal = simulate(60);
+  expect(simulate(30)).toEqual(normal);
+  expect(simulate(144)).toEqual(normal);
+});
+
+it('la trayectoria pasa por las zonas transparentes o por delante y frena ante la parte sólida', () => {
+  const space = new SwimSpace(BOUNDS, [routineSolid]);
+  const opaque = { x: 27.7, y: 24.5, plane: 1 };
+  expect(space.clear(opaque, 2, false)).toBe(false);
+  expect(space.clear({ ...opaque, plane: 1.85 }, 2, false)).toBe(true);
+  expect(space.clear({ x: 33.5, y: 19.7, plane: 1 }, 1, false)).toBe(true);
+  const from = { ...opaque, x: 22.5 };
+  expect(space.clear(from, 2, false)).toBe(true);
+  const end = { ...opaque, vx: 6, vy: 0 };
+  space.constrain(from, end, 2, false);
+  expect(end.x).toBeGreaterThanOrEqual(from.x);
+  expect(end.x).toBeLessThan(opaque.x);
+  expect(space.clear(end, 2, false)).toBe(true);
+  const otherSide = { ...end, x: 42, vx: 10 };
+  expect(space.clear(otherSide, 2, false)).toBe(true);
+  space.constrain(from, otherSide, 2, false);
+  expect(otherSide.x).toBeLessThan(opaque.x);
+});
+
+it('el betta y el neón se separan cuando los dos paran en el mismo refugio', () => {
+  const motion = new FishMotion(32);
+  const list = [...animals('betta', 1, 'rest'), ...animals('neon_tetra', 1, 'rest', 2)];
+  const data = input(list, { illustratedSwimming: true, bettaPrototype: true, renderDepth: true,
+    habitat: { obstacles: [], leaves: [], refuges: [{ x: 0.5, y: 0.35 }] } });
+  motion.update(0, data);
+  const betta = motion.bodies.get(1)!;
+  const neon = motion.bodies.get(2)!;
+  for (const body of [betta, neon]) Object.assign(body, {
+    x: 30, y: 10.5, plane: 1, targetPlane: 1, heading: 0,
+    goalX: 30, goalY: 10.5, goalUntil: 100, vx: 0, vy: 0,
+  });
+  run(motion, data, 1);
+  expect(Math.hypot(neon.x - betta.x, neon.y - betta.y)).toBeGreaterThan(0.6);
 });

@@ -130,7 +130,7 @@ export class IllustratedBetta {
   ): void {
     this.pose.update(dt, input);
     const p = this.pose;
-    this.container.position.set(x, y);
+    this.container.position.set(x, y + p.bob * length / config.referenceLength);
     this.container.scale.set(length / config.referenceLength);
     this.view.scale.y = input.alive ? 1 : -1;
     this.container.tint = input.alive ? (lit ? 0xffffff : 0x8297ac) : 0x91969b;

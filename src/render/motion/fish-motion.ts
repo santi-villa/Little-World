@@ -1,3 +1,4 @@
+import { SwimSpace, type SwimPoint } from './swim-space';
 import { companionProfile, type CompanionProfile } from './illustrated-companions';
 import ecosystem from '../../data/ecosystem.json';
 import type {WaterVelocity} from './water-flow';
@@ -19,6 +20,7 @@ import { interestedInHand, type HandInput } from './hand';
 import { groupStyle, type Intent, type Species } from '../../sim';
 import {
   alignment,
+  angleDiff,
   arrive,
   cohesion,
   containment,
@@ -61,7 +63,7 @@ export interface MotionAnimal {
 export interface MotionInput {
   /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
   bettaPrototype?: boolean;
-  illustratedCompanions?: boolean;
+  illustratedSwimming?: boolean;
   renderDepth?:boolean;
   mirror?:{x:number;y:number;z:number};
   water?:WaterVelocity;
@@ -101,6 +103,15 @@ interface SchoolGoal {
   y: number;
   plane: number;
   until: number;
+}
+
+const SWIM_STEP = 1 / 60;
+const usesSwimSpace = (id: string) => id === 'betta' || !!companionProfile(id);
+
+interface BodySample extends SwimPoint {
+  vx: number;
+  vy: number;
+  heading: number;
 }
 
 const TWO_PI = Math.PI * 2;
@@ -149,6 +160,9 @@ export class FishMotion {
   private readonly schools = new Map<string, SchoolGoal>();
   private readonly random: () => number;
   private time = 0;
+  private remaining = 0;
+  private readonly previous = new Map<number, BodySample>();
+  private readonly individualRandom = new Map<number, () => number>();
 
   constructor(seed = 1) {
     this.random = mulberry(seed);
@@ -184,20 +198,21 @@ export class FishMotion {
     return body;
   }
 
-  private pickGoal(body: FishBody, animal: MotionAnimal, bounds: Bounds, companion?: CompanionProfile, habitat?: Habitat): void {
-    const r = this.random;
+  private pickGoal(body: FishBody, animal: MotionAnimal, bounds: Bounds, companion?: CompanionProfile, habitat?: Habitat, r = this.random): void {
     if (companion) {
       const [top, bottom] = companion.band;
       const cory = animal.species.id === 'corydoras_paleatus';
-      const features = habitat?.features;
-      const feature = cory && features?.length && r() < 0.58
+      const features = habitat?.features?.filter(p => cory ? p.y > 0.46 : p.y >= top && p.y <= bottom);
+      const feature = features?.length && r() < (cory ? 0.62 : 0.29)
         ? features[Math.floor(r() * features.length)] : undefined;
       const shortHop = (0.085 + r() * 0.19) * (r() > 0.5 ? 1 : -1);
       const x = feature
         ? feature.x + (feature.x < 0.5 ? 0.07 : -0.07)
         : cory ? body.x / bounds.width + shortHop : 0.13 + r() * 0.74;
       body.goalX = bounds.width * Math.max(0.09, Math.min(0.91, x));
-      body.goalY = bounds.height * (top + (bottom - top) * r());
+      const lane = feature && !cory ? Math.max(top, Math.min(bottom, feature.y + (r() - 0.5) * 0.1))
+        : top + (bottom - top) * r();
+      body.goalY = bounds.height * lane;
       body.goalUntil = this.time + companion.goalSeconds[0] + (companion.goalSeconds[1] - companion.goalSeconds[0]) * r();
       body.targetPlane = feature ? Math.max(0.5, Math.min(1.7, feature.z * 2 + 0.46)) : 0.72 + r() * 0.94;
       return;
@@ -229,19 +244,67 @@ export class FishMotion {
     return goal;
   }
 
-  /** Avanza `dt` segundos. Conviene llamarlo con pasos chicos (un cuadro). */
+  /** Only presentation reads this interpolated sample. Feeding still uses the physical body. */
+  renderBody(body: FishBody): FishBody {
+    const previous = this.previous.get(body.id);
+    if (!previous) return body;
+    const t = this.remaining / SWIM_STEP;
+    const lerp = (a: number, b: number) => a + (b - a) * t;
+    return { ...body, x: lerp(previous.x, body.x), y: lerp(previous.y, body.y),
+      vx: lerp(previous.vx, body.vx), vy: lerp(previous.vy, body.vy),
+      plane: lerp(previous.plane, body.plane), heading: previous.heading + angleDiff(body.heading, previous.heading) * t };
+  }
+
+  /** Advance motion. The illustrated aquarium steps the same clock at any refresh rate. */
   update(dt: number, input: MotionInput): void {
     const { bounds, animals } = input;
-    const r = this.random;
-
-    // Altas y bajas (también con dt = 0: quien dibuja necesita un cuerpo por animal).
+    const space = input.illustratedSwimming ? new SwimSpace(bounds, input.habitat?.solids) : undefined;
     const present = new Set<number>();
     for (const animal of animals) {
       present.add(animal.id);
-      if (!this.bodies.has(animal.id)) this.bodies.set(animal.id, this.spawn(animal, bounds, input.illustratedCompanions ? companionProfile(animal.species.id) : undefined));
+      if (this.bodies.has(animal.id)) continue;
+      const advanced = !!space && usesSwimSpace(animal.species.id);
+      const companion = advanced ? companionProfile(animal.species.id) : undefined;
+      let body = this.spawn(animal, bounds, companion);
+      if (advanced) {
+        this.individualRandom.set(animal.id, mulberry(Math.floor(this.random() * 0xffffffff) ^ animal.id));
+        // Start from a valid lane even if a root extends into it.
+        for (let i = 0; i < 20 && !space!.clear(body, animal.sizeCm, animal.species.zone === 'bottom'); i++) {
+          body = this.spawn(animal, bounds, companion);
+        }
+      }
+      this.bodies.set(animal.id, body);
     }
-    for (const id of this.bodies.keys()) if (!present.has(id)){this.bodies.delete(id);this.bettas.delete(id);}
-    if (!(dt > 0)) return;
+    for (const id of this.bodies.keys()) {
+      if (present.has(id)) continue;
+      this.bodies.delete(id);
+      this.bettas.delete(id);
+      this.previous.delete(id);
+      this.individualRandom.delete(id);
+    }
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
+    if (!space) {
+      this.previous.clear();
+      this.remaining = 0;
+      this.tick(dt, input);
+      return;
+    }
+    this.remaining += Math.min(0.1, dt);
+    while (this.remaining + 1e-9 >= SWIM_STEP) {
+      for (const animal of animals) {
+        if (!usesSwimSpace(animal.species.id)) continue;
+        const { x, y, plane, vx, vy, heading } = this.bodies.get(animal.id)!;
+        const sample = this.previous.get(animal.id);
+        if (sample) Object.assign(sample, { x, y, plane, vx, vy, heading });
+        else this.previous.set(animal.id, { x, y, plane, vx, vy, heading });
+      }
+      this.tick(SWIM_STEP, input, space);
+      this.remaining = Math.max(0, this.remaining - SWIM_STEP);
+    }
+  }
+
+  private tick(dt: number, input: MotionInput, space?: SwimSpace): void {
+    const { bounds, animals } = input;
     this.time += dt;
 
     // Vecinos por especie (para los boids) y todos (para el espacio personal).
@@ -259,8 +322,11 @@ export class FishMotion {
     for (const animal of animals) {
       const body = this.bodies.get(animal.id) as FishBody;
       const sp = animal.species;
+      const r = this.individualRandom.get(animal.id) ?? this.random;
+      const navigation = space && usesSwimSpace(sp.id) ? space : undefined;
+      const previous = navigation ? { x: body.x, y: body.y, plane: body.plane } : undefined;
       const limits = limitsFor(sp);
-      const companion = input.illustratedCompanions ? companionProfile(sp.id) : undefined;
+      const companion = input.illustratedSwimming ? companionProfile(sp.id) : undefined;
       const cory = !!companion && sp.id === 'corydoras_paleatus';
       if (companion) limits.maxTurn *= companion.turn;
       const group=sp.zone==='bottom'?'bottom':sp.traits.includes('slow')?'slow':groupStyle(sp)!=='none'?'school':'active';
@@ -270,7 +336,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const depth = bounds.height;
 
       if(input.renderDepth&&animal.alive){
-        if(this.time>=(body.depthAt??0)){if(animal.intent!=='eat' && !(sp.id==='betta'&&input.bettaPrototype&&input.habitat?.features))body.targetPlane=animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
+        if(this.time>=(body.depthAt??0)){if(animal.intent!=='eat' && !navigation && !(sp.id==='betta'&&input.bettaPrototype&&input.habitat?.features))body.targetPlane=animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
         body.plane+=(body.targetPlane-body.plane)*(1-Math.exp(-dt*visual.depthTravelSpeed));
       }
       if (!animal.alive) {
@@ -282,7 +348,18 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
         continue;
       }
 
-      if(sp.id==='betta' && input.bettaPrototype){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,{...input,trackingTargets:this.bodies},this.time,r);continue;}
+      if (sp.id === 'betta' && input.bettaPrototype) {
+        let motion = this.bettas.get(animal.id);
+        if (!motion) { motion = new BettaDynamics(); this.bettas.set(animal.id, motion); }
+        const avoid = navigation ? separation(body, everyone.filter(other => Math.abs(other.plane - body.plane) < 0.62),
+          Math.max(2, animal.sizeCm * 0.86)) : undefined;
+        motion.update(body, animal, dt, { ...input, trackingTargets: this.bodies }, this.time, r, navigation && avoid ? {
+          steer: desired => navigation.steer(body, desired, animal.sizeCm, false),
+          avoid,
+        } : undefined);
+        if (previous) navigation!.constrain(previous, body, animal.sizeCm, false);
+        continue;
+      }
 
       const crawler = sp.category !== 'fish';
       const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (companion?.cruise ?? 1) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
@@ -402,7 +479,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
               break;
             }
             if (this.time >= body.goalUntil || arrived) {
-              this.pickGoal(body, animal, bounds, companion, input.habitat);
+              this.pickGoal(body, animal, bounds, companion, input.habitat, r);
               if (input.water && !companion) body.goalUntil = this.time + (body.goalUntil - this.time) * profile.goalSeconds;
             }
             const toGoal = arrive(body, body.goalX, body.goalY, cruise, cory ? 3.2 : 5);
@@ -467,7 +544,9 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
         if (sp.category === 'snail') body.targetPlane = PLANE_FAR;
       }
 
-      if(input.habitat){
+      if (navigation) {
+        desired = navigation.steer(body, desired, animal.sizeCm, cory);
+      } else if (input.habitat) {
         const ahead=resolveHabitat(body.x+desired.x,body.y+desired.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);
         desired.x+=(ahead.x-body.x-desired.x)*2;desired.y+=(ahead.y-body.y-desired.y)*2;
         const goal=resolveHabitat(body.goalX,body.goalY,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.goalX=goal.x;body.goalY=goal.y;
@@ -481,12 +560,13 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       }
       integrate(body, desired.x, desired.y, { ...limits, maxSpeed: speedLimit }, dt, bounds);
 
-      if(input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.x=safe.x;body.y=safe.y;}
+      if(!navigation && input.habitat){const safe=resolveHabitat(body.x,body.y,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15),input.renderDepth?body.plane/2:undefined);body.x=safe.x;body.y=safe.y;}
       if(['explore','school'].includes(animal.intent)){
         body.slowSeconds=Math.hypot(body.vx,body.vy)<.12?(body.slowSeconds??0)+dt:0;
-        if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body, animal, bounds, companion, input.habitat);body.slowSeconds=0;}
+        if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body, animal, bounds, companion, input.habitat, r);body.slowSeconds=0;}
       }
       if(input.water?.constrain){const p=input.water.constrain(body.x,body.y,animal.sizeCm*.15);body.x=p.x;body.y=p.y;}
+      if (previous) navigation!.constrain(previous, body, animal.sizeCm, cory);
       // Cambio de plano suave.
       if (!input.renderDepth) {
         const dp = body.targetPlane - body.plane;

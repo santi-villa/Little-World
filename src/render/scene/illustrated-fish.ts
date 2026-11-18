@@ -16,7 +16,8 @@ export async function loadIllustratedFishRenderer(): Promise<IllustratedFishFact
   cory.source.scaleMode = neon.source.scaleMode = 'linear';
   return (id, facing, species) => {
     if (species === 'betta') return new IllustratedBetta(id, facing, betta);
+    const texture = species === 'corydoras_paleatus' ? cory : species === 'neon_tetra' ? neon : undefined;
     const profile = companionProfile(species);
-    if (profile) return new IllustratedCompanion(id, facing, species, species === 'corydoras_paleatus' ? cory : neon, profile);
+    if (texture && profile) return new IllustratedCompanion(id, facing, species, texture, profile);
   };
 }

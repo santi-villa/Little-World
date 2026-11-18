@@ -1,3 +1,4 @@
+import { swimProjection } from '../motion/swim-space';
 import foodTypes from '../../data/food-types.json';
 import ecosystem from '../../data/ecosystem.json';
 import {WaterFlow} from '../motion/water-flow';
@@ -161,7 +162,7 @@ export class FishLayer {
     this.motion.update(Math.min(0.1, Math.max(0, dtSeconds)), {
       bounds,
       bettaPrototype: true,
-      illustratedCompanions: !!this.createIllustratedFish,
+      illustratedSwimming: !!this.createIllustratedFish,
       renderDepth:true,
       water:this.water,
       animals,
@@ -192,7 +193,7 @@ export class FishLayer {
 
     // De atrás hacia adelante.
     const order = animals
-      .map((animal) => ({ animal, body: this.motion.bodies.get(animal.id) as FishBody }))
+      .map((animal) => ({ animal, body: this.motion.renderBody(this.motion.bodies.get(animal.id)!) }))
       .sort((a, b) => a.body.plane - b.body.plane);
     for (const { animal, body } of order) {
       this.ink = body.plane < 1.2 ? this.graphics : this.foreground;
@@ -266,12 +267,9 @@ export class FishLayer {
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;
     const halfLen = Math.min(len / 2, area.width / 2);
-    const cx = (
-      Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x+area.width/2+(body.x*this.pxPerCm-area.width/2)*(1-far*visual.depthScale*.25)))
-    );
-    const cy = (
-      Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + body.y * this.pxPerCm-far*area.height*(cory ? 0.018 : 0.07)))
-    );
+    const water = swimProjection(body, { width: area.width / this.pxPerCm, height: area.height / this.pxPerCm }, !!cory);
+    const cx = Math.min(area.x + area.width - halfLen, Math.max(area.x + halfLen, area.x + water.x * this.pxPerCm));
+    const cy = Math.min(area.y + area.height, Math.max(area.y + Math.min(len * 0.3, area.height), area.y + water.y * this.pxPerCm));
     this.positions.set(animal.id,{x:cx,y:cy,radius:Math.max(8,len*0.8)});
     const nibbling = animal.alive && animal.intent === 'eat' &&
       Math.abs(body.x-this.foodXCm)<3 && body.y*this.pxPerCm<Math.max(8,this.area.height*0.15);

@@ -1,7 +1,7 @@
 import ecosystem from '../../data/ecosystem.json';
 import defaults from '../../data/motion-betta.json';
 import type { FishBody, MotionAnimal, MotionInput } from './fish-motion';
-import { angleDiff, containment } from './steering';
+import { angleDiff, containment, type Vec } from './steering';
 import { resolveHabitat } from './habitat';
 export const bettaParameters = { ...defaults };
 export type BettaMode =
@@ -30,6 +30,9 @@ export class BettaDynamics {
   private featurePause = 0;
   private inspecting = false;
   private foodTargetId: number | undefined;
+  private propulsion = 0;
+  private parkUntil = 0;
+  private parked = false;
   update(
     b: FishBody,
     a: MotionAnimal,
@@ -37,6 +40,7 @@ export class BettaDynamics {
     input: MotionInput,
     time: number,
     random: () => number,
+    navigation?: { steer: (desired: Vec) => Vec; avoid: Vec },
   ): void {
     const c = bettaParameters,
       L = Math.max(c.epsilon, a.sizeCm * c.bodyFraction),
@@ -166,6 +170,7 @@ export class BettaDynamics {
       b.goalY = bounds.height * y;
       if (input.renderDepth) b.targetPlane = 0.24 + random() * 1.55;
       this.cycle = 0;
+      this.parked = false;
       this.goalAt =
         time +
         c.goalMinSeconds +
@@ -194,12 +199,22 @@ export class BettaDynamics {
       !arrived
     )
       this.stroke = 'burst';
-    if (arrived || this.mode === 'flare') this.stroke = 'float';
+    if (navigation && this.mode === 'wander' && arrived && !this.parked) {
+      this.parked = true;
+      this.parkUntil = time + 0.65 + random() * (1.2 + (1 - a.activity) * 0.85);
+      this.goalAt = this.parkUntil;
+    }
+    const parked = !!navigation && this.mode === 'wander' && time < this.parkUntil;
+    if (arrived || parked || this.mode === 'flare') this.stroke = 'float';
+    const dx = b.goalX - b.x, dy = b.goalY - b.y;
+    const travel = Math.max(0.0001, Math.hypot(dx, dy));
+    const speedHint = Math.min(L * c.cruiseLengthsS, travel * 1.2);
+    const course = navigation?.steer({ x: dx * speedHint / travel, y: dy * speedHint / travel });
     let remaining = Math.min(c.maxDelta, Math.max(0, dt));
     while (remaining > 0) {
       const h = Math.min(c.stepSeconds, remaining);
       remaining -= h;
-      const angle = Math.atan2(b.goalY - b.y, b.goalX - b.x),
+      const angle = course ? Math.atan2(course.y, course.x) : Math.atan2(b.goalY - b.y, b.goalX - b.x),
         turn = Math.max(
           ((-c.maxTurnDegS * Math.PI) / 180) * h,
           Math.min(
@@ -217,11 +232,13 @@ export class BettaDynamics {
               * L * (a.condition ?? 1) * Math.min(1, (cap - speed) / Math.max(0.01, cap * 0.33))
             : 0;
       const wall = containment(b, bounds, L * c.wallLengths, c.wallForce * L);
-      let fx = Math.cos(b.heading) * thrust + wall.x,
+      this.propulsion += (thrust - this.propulsion) * (1 - Math.exp(-h * 14));
+      const drive = navigation ? this.propulsion : thrust;
+      let fx = Math.cos(b.heading) * drive + wall.x,
         fy =
-          Math.sin(b.heading) * thrust +
+          Math.sin(b.heading) * drive +
           (['food', 'breathe'].includes(this.mode) ? 0 : wall.y);
-      for (const o of input.habitat?.obstacles ?? []) {
+      for (const o of navigation ? [] : input.habitat?.obstacles ?? []) {
         if(input.renderDepth&&o.z!==undefined&&Math.abs(b.plane/2-o.z)>(o.depth??.4)/2)continue;
         const rx = o.rx * bounds.width + L * c.wallLengths,
           ry = o.ry * bounds.height + L * c.wallLengths,
@@ -232,6 +249,10 @@ export class BettaDynamics {
           fx += (dx / d) * (1 - d) * c.obstacleForce * L;
           fy += (dy / d) * (1 - d) * c.obstacleForce * L;
         }
+      }
+      if (navigation) {
+        fx += navigation.avoid.x * L * 2.2;
+        fy += navigation.avoid.y * L * 2.2;
       }
       if(input.water){const current=input.water.getWaterVelocity(b.x,b.y);fx+=current.x*ecosystem.flow.fishCoupling;fy+=current.y*ecosystem.flow.fishCoupling;}
       this.force = { x: fx, y: fy };
@@ -249,17 +270,19 @@ export class BettaDynamics {
       }
       b.x += b.vx * h;
       b.y += b.vy * h;
-      const safe = resolveHabitat(
-        b.x,
-        b.y,
-        input.habitat ?? { obstacles: [], leaves: [], refuges: [] },
-        bounds.width,
-        bounds.height,
-        ['breathe', 'food'].includes(this.mode) ? 0 : L * c.collisionMargin,
-        input.renderDepth?b.plane/2:undefined,
-      );
-      b.x = safe.x;
-      b.y = safe.y;
+      if (!navigation) {
+        const safe = resolveHabitat(
+          b.x,
+          b.y,
+          input.habitat ?? { obstacles: [], leaves: [], refuges: [] },
+          bounds.width,
+          bounds.height,
+          ['breathe', 'food'].includes(this.mode) ? 0 : L * c.collisionMargin,
+          input.renderDepth?b.plane/2:undefined,
+        );
+        b.x = safe.x;
+        b.y = safe.y;
+      }
       if(input.water?.constrain){const p=input.water.constrain(b.x,b.y,L*c.collisionMargin);b.x=p.x;b.y=p.y;}
     }
     const pitch = Math.max(
