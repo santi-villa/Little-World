@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Little World · Prueba de coherencia visual</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #343d39; background: #efece4; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      main { max-width: 1440px; margin: auto; padding: 24px; }
+      header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+      h1 { font: 500 clamp(22px, 3vw, 32px)/1.2 Georgia, serif; margin: 0; }
+      p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; }
+      a { color: #365f59; text-underline-offset: 3px; }
+      nav { display: flex; gap: 18px; font-size: 14px; }
+      #stage { position: relative; overflow: hidden; background: #ded9ca; border-radius: 6px; box-shadow: 0 8px 30px #302e2420; }
+      #room { display: block; width: 100%; height: auto; }
+      #aquarium { position: absolute; height: auto; transform: translate(-50%, -100%); pointer-events: none; }
+      img { image-rendering: auto; }
+      #controls { padding: 18px 0; display: flex; align-items: end; gap: 20px; flex-wrap: wrap; }
+      .slider { flex: 1 1 180px; }
+      label { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+      output { font-variant-numeric: tabular-nums; }
+      input[type=range] { display: block; width: 100%; margin: 12px 0 0; accent-color: #4a7063; }
+      .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+      .actions label { align-items: center; }
+      input[type=checkbox] { accent-color: #4a7063; width: 18px; height: 18px; }
+      button { padding: 9px 12px; border-radius: 5px; background: #f9f7f0; border: 1px solid #bbbfb3; color: inherit; cursor: pointer; font: inherit; font-size: 13px; }
+      button:hover { background: #fff; }
+      :focus-visible { outline: 3px solid #a9703b; outline-offset: 4px; }
+      #status { min-height: 22px; color: #744b30; }
+      footer { border-top: 1px solid #d1d3c7; padding-top: 12px; color: #62695e; }
+      @media (max-width: 600px) { main { padding: 14px; } #controls { gap: 16px; } .slider { flex-basis: 100%; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Un mismo pequeño mundo</h1>
+          <p>Prueba de arte · Habitación y pecera como imágenes separadas.</p>
+        </div>
+        <nav aria-label="Assets originales">
+          <a href="room-test.png" target="_blank" rel="noopener">Habitación</a>
+          <a href="aquarium-test.png" target="_blank" rel="noopener">Pecera</a>
+        </nav>
+      </header>
+      <div id="stage" aria-label="Composición de habitación y pecera">
+        <img id="room" src="room-test.png" alt="Habitación ilustrada con un mueble vacío preparado para la pecera." />
+        <img id="aquarium" hidden src="aquarium-test.png" alt="Pecera ilustrada independiente, con vidrio, agua, arena y plantas." />
+      </div>
+      <form id="controls" aria-label="Ajustar la composición">
+        <div class="slider">
+          <label for="x">Posición horizontal <output id="x-value" for="x"></output></label>
+          <input id="x" type="range" min="0" max="100" step="0.1" value="50" />
+        </div>
+        <div class="slider">
+          <label for="y">Apoyo vertical <output id="y-value" for="y"></output></label>
+          <input id="y" type="range" min="0" max="110" step="0.1" value="65" />
+        </div>
+        <div class="slider">
+          <label for="width">Ancho de la pecera <output id="width-value" for="width"></output></label>
+          <input id="width" type="range" min="10" max="85" step="0.1" value="40" />
+        </div>
+        <div class="actions">
+          <label><input id="visible" type="checkbox" checked /> Ver pecera</label>
+          <button id="reset" type="button">Restablecer</button>
+          <button id="export" type="button">Guardar ajuste</button>
+        </div>
+      </form>
+      <p id="status" role="status" aria-live="polite">Cargando imágenes…</p>
+      <footer><p>Composición estática para evaluar estilo, iluminación, perspectiva y escala. Los ajustes no afectan al juego ni a sus partidas.</p></footer>
+    </main>
+    <script type="module">
+      const aquarium = document.querySelector('#aquarium');
+      const room = document.querySelector('#room');
+      const status = document.querySelector('#status');
+      const visible = document.querySelector('#visible');
+      const fields = ['x', 'y', 'width'];
+      const inputs = Object.fromEntries(fields.map(key => [key, document.getElementById(key)]));
+      let defaults;
+      const read = () => Object.fromEntries(fields.map(key => [key, Number(inputs[key].value)]));
+      function update() {
+        const values = read();
+        aquarium.style.left = `${values.x}%`;
+        aquarium.style.top = `${values.y}%`;
+        aquarium.style.width = `${values.width}%`;
+        aquarium.hidden = !visible.checked;
+        for (const key of fields) document.getElementById(`${key}-value`).value = `${values[key].toFixed(1)} %`;
+      }
+      function restore() {
+        if (!defaults) return;
+        for (const key of fields) inputs[key].value = defaults[key];
+        visible.checked = true;
+        update();
+      }
+      document.querySelector('#controls').addEventListener('submit', event => event.preventDefault());
+      document.querySelector('#controls').addEventListener('input', update);
+      document.querySelector('#reset').addEventListener('click', restore);
+      document.querySelector('#export').addEventListener('click', () => {
+        const data = new Blob([JSON.stringify(read(), null, 2) + '\n'], { type: 'application/json' });
+        const url = URL.createObjectURL(data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'placement.json';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        status.textContent = 'Ajuste descargado. Para conservarlo en la prueba, reemplazá placement.json.';
+      });
+      try {
+        const response = await fetch('./placement.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error('No se pudo cargar placement.json.');
+        defaults = await response.json();
+        if (!fields.every(key => Number.isFinite(defaults[key]) && defaults[key] >= Number(inputs[key].min) && defaults[key] <= Number(inputs[key].max))) {
+          throw new Error('placement.json contiene un ajuste inválido.');
+        }
+        restore();
+        await Promise.all([room.decode(), aquarium.decode()]);
+        status.textContent = 'Imágenes cargadas. Podés ocultar la pecera para comprobar que el mueble está vacío.';
+      } catch (error) {
+        aquarium.hidden = true;
+        status.textContent = `No se pudo abrir la prueba: ${error.message}`;
+      }
+    </script>
+  </body>
+</html>

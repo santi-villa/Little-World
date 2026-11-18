@@ -1,0 +1,13 @@
+# Pecera ilustrada — prompt de la prueba
+
+Referencia de estilo: `src/render/dev/art/betta-illustrated-atlas.png`.
+
+Generación nativa con fondo transparente. Resultado: `public/assets/concept/aquarium-test.png`, PNG RGBA de 1536 × 1024. No contiene peces. Original conservado en `/workspace/generated_images/exec-563bdd0b-bbbc-42ed-8e0e-e2f82fdadae3.png` dentro de este entorno.
+
+## Prompt utilizado
+
+Create ONE isolated aquarium illustration as a reusable premium indie game asset, on a genuinely transparent background. Landscape canvas approximately 3:2, generous transparent padding around all edges. Use the attached illustrated betta atlas ONLY as the precise artistic treatment reference: delicately hand-painted natural-history illustration, very fine soft brushed texture, rich yet natural colors, subtle dimensional shading, beautiful handcrafted surface detail. Do not copy its fish, separated parts, atlas layout, or hazy background. This aquarium must belong to the same illustrated world as that betta.
+
+The aquarium is a modest rectangular freshwater tank, mainly FRONT view with a SMALL amount of its RIGHT SIDE visible. Restrained 2.5D depth, almost orthographic, camera just slightly above mid-height so a little upper rim/water surface can be seen. Not an isometric cube, not a wide dramatic 3/4 angle. Front face roughly 1.6 times as wide as tall. Thin handsome charcoal-brown upper lid/rim and solid understated dark base, no branding. Clear thick glass with subtle translucent pale blue edge highlights and restrained gentle reflections, no heavy black outlines. Water clear with a faint natural teal tint, a fine visible waterline, and a softly glowing warm-white LED under the lid. Upper-left diffuse cream daylight, cool teal shadows, warm walnut/copper accents on wood. Illustrated material rendering; NOT photorealism, NOT a realistic 3D render, NOT pixel art, NOT plastic cartoon, NOT vector flat geometry.
+
+Interior intentionally minimal and readable: low gently sloping pale sand, ONE small sculptural warm brown driftwood piece and a small smooth gray stone, ONE or TWO restrained elegant sage-green aquatic plants at the rear corners. Spacious empty middle swimming zone. Interior seen naturally through glass, bottom sand rests correctly inside the base. NO fish, animals, bubbles used as characters, text, labels, UI, room, table, pedestal, floor, scene backdrop, or opaque background. Do not bake a room into the glass; the water may be translucent colored, but the isolated object's surroundings must be alpha-transparent. Centered complete silhouette with no crop. A polished beautiful illustration asset suitable to later place on a walnut desk in a cozy illustrated bedroom.
