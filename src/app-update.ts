@@ -14,7 +14,9 @@ export async function repairApp():Promise<void>{
   const cache=await caches.open(name);
   for(const request of await cache.keys())if(request.url.startsWith(scope))await cache.delete(request);
  }
- location.replace(`${import.meta.env.BASE_URL}?actualizar=${Date.now()}`);
+ const url = new URL(location.href);
+ url.searchParams.set('actualizar', String(Date.now()));
+ location.replace(url);
 }
 export function startAppUpdates():void{
  const button=document.createElement('button');button.className='repair-app';button.textContent=texts.appUpdate.label;button.title=texts.appUpdate.title;

@@ -47,6 +47,8 @@ export default defineConfig({
         // json incluido: manifest.json de los assets tiene que venir de la misma versión que sus PNG.
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}', 'art/*.jpg'],
         cleanupOutdatedCaches: true,
+        // Mode selection changes how the same entry document boots.
+        ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^(fish-preview|tank|debug|classic-room|room-preview|actualizar)$/],
         // Exclude the original public PNG copies. The hashed fish textures
         // are part of the same bundle as their meshes and must work offline.
         globIgnores: [

@@ -70,6 +70,12 @@ async function loadGame(): Promise<LoadedGame> {
   }
 }
 
+function openPreviewTank(id: string): void {
+  const url = new URL(location.href);
+  url.searchParams.set('tank', id);
+  location.assign(url);
+}
+
 function fishPreviewGame(): LoadedGame {
   const requested = new URLSearchParams(location.search).get('tank');
   const model = TANK_MODELS.find(tank => tank.id === requested);
@@ -90,6 +96,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   const stage = document.getElementById('stage');
   if (!stage) throw new Error('Falta #stage');
   document.title = fishPreview ? 'Peces ilustrados · Little World' : texts.title;
+  document.body.classList.toggle('fish-preview', fishPreview);
   const hint = document.querySelector('#rotate-hint p');
   if (hint) hint.textContent = texts.rotateHint;
 
@@ -192,8 +199,8 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
       await save();
       if (game.dirty || !savingWorks) throw new Error('No se pudo confirmar el guardado');
     });
-    startAppUpdates();
   }
+  startAppUpdates();
 
   const saveStatus = (): string => {
     if (!savingWorks) return texts.save.unavailable;
@@ -234,12 +241,14 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
       selector.add(new Option(tank.name, tank.id));
     }
     selector.value = game.state.tank.modelId;
-    selector.addEventListener('change', () => {
-      const url = new URL(location.href);
-      url.searchParams.set('tank', selector.value);
-      location.assign(url);
-    });
+    selector.addEventListener('change', () => openPreviewTank(selector.value));
     tools.addNavigationControl(selector);
+  } else {
+    const preview = document.createElement('a');
+    preview.className = 'fish-preview-tank';
+    preview.href = '?fish-preview';
+    preview.textContent = 'Probar peces';
+    tools.addNavigationControl(preview);
   }
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   tools.onObserveAnimal=id=>scene.showFish(id);
@@ -266,12 +275,19 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
 
   // An explicit flag also lets a production build be inspected without
   // putting debug controls in the normal player experience.
-  const debug = !fishPreview && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'));
+  const debug = fishPreview || import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
   document.body.classList.toggle('has-debug-tools', debug);
   const panel = debug ? new DebugPanel(game, document.body, {
     saveStatus,
-    onReset: (tankId) => { game.reset(randomSeed(), tankId); tools.open('guide'); },
+    onReset: (tankId) => {
+      if (fishPreview) openPreviewTank(tankId);
+      else { game.reset(randomSeed(), tankId); tools.open('guide'); }
+    },
     onNewGame: () => {
+      if (fishPreview) {
+        location.reload();
+        return;
+      }
       // Se borra el guardado y se arranca de cero: pecera inicial con un solo betta.
       void deleteSave().finally(() => {
         game.reset(randomSeed());
