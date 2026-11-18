@@ -198,7 +198,10 @@ async function boot(illustrated: boolean): Promise<void> {
     if (why) tray.reject(tool, why);
   }, () => scene.toggleLid());
   const hud = new HudPaper(() => tools.open('weather'), () => tools.open('status'));
-  const scene = new RoomScene((action) => void game.act(action), (page, animalId) => {
+  const scene = new RoomScene((action) => {
+    game.act(action);
+    scene.syncState(game.state);
+  }, (page, animalId) => {
     if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
@@ -222,7 +225,11 @@ async function boot(illustrated: boolean): Promise<void> {
   tools.setBusy(false); recovering.remove();
   document.body.classList.remove('busy');
 
-  const panel = new DebugPanel(game, document.body, {
+  // An explicit flag also lets a production build be inspected without
+  // putting debug controls in the normal player experience.
+  const debug = import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+  document.body.classList.toggle('has-debug-tools', debug);
+  const panel = debug ? new DebugPanel(game, document.body, {
     saveStatus,
     onReset: (tankId) => { game.reset(randomSeed(), tankId); tools.open('guide'); },
     onNewGame: () => {
@@ -236,7 +243,7 @@ async function boot(illustrated: boolean): Promise<void> {
       const report = game.catchUp(minutes * 60_000);
       if (report) welcome.show(report.result.summary);
     },
-  });
+  }) : undefined;
 
   // --- Tocar la escena: la escena decide (zonas, cámara, caricias, botones) ---
   const canvas = app.canvas;
@@ -312,10 +319,15 @@ async function boot(illustrated: boolean): Promise<void> {
     tray.update(scene.activeTool, game.state.tank.hasLid,game.state.food.kind);
     // La cámara deja la pecera arriba de la bandeja: su alto, en píxeles del juego.
     const trayHeight = tray.height;
-    if (trayHeight > 0) {
-      const scale = canvas.getBoundingClientRect().height / GAME_HEIGHT;
-      uiInsets.bottom = Math.round((trayHeight + 12) / Math.max(0.01, scale));
-      document.body.style.setProperty('--tray-height', `${trayHeight}px`);
+    const viewportScale = canvas.clientHeight / GAME_HEIGHT;
+    if (viewportScale > 0) {
+      if (trayHeight > 0) {
+        uiInsets.bottom = Math.round((trayHeight + 12) / viewportScale);
+        document.body.style.setProperty('--tray-height', `${trayHeight}px`);
+      }
+      const chrome = window.innerWidth <= 760 ? 49 : 57;
+      // The canvas is letterboxed. Only reserve the part that the UI overlaps.
+      uiInsets.top = Math.max(12, Math.round((chrome - canvas.offsetTop) / viewportScale));
     }
     // Después de una acción del jugador se guarda enseguida.
     if (game.saveSoon) {
@@ -324,7 +336,7 @@ async function boot(illustrated: boolean): Promise<void> {
     }
     const now = performance.now();
     scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default', bettaStyle:game.player.bettaStyle??'code' });
-    panel.update(now);
+    panel?.update(now);
   });
 
   // Guardado automático: cada minuto y al salir o pasar a segundo plano.

@@ -130,28 +130,20 @@ export class IllustratedOptics {
       }
     }
     // The waterline and its reflected secondary edge are both moving curves.
-    for (const offset of [0, 1.75]) {
+    for (const offset of [0, 1.3, 3.4]) {
       this.ripples.moveTo(left, waterTop + offset);
       for (let i = 1; i <= 40; i++) {
         const u = i / 40;
         const wave = 0.64 * Math.sin(24 * u - seconds * 1.42) + 0.35 * Math.sin(45 * u + seconds * 1.1);
         this.ripples.lineTo(left + width * u, waterTop + wave + offset);
       }
-      this.ripples.stroke({ color: 0xe1f5d9, width: offset ? 0.55 : 0.85, alpha: lit ? (offset ? 0.11 : 0.56) : 0.15 });
+      const glimmer = 0.79 + 0.21 * Math.sin(seconds * 0.74 + offset);
+      this.ripples.stroke({ color: offset > 2 ? 0x457d75 : 0xe1f5d9, width: offset ? 0.56 : 0.82,
+        alpha: (lit ? (offset ? 0.19 : 0.55) : 0.12) * glimmer });
     }
     const flash = Math.max(0, Math.sin(seconds * 0.66 - 0.4)) ** 14;
     if (lit && flash > 0.02) {
       this.glints.circle(right - 1.4, top + height * 0.2, 1.1).fill({ color: 0xfcfff1, alpha: flash * 0.6 });
     }
   }
-}
-
-/** One texture with two contours. The foreground lip hides the ends of roots. */
-export function traceBed(g: Graphics, area: OpticalArea, ridge: number, amount: number) {
-  const { left, top, width, height } = area;
-  const bottom = top + height;
-  g.clear().moveTo(left, ridge - amount * 0.55);
-  g.bezierCurveTo(left + width * 0.18, ridge - amount * 1.43, left + width * 0.42, ridge + amount * 0.76, left + width * 0.59, ridge + amount * 0.19)
-    .bezierCurveTo(left + width * 0.76, ridge - amount * 0.65, left + width * 0.85, ridge - amount * 0.92, left + width, ridge - amount * 0.19)
-    .lineTo(left + width, bottom).lineTo(left, bottom).closePath();
 }

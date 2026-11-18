@@ -169,7 +169,7 @@ export class FishLayer {
         sinking: state.food.sinkingG > 1e-4,
         bottom: state.organics.foodG > 1e-3,
         x: this.foodXCm,
-        targets:this.food.particles.filter(p=>p.phase!=="falling").map(p=>({x:p.x,y:p.y,layer:p.layer,z:p.z})),
+        targets:this.food.particles.filter(p=>p.phase!=="falling").map(p=>({id:p.id,x:p.x,y:p.y,layer:p.layer,z:p.z})),
       },
       scare: this.scare,
       hand:this.hand,
@@ -257,7 +257,7 @@ export class FishLayer {
     // The painted juvenile still grows, but retains a readable silhouette
     // at room scale. Motion and collisions continue to use its real length.
     const length = this.createIllustratedBetta && sp.id === 'betta'
-      ? Math.max(visualLength, animal.sizeCm * 0.87) : visualLength;
+      ? Math.max(visualLength * 1.07, animal.sizeCm * 1.08) : visualLength;
     const len = Math.max(sp.category === 'fish' ? visual.minimumFishPixels : 3, length * this.pxPerCm * scale);
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;

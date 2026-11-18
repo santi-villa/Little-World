@@ -23,3 +23,13 @@ El betta articulado lee el mismo `FishMotion` y `BettaDynamics` que usa la parti
 ## Verificación
 
 Pasaron la compilación con typecheck y las 277 pruebas existentes. Se comprobaron las 20 texturas ilustradas en dimensiones y alfa. En Chromium se probó el build en escritorio y en tamaño móvil horizontal, incluida la entrada normal, zoom por clic, regreso, animación entre fotogramas, tapa cerrada y abierta, alimentación guardada, limpieza con esponja, modo Contemplar, día/noche, variante redonda, habitación clásica y preview previa. Las capturas se guardaron en `/workspace/artifacts/illustrated-room-redesign/`.
+
+## Iteración de profundidad y ambiente
+
+Los tres diseños de acuario reutilizan sus ilustraciones en planos de fondo, medio y primer plano. Dos grupos de peces se intercalan con esos planos. Los puntos de apoyo, las máscaras de raíces y el relieve de la arena usan el mismo perfil. El sustrato mantiene su textura y agrega variaciones de tono, granos y piedras pequeñas. Los puntos de interés del betta salen de la posición del tronco y de las plantas. El pez también puede pasear a distintas alturas, detenerse al llegar y seguir un grano hasta que desaparezca.
+
+La tapa frontal gira alrededor de un eje trasero con soportes fijos. La apertura lógica se aplica al tocar el botón y borra el aviso anterior. La animación interpola hacia el mismo estado y se puede invertir mientras está en movimiento. Las burbujas salen de la boquilla cuando está por debajo del nivel del agua. La tapa articulada corresponde al tanque rectangular. La pecera redonda conserva su carcasa previa.
+
+Los gradientes de ventana, lámpara, pared y mesa responden a la hora y al estado de las luces, con una transición gradual. La luz nocturna de la pecera depende de su programación habitual. La bandeja se adapta al ancho disponible y el acercamiento reserva lugar para ella, el encabezado y la tapa abierta. DEBUG aparece en desarrollo o en una apertura explícita con `?debug`.
+
+Pasaron el build con typecheck y las 280 pruebas. En Chromium se verificaron la entrada de producción sin DEBUG, el encuadre en escritorio y móvil horizontal, el movimiento, la alimentación bloqueada con tapa cerrada, la desaparición del aviso al abrir, la alimentación guardada, el regreso a la habitación, el modo nocturno y las variantes redonda y clásica. Se guardaron capturas en `/workspace/artifacts/aquarium-depth/`.

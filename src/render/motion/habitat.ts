@@ -7,7 +7,9 @@ export interface HabitatObstacle {
   rx: number;
   ry: number;
 }
+export interface HabitatFeature { x: number; y: number; z: number }
 export interface Habitat {
+  features?: HabitatFeature[];
   solids?:HabitatSolid[];
   obstacles: HabitatObstacle[];
   refuges: { x: number; y: number }[];

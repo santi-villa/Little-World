@@ -47,3 +47,18 @@ describe('alimentación en vivo sin duplicar química',()=>{
 });
 
 it('el alimento asentado permanece sobre el sustrato al rellenar agua',()=>{const field=new WaterFlow(),food=new FoodParticles();food.update(0,{surface:0,sinking:0,bottom:.002,x:10},20,10,field);const id=food.particles[0]!.id;food.update(.1,{surface:0,sinking:0,bottom:.002,x:10},20,15,field);expect(food.particles[0]!.id).toBe(id);expect(food.particles[0]!.y).toBe(15);});
+
+it('las burbujas nacen cerca de la boquilla sumergida y se cortan al quedar en seco', () => {
+  const water = new WaterFlow();
+  const bubbles = new BubbleParticles();
+  for (let i = 0; i < 55; i++) bubbles.update(1 / 60, 60, 30, 1, water, { x: 53, y: -2 });
+  expect(bubbles.particles).toHaveLength(0);
+  for (let i = 0; i < 55; i++) bubbles.update(1 / 60, 60, 30, 1, water, { x: 53, y: 7 });
+  expect(bubbles.particles.length).toBeGreaterThan(0);
+  for (const bubble of bubbles.particles) {
+    expect(bubble.x).toBeCloseTo(53, 0);
+    expect(bubble.y).toBeGreaterThan(0);
+    expect(bubble.y).toBeLessThan(7);
+  }
+  expect(new Set(bubbles.particles.map(p => p.radius)).size).toBeGreaterThan(1);
+});

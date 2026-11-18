@@ -1,6 +1,6 @@
 import {CodeBird} from './code-bird';
 import { cannotUse, pinchGrams, strokeSamples, type HandTool } from '../hand-tools';
-import { confirmPaper, type CursorState } from '../ui/paper-ui';
+import { confirmPaper, dismissNote, type CursorState } from '../ui/paper-ui';
 import { fill } from '../ui/texts';
 import { ambientTint } from '../art-direction';
 import { illustratedDecor } from '../tank/illustrated-layout';
@@ -34,9 +34,9 @@ import { Container, Graphics, Sprite } from 'pixi.js';
 import { defaultConfig, type DerivedValues, type SimAction, type SimState, type Weather } from '../../sim';
 import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
-import { daylight } from '../pixel-utils';
+import { daylight, lerpColor } from '../pixel-utils';
 import { TankView } from '../tank/tank-view';
-import { careBarHeight, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
+import { careBarHeight, uiInsets, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../viewport';
 import { CatView } from './cat-view';
@@ -93,6 +93,8 @@ export class RoomScene {
   private skyKey = '';
   private nextSkyAt = 0;
   private lastBolt = 0;
+  private cloudDistance = 0;
+  private ambient?: number;
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
@@ -205,8 +207,13 @@ export class RoomScene {
     });
   }
 
+  syncState(state: SimState): void {
+    if (!state.tank.hasLid && this.state?.tank.hasLid) dismissNote(texts.ui.cannot.lidClosed);
+    this.state = state;
+  }
+
   update(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): void {
-    this.state=state;
+    this.syncState(state);
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
     this.seconds = seconds;
@@ -239,7 +246,7 @@ export class RoomScene {
         this.handOverlay.rect(Math.round(cx-2),Math.round(r.y-3),4,1).fill({color:0xf0d59c,alpha:.8});
       }
     }
-    const light = this.drawRoom(state, derived, seconds, view);
+    const light = this.drawRoom(state, derived, seconds, Math.min(0.1, Math.max(0, dt)), view);
     this.cat.update(
       Math.max(light, derived.lightOn ? 0.6 : 0.3), seconds,
     );
@@ -495,10 +502,11 @@ export class RoomScene {
   private tankFocus(fill: number): CameraView {
     const t = this.tank.bounds;
     const bar = careBarHeight();
-    const free = GAME_HEIGHT - bar;
-    const zoom = Math.min((fill * GAME_WIDTH) / t.width, (0.94 * free) / t.height);
-    // Centrada en el espacio libre (la bandeja tapa la parte de abajo de la pantalla).
-    return { x: t.x + t.width / 2, y: t.y + t.height / 2 + bar / 2 / zoom, zoom };
+    const header = this.illustrated ? uiInsets.top : 0;
+    const lidRoom = this.illustrated ? t.height * 0.14 : 0;
+    const free = Math.max(250, GAME_HEIGHT - bar - header);
+    const zoom = Math.min((fill * GAME_WIDTH) / t.width, (0.94 * free) / (t.height + lidRoom));
+    return { x: t.x + t.width / 2, y: t.y + (t.height - lidRoom) / 2 + (bar - header) / 2 / zoom, zoom };
   }
 
   private catFocus(): CameraView {
@@ -513,7 +521,7 @@ export class RoomScene {
     this.mode = mode;
     this.focusSince = this.seconds;
     if (projected) this.camera.goTo(view, false, this.hybrid!.duration);
-    else if (this.illustrated) this.camera.goTo(view, false, illustratedRoom.transition);
+    else if (this.illustrated) this.camera.goTo(view, false, illustratedRoom.transition, false);
     else this.focusOn(view, true);
   }
 
@@ -571,11 +579,16 @@ export class RoomScene {
   }
 
   /** Dibuja la habitación y devuelve cuánta luz de día hay (0 noche .. 1 pleno día). */
-  private drawRoom(state: SimState, derived: DerivedValues, seconds: number, view: SceneView): number {
+  private drawRoom(state: SimState, derived: DerivedValues, seconds: number, dt: number, view: SceneView): number {
     const tank = this.tankBounds;
     // La hora puede venir del panel de debug (solo cambia lo que se ve).
     const day = scenePreview.hour === null && view.outside ? view.outside.daylight : daylight(scenePreview.hour ?? derived.hour);
-    const light = day * WEATHER_LIGHT[view.weather];
+    const target = day * WEATHER_LIGHT[view.weather];
+    const previous = this.ambient ?? target;
+    this.ambient = previous + (target - previous) * (1 - Math.exp(-dt * 2.6));
+    const light = this.illustrated ? this.ambient : target;
+    const wind = Math.max(0.28, Math.min(2.2, (view.outside?.windKph ?? 10) / 14));
+    this.cloudDistance += wind * dt;
     const night = 1 - light;
     // La lámpara: la que eligió el jugador o, si nunca la tocó, sola cuando oscurece.
     const lampOn = this.lamp ?? light < 0.5;
@@ -589,13 +602,13 @@ export class RoomScene {
     }
     if (seconds >= this.nextSkyAt || seconds < this.nextSkyAt - 1 || view.weather === 'storm') {
       this.nextSkyAt = seconds + 1 / 30;
-      this.lastBolt = drawSky(this.sky.clear(), this.window, day, view.weather, seconds, 'front', view.outside);
+      this.lastBolt = drawSky(this.sky.clear(), this.window, day, view.weather, seconds, 'front', view.outside, this.cloudDistance);
     }
     const bolt = this.lastBolt;
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.
-    const tint = ambientTint(light);
+    const tint = this.illustrated ? lerpColor(0x68768f, 0xfff1dc, light) : ambientTint(light);
     this.room.tint = tint;
     // Brisa: las plantas se hamacan apenas (más con la ventana abierta).
     const breeze = (state.room.windowOpen ? 1.8 : 0.9) * (view.weather === 'storm' ? 1.2 : 1);
@@ -605,7 +618,7 @@ export class RoomScene {
       item.sprite.rotation = (Math.min(2, breeze * item.amount) * swing * Math.PI) / 180;
     }
 
-    this.paintedDecor?.update(tank, seconds, tint, light, derived.lightOn, lampOn, breeze);
+    this.paintedDecor?.update(tank, seconds, dt, tint, light, derived.lightOn, lampOn, breeze);
     if (!this.illustrated) drawRoomAnim(this.anim.clear(), seconds);
 
     // Luces.

@@ -59,9 +59,9 @@ export class Camera {
   constructor(private readonly world: Container) {}
 
   /** Va hacia una vista (con easing). `instant` salta sin transición. */
-  goTo(view: CameraView, instant = false,durationSeconds?:number): void {
+  goTo(view: CameraView, instant = false,durationSeconds?:number, snap = true): void {
     this.anchor=null;
-    this.target.zoom = snapZoom(view.zoom);
+    this.target.zoom = snap ? snapZoom(view.zoom) : view.zoom;
     this.target.x = view.x;
     this.target.y = view.y;
     this.clamp(this.target);

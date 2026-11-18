@@ -78,6 +78,12 @@ export function initUiArt(): void {
 
 let notes: HTMLElement | null = null;
 
+export function dismissNote(text: string) {
+  for (const note of Array.from(notes?.children ?? [])) {
+    if (note.textContent === text) note.remove();
+  }
+}
+
 /** Un papelito que aparece, se queda unos segundos y se va solo. No bloquea nada. */
 export function showNote(text: string, ms = 3400): void {
   if (!text) return;
@@ -88,7 +94,7 @@ export function showNote(text: string, ms = 3400): void {
     document.body.append(notes);
   }
   // Si ya está el mismo aviso, no se repite.
-  for (const old of notes.children) if (old.textContent === text) old.remove();
+  dismissNote(text);
   const note = document.createElement('div');
   note.className = 'paper-note';
   note.textContent = text;

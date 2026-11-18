@@ -14,7 +14,7 @@ export type UiMode = 'room' | 'tank' | 'cat' | 'window';
  * Lo que tapan los controles de la pantalla, en píxeles del juego (1280x720).
  * main.ts lo actualiza con el alto real de la bandeja de herramientas.
  */
-export const uiInsets = { bottom: 110 };
+export const uiInsets = { top: 54, bottom: 110 };
 
 /** Alto de la bandeja de herramientas, en píxeles del juego. */
 export function careBarHeight(): number {

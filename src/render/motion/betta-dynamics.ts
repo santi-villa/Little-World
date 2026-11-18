@@ -26,6 +26,10 @@ export class BettaDynamics {
   force = { x: 0, y: 0 };
   private cycle = 0;
   private goalAt = 0;
+  private featureIndex = -1;
+  private featurePause = 0;
+  private inspecting = false;
+  private foodTargetId: number | undefined;
   update(
     b: FishBody,
     a: MotionAnimal,
@@ -63,11 +67,12 @@ export class BettaDynamics {
     this.scareLatch = scared;
     const food = input.food.surface || input.food.sinking;
     if (food && !this.previousFood)
-      this.foodUntil = time + c.investigateSeconds;
+      this.foodUntil = time + 9 + a.boldness * 7;
     this.previousFood = food;
+    if (!food) this.foodTargetId = undefined;
     if (this.mode === 'startle' && time < this.modeUntil) {
       /* Finish the short escape before another intention. */
-    } else if (a.intent === 'rest'||a.intent==='hide') {
+    } else if (a.intent === 'hide' || (a.intent === 'rest' && !(food && time < this.foodUntil))) {
       this.mode = 'sleep';
       b.goalX = bounds.width * c.zoneTop;
       b.goalY = bounds.height * c.sleepFraction;
@@ -83,11 +88,19 @@ export class BettaDynamics {
       this.modeUntil = Infinity;
     } else if (food && (a.intent === 'eat' || time < this.foodUntil)) {
       this.mode = 'food';
-      const targets=(input.food.targets??[]).filter(p=>p.layer!==2),closest=targets.reduce<{x:number;y:number;z?:number}|undefined>((best,p)=>!best||Math.hypot(p.x-b.x,p.y-b.y,((p.z??b.plane/2)-b.plane/2)*bounds.width*.5)<Math.hypot(best.x-b.x,best.y-b.y,((best.z??b.plane/2)-b.plane/2)*bounds.width*.5)?p:best,undefined);
-      if(closest?.z!==undefined)b.targetPlane=closest.z*2;
-      b.goalX = closest?.x??input.food.x;
-      b.goalY = closest?.y??
-        bounds.height * (input.food.surface ? c.surfaceFraction : c.zoneBottom);
+      let closest: NonNullable<MotionInput['food']['targets']>[number] | undefined;
+      let closestSquared = Infinity;
+      for (const particle of input.food.targets ?? []) {
+        if (particle.layer === 2) continue;
+        if (particle.id !== undefined && particle.id === this.foodTargetId) { closest = particle; break; }
+        const dz = ((particle.z ?? b.plane / 2) - b.plane / 2) * bounds.width * 0.5;
+        const distance = (particle.x - b.x) ** 2 + (particle.y - b.y) ** 2 + dz ** 2;
+        if (distance < closestSquared) { closest = particle; closestSquared = distance; }
+      }
+      this.foodTargetId = closest?.id;
+      if (closest?.z !== undefined) b.targetPlane = closest.z * 2;
+      b.goalX = closest?.x ?? input.food.x;
+      b.goalY = closest?.y ?? bounds.height * (input.food.surface ? c.surfaceFraction : c.zoneBottom);
     } else if ((a.intent==='chase'||a.intent==='court')&&input.trackingTargets?.has(a.targetId??-1)){const target=input.trackingTargets.get(a.targetId!)!;this.mode='investigate';b.goalX=target.x+(a.intent==='court'?Math.cos(time+b.phase)*L:0);b.goalY=target.y+(a.intent==='court'?Math.sin(time+b.phase)*L:0);this.modeUntil=time+1;
     } else if (input.hand&&input.hand.age<1&&input.hand.speed<15&&(a.feedingTrust??0)>.4&&a.fright<.1&&Math.sin(time*.07+b.phase)>.92){this.mode='investigate';b.goalX=input.hand.x;b.goalY=input.hand.y;this.modeUntil=time+1;
     } else if(input.mirror&&a.fright<.1&&(a.condition??1)>.7&&Math.hypot(b.x-input.mirror.x,b.y-input.mirror.y)<L*5){
@@ -117,40 +130,51 @@ export class BettaDynamics {
       b.goalX = b.x;
       b.goalY = bounds.height * c.surfaceFraction;
     } else if (this.mode === 'investigate' && time < this.modeUntil) {
-      /* Pause at the selected feature. */
+      if (this.inspecting && this.featurePause === 0 &&
+        Math.hypot(b.goalX - b.x, b.goalY - b.y) < L * c.arriveLengths * 1.5) {
+        this.featurePause = time + 0.75 + (1 - a.activity) * 1.5;
+        this.modeUntil = this.featurePause;
+      }
     } else {
       if (this.mode !== 'wander') this.goalAt = 0;
       this.mode = 'wander';
-      const features = [
-        ...(input.habitat?.refuges ?? []),
-        ...(input.habitat?.leaves ?? []),
-      ];
-      if (
-        time >= this.goalAt &&
-        features.length &&
-        random() < c.investigateChance
-      ) {
-        const feature = features[Math.floor(random() * features.length)]!;
+      const features = time >= this.goalAt && input.habitat
+        ? input.habitat.features ?? [...input.habitat.refuges, ...input.habitat.leaves].map(point => ({ ...point, z: 0.52 }))
+        : undefined;
+      if (time >= this.goalAt && features?.length && random() < c.investigateChance + a.boldness * 0.23) {
+        let index = Math.floor(random() * features.length);
+        if (index === this.featureIndex && features.length > 1) index = (index + 1) % features.length;
+        this.featureIndex = index;
+        const feature = features[index]!;
         this.mode = 'investigate';
-        this.modeUntil = time + c.investigateSeconds;
+        this.inspecting = true;
+        this.featurePause = 0;
         b.goalX = feature.x * bounds.width;
         b.goalY = feature.y * bounds.height;
-        this.goalAt = this.modeUntil;
+        b.targetPlane = 2 * feature.z;
+        const distance = Math.hypot(b.goalX - b.x, b.goalY - b.y);
+        this.modeUntil = time + Math.min(24, c.investigateSeconds + distance / Math.max(1, L * 0.85));
       }
     }
+    if (this.mode !== 'investigate') this.inspecting = false;
     if (this.mode === 'wander' && time >= this.goalAt) {
       b.goalX = L + (bounds.width - 2 * L) * random();
-      b.goalY =
-        bounds.height * (c.zoneTop + (c.zoneBottom - c.zoneTop) * random());
+      const route = random();
+      const y = route < 0.24 ? 0.1 + random() * 0.16
+        : route < 0.48 ? 0.59 + random() * 0.26
+        : c.zoneTop + (c.zoneBottom - c.zoneTop) * random();
+      b.goalY = bounds.height * y;
+      if (input.renderDepth) b.targetPlane = 0.24 + random() * 1.55;
+      this.cycle = 0;
       this.goalAt =
         time +
         c.goalMinSeconds +
-        random() * (c.goalMaxSeconds - c.goalMinSeconds);
+        random() * (c.goalMaxSeconds - c.goalMinSeconds) + (1 - a.activity) * 2;
     }
     if (this.mode !== 'wander')
       this.goalAt = Math.max(this.goalAt, time + c.goalMinSeconds);
     this.cycle += dt;
-    const period = c.burstSeconds + c.glideSeconds + c.floatSeconds,
+    const period = c.burstSeconds + c.glideSeconds + c.floatSeconds * (1.03 - a.activity * 0.55),
       at = this.cycle % period;
     this.stroke =
       at < c.burstSeconds
@@ -183,13 +207,14 @@ export class BettaDynamics {
             angleDiff(angle, b.heading),
           ),
         );
-      b.heading += turn;
+      if (!arrived || Math.hypot(b.vx, b.vy) > 0.4) b.heading += turn;
       const speed = Math.hypot(b.vx, b.vy),
         cap =
-          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS)*(a.condition??1),
+          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS * (1.02 + a.activity * 0.38)) * (a.condition ?? 1),
         thrust =
           this.stroke === 'burst' && speed < cap
-            ? (this.mode === 'startle' ? c.burstThrust : c.thrust) * L*(a.condition??1)
+            ? (this.mode === 'startle' ? c.burstThrust : c.thrust * (0.82 + a.activity * 0.32))
+              * L * (a.condition ?? 1) * Math.min(1, (cap - speed) / Math.max(0.01, cap * 0.33))
             : 0;
       const wall = containment(b, bounds, L * c.wallLengths, c.wallForce * L);
       let fx = Math.cos(b.heading) * thrust + wall.x,

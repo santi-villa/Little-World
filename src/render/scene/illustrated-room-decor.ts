@@ -1,4 +1,4 @@
-import { Container, Graphics, MeshPlane, Sprite } from 'pixi.js';
+import { Container, FillGradient, Graphics, MeshPlane, Sprite } from 'pixi.js';
 import { tex } from '../assets';
 import { lerpColor } from '../pixel-utils';
 import { softPool } from '../tank/illustrated-optics';
@@ -43,13 +43,18 @@ export class IllustratedRoomDecor {
   private readonly plants = plantSpecs.map(createPlant);
   private readonly table = new Graphics();
   private readonly tankGlow = new Graphics();
+  private readonly tableGlow = new Graphics();
+  private readonly tableMask = new Graphics().poly([356, 416, 922, 416, 966, 447, 316, 447]).fill(0xffffff);
+  private readonly moonlight = new Graphics();
+  private lit = -1;
+  private warm = -1;
   private readonly lampGlow = new Graphics();
   private readonly sunlight = new Graphics();
   private readonly lamp = new Sprite(tex('brass-lamp'));
   private readonly notebook = new Sprite(tex('objeto-cuaderno'));
   private readonly occlusion = softPool('#39271c');
   private readonly aqua = softPool('#b5dab9');
-  private name = '';
+  private footprint = '';
 
   constructor() {
     const props = new Graphics();
@@ -67,40 +72,51 @@ export class IllustratedRoomDecor {
     this.notebook.position.copyFrom(illustratedRoom.notebook);
     props.ellipse(this.lamp.x + 2, this.lamp.y - 1, this.lamp.width * 0.54, 3)
       .fill({ fill: this.occlusion, alpha: 0.65 });
-    this.lampGlow.ellipse(this.lamp.x, this.lamp.y - this.lamp.height * 0.72, 102, 86)
+    this.lampGlow.ellipse(this.lamp.x + 9, this.lamp.y - this.lamp.height * 0.65, 135, 103)
       .fill(softPool('#ffc47b'));
-    this.sunlight.ellipse(538, 394, 310, 223).fill(softPool('#fdf1c3'));
-    this.sunlight.rotation = -0.09;
+    this.sunlight.ellipse(434, 268, 246, 172).fill(softPool('#fdf1c3'));
+    this.sunlight.poly([184, 133, 503, 130, 762, 445, 439, 452]).fill(new FillGradient({
+      start: { x: 0, y: 0 }, end: { x: 0.88, y: 1 },
+      colorStops: [{ offset: 0, color: '#ffe5ab00' }, { offset: 0.56, color: '#ffe5ab1e' }, { offset: 1, color: '#ffe5ab00' }],
+    }));
+    this.moonlight.ellipse(353, 222, 262, 216).fill(softPool('#8ea9db'));
+    this.tableGlow.mask = this.tableMask;
     this.container.addChildAt(props, 0);
-    this.container.addChild(this.lamp, this.notebook, this.sunlight, this.lampGlow, this.tankGlow, this.table);
+    this.container.addChild(this.lamp, this.notebook, this.sunlight, this.moonlight, this.lampGlow, this.tankGlow, this.table, this.tableMask, this.tableGlow);
   }
 
-  update(tank: TankRect, seconds: number, tint: number, light: number, tankLit: boolean, lampOn: boolean, breeze: number) {
+  update(tank: TankRect, seconds: number, dt: number, tint: number, light: number, tankLit: boolean, lampOn: boolean, breeze: number) {
     for (const p of this.plants) {
       p.pot.tint = p.mesh.tint = tint;
-      const sway = (Math.sin(seconds * 0.66 + p.spec.phase) + 0.33 * Math.sin(seconds * 1.07 + p.spec.phase * 1.7))
-        * p.spec.amount * breeze;
+      const sway = Math.sin(seconds * 0.47 + p.spec.phase) * p.spec.amount * breeze;
       for (let i = 0; i < p.positions.length; i += 2) {
         const row = Math.floor(i / (COLS * 2));
         const free = (1 - row / (ROWS - 1)) ** 1.8;
-        p.positions[i] = p.rest[i]! + (sway * free) / p.mesh.scale.x;
+        const leaf = Math.sin(seconds * 0.71 + p.spec.phase * 1.8 + (i / 2 % COLS) * 0.63) * 0.33;
+        p.positions[i] = p.rest[i]! + ((sway + leaf) * free) / p.mesh.scale.x;
       }
       p.buffer.update();
     }
-    this.lamp.tint = lerpColor(tint, 0xffd6a8, lampOn ? 0.47 : 0);
+    const fade = 1 - Math.exp(-dt * 2.6);
+    this.lit = this.lit < 0 ? Number(tankLit) : this.lit + (Number(tankLit) - this.lit) * fade;
+    this.warm = this.warm < 0 ? Number(lampOn) : this.warm + (Number(lampOn) - this.warm) * fade;
+    this.lamp.tint = lerpColor(tint, 0xffd6a8, this.warm * 0.54);
     this.notebook.tint = tint;
-    this.lampGlow.alpha = lampOn ? 0.17 + (1 - light) * 0.24 : 0;
-    this.sunlight.alpha = light * 0.17;
-    this.tankGlow.alpha = tankLit ? 0.1 + (1 - light) * 0.19 : 0;
+    this.lampGlow.alpha = this.warm * (0.12 + (1 - light) * 0.33);
+    this.sunlight.alpha = light * 0.29;
+    this.moonlight.alpha = (1 - light) * 0.16;
+    this.tankGlow.alpha = this.lit * (0.085 + (1 - light) * 0.31);
+    this.tableGlow.alpha = this.lit * (0.08 + (1 - light) * 0.37);
     const key = [tank.x, tank.y, tank.width, tank.height].join();
-    if (key === this.name) return;
-    this.name = key;
+    if (key === this.footprint) return;
+    this.footprint = key;
     const cx = tank.x + tank.width / 2, base = tank.y + tank.height;
     this.tankGlow.clear()
-      .ellipse(cx, tank.y + tank.height * 0.34, tank.width * 0.69, tank.height * 0.76).fill(this.aqua)
-      .ellipse(cx, base - 3, tank.width * 0.63, 13).fill(this.aqua);
+      .ellipse(cx, tank.y + tank.height * 0.41, tank.width * 0.71, tank.height * 0.88).fill(this.aqua);
+    this.tableGlow.clear()
+      .ellipse(cx + 3, base + 2, tank.width * 0.64, 23).fill(this.aqua);
     this.table.clear()
-      .ellipse(cx + 8, base - 4, tank.width * 0.53, 10).fill({ fill: this.occlusion, alpha: 0.46 })
-      .ellipse(cx, base - 1.5, tank.width * 0.49, 3.8).fill({ fill: this.occlusion, alpha: 0.68 });
+      .ellipse(cx + 8, base - 2, tank.width * 0.55, 10).fill({ fill: this.occlusion, alpha: 0.46 })
+      .ellipse(cx, base - 1, tank.width * 0.47, 4.6).fill({ fill: this.occlusion, alpha: 0.68 });
   }
 }

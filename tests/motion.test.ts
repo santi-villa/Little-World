@@ -424,3 +424,30 @@ describe('movimiento de los peces', () => {
     expect(simulate(42)).not.toEqual(simulate(43));
   });
 });
+
+it('el betta mantiene el grano que venía siguiendo y vuelve a recorrer el acuario cuando no queda comida', () => {
+  const motion = new FishMotion(88);
+  const betta = animals('betta', 1, 'explore');
+  const data = input(betta, { bettaPrototype: true, renderDepth: true });
+  motion.update(0, data);
+  const fish = motion.bodies.get(1)!;
+  fish.x = 24;
+  fish.y = 11;
+  const first = { id: 71, x: 30, y: 9, z: 0.5, layer: 1 };
+  const other = { id: 72, x: 40, y: 4, z: 0.5, layer: 1 };
+  const withFood = (targets: NonNullable<MotionInput['food']['targets']>) => ({
+    ...data,
+    food: { ...data.food, sinking: true, targets },
+  });
+  motion.update(DT, withFood([first, other]));
+  expect(fish.goalX).toBe(first.x);
+  const closer = { ...other, x: 26, y: 10 };
+  motion.update(DT, withFood([closer, first]));
+  expect(fish.goalX).toBe(first.x);
+  motion.update(DT, withFood([closer]));
+  expect(fish.goalX).toBe(closer.x);
+  run(motion, data, 1);
+  expect(motion.bettas.get(1)?.mode).toBe('wander');
+  expect(fish.goalX).not.toBe(closer.x);
+  expect(Math.hypot(fish.vx, fish.vy)).toBeGreaterThan(0);
+});

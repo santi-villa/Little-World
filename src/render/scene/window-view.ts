@@ -37,6 +37,7 @@ export function drawSky(
   /** 'base': solo el degradé del cielo; 'front': estrellas, nubes, árboles, lluvia y rayos. */
   part: 'base' | 'front' = 'front',
   outside?: OutsideView,
+  cloudDistance?: number,
 ): number {
   const { x, y, width: W, height: H } = window;
   const ov = outside ? Math.max(weather === 'storm' ? 0.9 : weather === 'rain' ? 0.7 : 0, outside.cloudCover / 100) : OVERCAST[weather];
@@ -108,7 +109,7 @@ export function drawSky(
   const cloudDark=lerpColor(cloudLight,0x526174,0.22);
   for(let i=0;i<clouds;i++) {
     const w=42+scatter(i,37)*54, h=9+scatter(i,74)*9;
-    const cx=x-100+((scatter(i,33)*(W+200)+t*(0.4+scatter(i,38))*wind)%(W+200));
+    const cx=x-100+((scatter(i,33)*(W+200)+(cloudDistance ?? t * wind) * (0.34 + scatter(i,38) * 0.7))%(W+200));
     const cy=y+H*(0.1+scatter(i,39)*0.34);
     for(let pass=0;pass<3;pass++) {
       const cyLayer=cy+pass*1.2,half=w*.5;

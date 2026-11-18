@@ -70,7 +70,7 @@ export interface MotionInput {
   bounds: Bounds;
   animals: readonly MotionAnimal[];
   /** Dónde hay comida ahora. */
-  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number;targets?:readonly {x:number;y:number;layer:number;z?:number}[] };
+  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number;targets?:readonly {id?:number;x:number;y:number;layer:number;z?:number}[] };
   /** Golpe reciente en el vidrio (posición en cm) o null. */
   scare: Vec | null;
   /** El gato está pegado al vidrio. */
@@ -249,7 +249,7 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const depth = bounds.height;
 
       if(input.renderDepth&&animal.alive){
-        if(this.time>=(body.depthAt??0)){if(animal.intent!=='eat')body.targetPlane=animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
+        if(this.time>=(body.depthAt??0)){if(animal.intent!=='eat' && !(sp.id==='betta'&&input.bettaPrototype&&input.habitat?.features))body.targetPlane=animal.intent==='hide'?0:r()*2;body.depthAt=this.time+visual.depthIntervalSeconds*(1+r());}
         body.plane+=(body.targetPlane-body.plane)*(1-Math.exp(-dt*visual.depthTravelSpeed));
       }
       if (!animal.alive) {
@@ -457,9 +457,11 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
       }
       if(input.water?.constrain){const p=input.water.constrain(body.x,body.y,animal.sizeCm*.15);body.x=p.x;body.y=p.y;}
       // Cambio de plano suave.
-      const dp = body.targetPlane - body.plane;
-      const maxDp = PLANE_SPEED * dt * (animal.intent === 'flee' ? 3 : 1);
-      body.plane += Math.abs(dp) <= maxDp ? dp : Math.sign(dp) * maxDp;
+      if (!input.renderDepth) {
+        const dp = body.targetPlane - body.plane;
+        const maxDp = PLANE_SPEED * dt * (animal.intent === 'flee' ? 3 : 1);
+        body.plane += Math.abs(dp) <= maxDp ? dp : Math.sign(dp) * maxDp;
+      }
 
       // El sprite se da vuelta recién cuando el giro es claro (no titila).
       if (body.vx > 0.3) body.facing = 1;
