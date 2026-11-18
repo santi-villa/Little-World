@@ -6,6 +6,7 @@ import { Application, TextureSource } from 'pixi.js';
 import { Game } from './game';
 import { loadAssets } from './render/assets';
 import { RoomScene } from './render/scene/room-scene';
+import { tankAppearance } from './render/tank/tank-layout';
 import { enableTips, follow, longPress, setCursor } from './render/ui/cursor';
 import { HudPaper } from './render/ui/hud-paper';
 import { initUiArt } from './render/ui/paper-ui';
@@ -17,7 +18,7 @@ import { fill, texts } from './render/ui/texts';
 import { GAME_HEIGHT, GAME_WIDTH, attachViewport } from './render/viewport';
 import { SAVE_FORMAT_VERSION, createSave } from './save/save-format';
 import { deleteSave, readSave, writeSave } from './save/storage';
-import { MINUTES_PER_DAY, defaultConfig, derive } from './sim';
+import { MINUTES_PER_DAY, TANK_MODELS, defaultConfig, derive } from './sim';
 import { BuenosAiresWeather } from './world/weather';
 import './styles.css';
 import './ui.css';
@@ -70,9 +71,12 @@ async function loadGame(): Promise<LoadedGame> {
 }
 
 function fishPreviewGame(): LoadedGame {
-  const game = Game.newTank(416, 'rect_65');
-  game.act({ type: 'addAnimals', speciesId: 'corydoras_paleatus', count: 1 });
-  game.act({ type: 'addAnimals', speciesId: 'neon_tetra', count: 1 });
+  const requested = new URLSearchParams(location.search).get('tank');
+  const model = TANK_MODELS.find(tank => tank.id === requested);
+  const game = Game.newTank(416, model?.id ?? 'rect_65');
+  for (const [speciesId, count] of [['betta', 1], ['corydoras_paleatus', 2], ['neon_tetra', 2]] as const) {
+    game.act({ type: 'addAnimals', speciesId, count, ...(speciesId === 'betta' ? { males: 0 } : {}) });
+  }
   // The specimens are already acclimated in this temporary observation tank.
   for (const animal of game.state.animals) {
     animal.ageDays = defaultConfig.fish.adultAgeDays;
@@ -221,6 +225,22 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
   }, illustrated, paintedFishRenderer);
+  if (fishPreview) {
+    tankAppearance.shape = 'model';
+    const selector = document.createElement('select');
+    selector.className = 'fish-preview-tank';
+    selector.setAttribute('aria-label', 'Pecera de prueba');
+    for (const tank of TANK_MODELS) {
+      selector.add(new Option(tank.name, tank.id));
+    }
+    selector.value = game.state.tank.modelId;
+    selector.addEventListener('change', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('tank', selector.value);
+      location.assign(url);
+    });
+    tools.addNavigationControl(selector);
+  }
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   tools.onObserveAnimal=id=>scene.showFish(id);
   tools.onMirror=id=>scene.showMirror(id);

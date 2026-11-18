@@ -420,6 +420,17 @@ body.debug-open .aquarium-nav { right: calc(var(--debug-width) + 8px); }
   max-width: calc(100vw - 24px); gap: 4px;
 }
 .aquarium-nav button { border-color: #87735466; background: #211d19da; padding: 8px 10px; }
+.fish-preview-tank {
+  min-height: 40px;
+  max-width: 10.5rem;
+  padding: 6px 8px;
+  border: 1px solid #877354;
+  border-radius: 6px;
+  background: #211d19;
+  color: #fff0d5;
+  font: inherit;
+  font-size: 12px;
+}
 .outside-chip {
   position: fixed; z-index: 8; top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left)); white-space: pre-line;

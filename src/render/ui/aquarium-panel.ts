@@ -73,6 +73,8 @@ export class AquariumPanel {
     this.selectedAnimal=id;this.open('fish');
     this.body.querySelector(fill(careText.data_animal_id, { p0: id }))?.scrollIntoView({block:'nearest'});
   }
+  addNavigationControl(control: HTMLElement): void { this.navigation.append(control); }
+
   setBusy(busy: boolean): void { this.navigation.inert = busy; this.weatherButton.disabled = busy; }
   close(): void { this.dialog.close(); }
   open(page: Page): void {
