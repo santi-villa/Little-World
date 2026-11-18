@@ -13,6 +13,7 @@ import { drawPixelText, textWidth } from '../ui/pixel-font';
 import { ART } from '../art-direction';
 import type { IllustratedFishFactory, IllustratedFishRenderer } from './illustrated-fish-renderer';
 import { companionProfile } from '../motion/illustrated-companions';
+import { swimmingActivity, type AquariumEnvironment } from '../scene/aquarium-environment';
 /**
  * Animales y comida dentro del agua, dibujados con formas simples de colores
  * (placeholders hasta que haya sprites). El movimiento sale de FishMotion;
@@ -121,6 +122,8 @@ export class FishLayer {
     pxPerCm: number,
     seconds: number,
     dtSeconds: number,
+    environment?: AquariumEnvironment,
+    exposure = Number(lightOn),
   ): void {
     this.area = area;
     this.pxPerCm = pxPerCm;
@@ -142,6 +145,8 @@ export class FishLayer {
     const animals: MotionAnimal[] = state.animals.map((animal) => {
       const sp = getSpecies(animal.speciesId);
       species.set(animal.id, sp);
+      const group = sp.id === 'betta' ? 'betta' : sp.zone === 'bottom' ? 'bottom'
+        : sp.traits.includes('schooling') ? 'school' : 'other';
       return {
         id: animal.id,
         species: sp,
@@ -152,6 +157,7 @@ export class FishLayer {
         alive: animal.alive,
         boldness: animal.personality.boldness,
         activity: animal.personality.activity,
+        ambientActivity: environment && sp.category === 'fish' ? swimmingActivity(environment, group) : undefined,
         feedingTrust: animal.feedingTrust,
         condition:Math.max(visual.healthFloor,Math.min(1,animal.health/100))*(animal.mood==='sick'?visual.sickActivity:1),
         visualSizeCm:sp.adultSizeCm*(visual.juvenileFraction+(1-visual.juvenileFraction)*Math.min(1,Math.max(0,animal.ageDays-defaultConfig.fish.newAnimalAgeDays)/visual.growthDays)),
@@ -202,6 +208,7 @@ export class FishLayer {
         animal,
         body,
         lightOn,
+        exposure,
         seconds,
         state_?.finDamage ?? 0,
         state_?.mood === 'sick',
@@ -231,6 +238,7 @@ export class FishLayer {
     animal: MotionAnimal,
     body: FishBody,
     lightOn: boolean,
+    exposure: number,
     seconds: number,
     finDamage: number,
     sick: boolean,
@@ -249,10 +257,8 @@ export class FishLayer {
       if (!animal.alive) c = DEAD_COLOR;
       else if (sick) c = lerpColor(c, 0xe8e8e8, 0.35);
       // De noche los colores se apagan (los neones, más).
-      if (!lightOn) {
-        const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
-        c = lerpColor(c, NIGHT_TINT, fade);
-      }
+      const fade = resting && sp.traits.includes('color_fades_at_night') ? 0.75 : 0.45;
+      c = lerpColor(c, NIGHT_TINT, fade * (1 - exposure));
       return lerpColor(c, WATER_TINT, visual.depthTint * far);
     };
     const main = tint(hex(sp.color));

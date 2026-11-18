@@ -55,6 +55,7 @@ export interface MotionAnimal {
   alive: boolean;
   boldness: number;
   activity: number;
+  ambientActivity?: number;
   feedingTrust?: number;
   condition?:number;
   visualSizeCm?:number;
@@ -464,17 +465,19 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
         case 'school':
         case 'explore':
         default: {
+          const ambient = animal.ambientActivity ?? 1;
+          const swimSpeed = cruise * ambient;
           if (animal.intent === 'school' && style !== 'none' && mates.length > 1 && !cory) {
             const goal = this.schoolGoal(sp, bounds, companion);
             body.targetPlane = goal.plane;
-            desired = arrive(body, goal.x, goal.y, cruise, 6);
+            desired = arrive(body, goal.x, goal.y, swimSpeed, 6);
           } else {
             const canPause = sp.id === 'betta' || !!companion;
             if (canPause && this.time < (body.pauseUntil ?? 0)) break;
             const arrived = length(body.goalX - body.x, body.goalY - body.y) < (cory ? 1.45 : 2);
             if (canPause && arrived && body.goalUntil >= 0) {
               const [min, max] = companion?.pause ?? [0.5, 1.7];
-              body.pauseUntil = this.time + min + (max - min) * r();
+              body.pauseUntil = this.time + (min + (max - min) * r()) / ambient;
               body.goalUntil = -1;
               break;
             }
@@ -482,8 +485,8 @@ limits.maxSpeed*=condition;limits.maxAccel*=condition;
               this.pickGoal(body, animal, bounds, companion, input.habitat, r);
               if (input.water && !companion) body.goalUntil = this.time + (body.goalUntil - this.time) * profile.goalSeconds;
             }
-            const toGoal = arrive(body, body.goalX, body.goalY, cruise, cory ? 3.2 : 5);
-            const drift = wander(body, cruise * (companion?.drift ?? 0.5), 1.5, dt, r);
+            const toGoal = arrive(body, body.goalX, body.goalY, swimSpeed, cory ? 3.2 : 5);
+            const drift = wander(body, swimSpeed * (companion?.drift ?? 0.5), 1.5, dt, r);
             desired = { x: toGoal.x + drift.x, y: toGoal.y + drift.y };
           }
           break;

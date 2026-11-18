@@ -3,11 +3,11 @@ import {surfaceSlope,causticStrips} from '../motion/water-light';
 import {textureSilhouette} from './alpha-mask';
 import ecosystem from '../../data/ecosystem.json';
 import {WaterFlow} from '../motion/water-flow';
-import {BubbleParticles} from '../motion/bubble-particles';
+import { BubbleParticles, type Bubble } from '../motion/bubble-particles';
 import visual from '../../data/aquarium-visual.json';
 import {tankAppearance} from './tank-layout';
 import {bettaParameters as bettaConfig} from '../motion/betta-dynamics';
-import {PlantMotion} from '../motion/plant-motion';
+import { PlantMotion, plantWakeDistance } from '../motion/plant-motion';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
 import { GLASS_COLS, GLASS_ROWS } from '../../sim/glass';
 import type { HandInput } from '../motion/hand';
@@ -59,6 +59,7 @@ import { fillWater, IllustratedOptics, softPool } from './illustrated-optics';
 import { AquariumBed, bedSurface, planeDepth } from './aquarium-bed';
 import { IllustratedLid } from './illustrated-lid';
 import { filterMount } from './illustrated-equipment';
+import { underwaterLight, type AquariumEnvironment } from '../scene/aquarium-environment';
 import { GLASS_ART, tankFrame, type TankRect } from './tank-layout';
 
 /** Una pieza de la decoración. */
@@ -153,6 +154,7 @@ export class TankView {
   private readonly roundMask=new Graphics();
   private round=false;private roundMaskKey="";
   private readonly water = new Graphics();
+  private readonly waterDay = new Graphics();
   private readonly glassBack = new Sprite(tex(GLASS_BACK));
   private readonly equip = new Graphics();
   private readonly inside = new Container();
@@ -164,10 +166,12 @@ export class TankView {
   private readonly frontPlants = new Container();
   private readonly contactShadows = new Graphics();
   private readonly frontShadows = new Graphics();
-  private readonly plantEncounters = new Set<string>();
+  private plantEncounters = new Set<string>();
+  private newPlantEncounters = new Set<string>();
   private habitat:Habitat=emptyHabitat();
   private plants: Plant[] = [];
   private readonly mid = new Graphics();
+  private readonly suspendedBack = new Graphics();
   private readonly fx = new Graphics();
   private readonly waterMask = new Graphics();
   private readonly ledOff = new Graphics();
@@ -185,6 +189,9 @@ export class TankView {
   private waterGradients: ReturnType<typeof fillWater> = [];
   private equipKey = '';
   private lastSeconds = 0;
+  private readonly bubblePop = (p: Bubble) => {
+    this.optics?.surface.disturb(p.x / this.flow.width, this.lastSeconds, p.radius * 9);
+  };
   private mirrorUntil=0;
   private mirrorAnchor={x:.5,y:.4,z:.5};
   showMirror(id:number):void{
@@ -200,17 +207,20 @@ export class TankView {
     try{if(localStorage.getItem("lw-tank-glass")==="round")tankAppearance.shape="round";}catch{/* Storage can be unavailable. */}
     if (illustrated) {
       const bed = this.bed!;
-      this.inside.addChild(this.substrate, bed.backMask, bed.terrain, ...Object.values(bed.above), this.contactShadows,
-        this.backObjects, this.rearPlants, bed.rootSeams.back, this.fish.graphics, this.fish.artBack,
-        this.hardscape, this.plantLayer, bed.rootSeams.middle, this.fish.foreground, this.fish.artFront,
-        this.foregroundSand, bed.frontMask, bed.details, this.frontShadows, this.frontObjects, this.frontPlants, bed.rootSeams.front,
-        this.mid, this.fish.foodGraphics, this.optics!.light, this.fx, this.optics!.reflections);
+      const optics = this.optics!;
+      this.inside.addChild(this.substrate, bed.backMask, bed.terrain, ...Object.values(bed.above), optics.sandLight,
+        this.suspendedBack, this.contactShadows, this.backObjects, optics.objectMasks[0], optics.objectLight[0],
+        this.rearPlants, bed.rootSeams.back, this.fish.graphics, this.fish.artBack,
+        this.hardscape, optics.objectMasks[1], optics.objectLight[1], this.plantLayer, bed.rootSeams.middle,
+        this.fish.foreground, this.fish.artFront, this.foregroundSand, bed.frontMask, bed.details, optics.frontSandLight,
+        this.frontShadows, this.frontObjects, optics.objectMasks[2], optics.objectLight[2], this.frontPlants, bed.rootSeams.front,
+        this.mid, this.fish.foodGraphics, optics.light, this.fx, optics.reflections);
     } else {
       this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.fish.artBack, this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
     }
     this.inside.mask = this.waterMask;
     this.equip.mask = this.waterMask;
-    this.wet.addChild(this.water,this.glassBack,this.equip,this.inside,this.waterMask,this.roundMask);
+    this.wet.addChild(this.water,this.waterDay,this.glassBack,this.equip,this.inside,this.waterMask,this.roundMask);
     this.art.addChild(this.wet, this.glass, this.glassMask, this.lidSprite, this.ledOff);
     if (this.paintedLid) this.art.addChild(this.paintedLid.container);
     this.container.addChild(this.art);
@@ -238,7 +248,9 @@ export class TankView {
   /** Golpe en el vidrio, en píxeles de la escena: los peces huyen de ese punto. */
   scareAt(sceneX: number, sceneY: number): void {
     const k = this.art.scale.x || 1;
-    this.fish.scareAt((sceneX - this.art.x) / k, (sceneY - this.art.y) / k);
+    const x = (sceneX - this.art.x) / k;
+    this.fish.scareAt(x, (sceneY - this.art.y) / k);
+    this.optics?.surface.disturb(clamp((x - this.waterArea.x) / this.waterArea.width, 0, 1), this.lastSeconds, 0.45);
   }
 
   /** Posición en la escena de un animal cualquiera (para que el gato lo siga con la cabeza). */
@@ -248,8 +260,9 @@ export class TankView {
     return p ? { x: this.art.x + p.x * k, y: this.art.y + p.y * k } : null;
   }
 
-  update(state: SimState, derived: DerivedValues, seconds: number): void {
+  update(state: SimState, derived: DerivedValues, seconds: number, environment?: AquariumEnvironment): void {
     const lit = derived.lightOn;
+    const lighting = underwaterLight(environment ?? { natural: 0, twilight: 0, lamp: Number(lit) });
     this.round=tankAppearance.shape==='round'||(tankAppearance.shape==='model'&&state.tank.modelId==='bowl_8');
     this.glass.texture = tex(this.round ? 'redonda-1' : this.paintedGlass ? 'illustrated-frame' : GLASS);
     this.glassBack.visible = !this.round && !this.paintedGlass;
@@ -263,16 +276,22 @@ export class TankView {
     const tannins = state.water.tannins;
 
     this.drawWater(geo, lit, tannins);
+    this.waterDay.visible = this.paintedGlass;
+    this.waterDay.alpha = lighting.exposure;
+    this.waterDay.tint = lerpColor(0xffffff, lighting.color, 0.18);
     this.drawEquipment(state, geo, lit);
     this.buildDecor(geo);
     this.flow.configure(geo.width/pxPerCm,(geo.sandTop-geo.waterTop-2)/pxPerCm,derived.effectiveFlowLph,state.tank.waterLiters,this.habitat,this.round);this.fish.water=this.flow;
+    this.flow.setTime(seconds);
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
-    const tint = lerpColor(this.illustrated && lit ? 0xe6eedd : ambientTint(lit ? 1 : 0.18), lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
+    const daylight = this.paintedGlass ? lighting.exposure : Number(lit);
+    const artTint = lerpColor(ambientTint(0.18), this.paintedGlass ? 0xe6eedd : ambientTint(1), daylight);
+    const tint = lerpColor(artTint, lerpColor(0x4a3a2a, 0xd9a860, daylight), tannins * 0.45);
     this.substrate.tint = tint;
     this.foregroundSand.tint = tint;
     for (const child of this.hardscape.children) child.tint = tint;
     for (const child of this.frontObjects.children) child.tint = lerpColor(tint, 0xcab895, 0.13);
-    const distantTint = lerpColor(tint, this.waterColor(lit, tannins, 0.46), 0.31);
+    const distantTint = lerpColor(tint, this.waterColor(lit, tannins, 0.46, daylight), 0.31);
     for (const child of this.backObjects.children) child.tint = distantTint;
     for (const plant of this.plants) plant.mesh.tint = this.illustrated && plant.depth < 0.3 ? distantTint : tint;
     this.bed?.tint(tint);
@@ -285,11 +304,14 @@ export class TankView {
     this.fish.habitat=this.habitat;
     this.fish.mirror=seconds<this.mirrorUntil?{x:this.mirrorAnchor.x*this.flow.width,y:this.mirrorAnchor.y*this.flow.height,z:this.mirrorAnchor.z}:undefined;
 
-    const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
-    this.drawMid(state, derived, geo, shade, seconds);
-    this.drawFx(state, geo, shade, lit, seconds);
+    const shade = (c: number): number => lerpColor(c, NIGHT, (1 - daylight) * 0.6);
+    this.drawMid(state, geo, shade, daylight, seconds);
+    this.drawFx(state, geo, shade, lit, daylight, seconds);
 
-    if (this.paintedGlass) this.optics?.update(geo, seconds, lit);
+    if (this.paintedGlass) {
+      const current = this.flow.getWaterVelocity(this.flow.width / 2, 0).x;
+      this.optics?.update(geo, seconds, lighting, current);
+    }
     this.lastSeconds = seconds;
     const swimTop = geo.waterTop + 2;
     this.fish.update(
@@ -299,6 +321,8 @@ export class TankView {
       pxPerCm,
       seconds,
       dt,
+      environment,
+      this.paintedGlass ? daylight : undefined,
     );
   }
 
@@ -396,28 +420,31 @@ export class TankView {
   }
 
   /** Color del agua a una profundidad (0 superficie .. 1 fondo). */
-  waterColor(lit: boolean, tannins: number, depth: number): number {
-    const clear = lit ? lerpColor(this.paintedGlass ? 0x96bdb0 : 0x6caaa1, this.paintedGlass ? 0x2b5955 : 0x294e50, depth) : lerpColor(0x14434e, 0x0a2731, depth);
-    const amber = lit ? lerpColor(0xc08a34, 0x6a4418, depth) : lerpColor(0x4a3413, 0x2a1c0c, depth);
+  waterColor(lit: boolean, tannins: number, depth: number, exposure = Number(lit)): number {
+    const clear = lerpColor(lerpColor(0x14434e, 0x0a2731, depth),
+      lerpColor(this.paintedGlass ? 0x96bdb0 : 0x6caaa1, this.paintedGlass ? 0x2b5955 : 0x294e50, depth), exposure);
+    const amber = lerpColor(lerpColor(0x4a3413, 0x2a1c0c, depth), lerpColor(0xc08a34, 0x6a4418, depth), exposure);
     return lerpColor(clear, amber, tannins * 0.6);
   }
 
   /** El agua: degradé en franjas, más clara arriba y en el centro. El hueco entero va recortado. */
   private drawWater(geo: Geo, lit: boolean, tannins: number): void {
-    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${geo.waterHeight},${lit},${Math.round(tannins * 20)}`;
+    const key = `${geo.left},${geo.top},${geo.width},${geo.height},${geo.waterHeight},${this.paintedGlass ? 'painted' : lit},${Math.round(tannins * 20)}`;
     if (key === this.waterKey) return;
     this.waterKey = key;
     const g = this.water;
     g.clear();
+    this.waterDay.clear();
     for (const gradient of this.waterGradients) gradient.destroy();
     this.waterGradients = [];
     this.waterMask.clear();
     // Lo de adentro (arena, plantas, peces) se recorta al hueco del vidrio.
     this.waterMask.rect(geo.left, geo.top, geo.width, geo.height).fill(0xffffff);
     if (this.paintedGlass) {
-      this.waterGradients = fillWater(g, geo, [
-        this.waterColor(lit, tannins, 0), this.waterColor(lit, tannins, 0.39), this.waterColor(lit, tannins, 1),
-      ], lit);
+      const palette = (bright: boolean): [number, number, number] => [
+        this.waterColor(bright, tannins, 0), this.waterColor(bright, tannins, 0.39), this.waterColor(bright, tannins, 1),
+      ];
+      this.waterGradients = [...fillWater(g, geo, palette(false), false), ...fillWater(this.waterDay, geo, palette(true), true)];
       return;
     }
     const { left: x, width: w, waterTop: top, waterHeight: h } = geo;
@@ -624,6 +651,8 @@ export class TankView {
         this.habitat.obstacles.push({z:slab,depth:.42,x:(cx-geo.left)/geo.width,y:Math.min(.95,(baseY-h*.38-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2)),rx:w*.27/geo.width,ry:h*.22/Math.max(1,geo.sandTop-geo.waterTop-2)});
       }
     }
+    if (this.bed) this.optics?.setProjectors(this.bed.backMask, this.bed.frontMask,
+      this.waterArea, this.habitat.solids ?? [], geo.bottom);
   }
 
   /**
@@ -632,11 +661,12 @@ export class TankView {
    * forma pareja (sin rayas).
    */
   private swayPlants(seconds: number, flow: number, dt: number, pxPerCm: number, state: SimState): void {
-    const recent = new Set<string>();
+    const recent = this.newPlantEncounters;
+    recent.clear();
     const visitors = state.animals.filter(animal => animal.alive).flatMap(animal => {
       const b = this.fish.motion.bodies.get(animal.id);
       return b ? [{ id: animal.id, x: this.waterArea.x + b.x * pxPerCm,
-        y: this.waterArea.y + b.y * pxPerCm, vx: b.vx, z: b.plane / 2 }] : [];
+        y: this.waterArea.y + b.y * pxPerCm, vx: b.vx, vy: b.vy, z: b.plane / 2 }] : [];
     });
     for (const [index, plant] of this.plants.entries()) {
       const buffer = plant.mesh.geometry.getAttribute('aPosition').buffer;
@@ -644,46 +674,53 @@ export class TankView {
       const height = plant.mesh.texture.height;
       const width = plant.mesh.texture.width;
       const profile = plant.canopy;
+      const pinned = profile ? profile.burial + 0.045 : 0;
+      const flip = Math.sign(plant.mesh.scale.x);
       const nearby = visitors.flatMap(f => {
-        const height = (plant.baseY - f.y) / plant.worldHeight;
-        const distance = Math.abs(f.x - plant.cx) / Math.max(14, plant.worldWidth * 0.77);
+        const height = ((plant.baseY - f.y) / plant.worldHeight - pinned) / (1 - pinned);
+        const horizontal = (f.x - plant.cx) / Math.max(14, plant.worldWidth * 0.77);
         const depth = this.illustrated ? Math.abs(plant.depth - f.z) : 0;
-        if (height < 0 || height > 1 || distance >= 1 || depth > 0.34) return [];
+        const distance = plantWakeDistance(horizontal, depth, height);
+        if (distance >= 1) return [];
         const contact = `${index}:${f.id}`;
         recent.add(contact);
-        const flip = Math.sign(plant.mesh.scale.x);
-        const speed = f.vx * flip * (1 - depth / 0.4) * (profile?.wake ?? 1);
+        const speed = (f.vx + Math.abs(f.vy) * horizontal * 0.65) * flip * (profile?.wake ?? 1);
         if (!this.plantEncounters.has(contact)) {
-          plant.motion.receiveImpulse(height, speed * bettaConfig.plantImpulse * (1 - distance * 0.55));
+          plant.motion.receiveImpulse(height, speed * bettaConfig.plantImpulse * (1 - distance) ** 1.5);
         }
         return [{ height, distance, speed: speed * 0.16 }];
       });
-      const current = this.flow.getWaterVelocity((plant.cx - this.inner.x) / pxPerCm,
-        (plant.baseY - plant.worldHeight * 0.58 - this.waterArea.y) / pxPerCm).x;
-      plant.motion.update(dt, seconds, flow, nearby, current * Math.sign(plant.mesh.scale.x));
+      const x = (plant.cx - this.waterArea.x) / pxPerCm;
+      const root = (plant.baseY - this.waterArea.y) / pxPerCm;
+      const span = plant.worldHeight / pxPerCm;
+      const lower = this.flow.getWaterVelocity(x, root - span * (0.32 + pinned));
+      const upper = this.flow.getWaterVelocity(x + (profile?.direction ?? 1) * span * 0.12, root - span * 0.89);
+      const depthResponse = 0.74 + plant.depth * 0.26;
+      plant.motion.update(dt, seconds, flow, nearby,
+        { base: lower.x * flip * depthResponse, tip: upper.x * flip * depthResponse });
       for (let i = 0; i < positions.length; i += 2) {
         const heightFromBase = 1 - plant.rest[i + 1]! / height;
-        // The whole exposed crown eases into the motion. The area below,
-        // including the small visible part of the roots, stays pinned.
-        const pinned = profile ? profile.burial + 0.045 : 0;
+        // Only the crown is deformed. Buried and exposed roots use rest coordinates.
         const free = Math.max(0, (heightFromBase - pinned) / (1 - pinned));
         const sample = free ** 1.52 * 8;
         const row = Math.min(7, Math.floor(sample));
         const blend = sample - row;
         const offset = plant.motion.offsets[row]! * (1 - blend) + plant.motion.offsets[row + 1]! * blend;
+        const side = plant.rest[i]! / width - 0.5;
         const blade = profile
-          ? Math.sin(seconds * profile.frequency * profile.direction + plant.phase + plant.rest[i]! / width * 2.5 + free * 2.8)
-            * free ** 2 * height * profile.amplitude * 0.018 * Math.sign(plant.mesh.scale.x) : 0;
+          ? Math.sin(seconds * profile.frequency * profile.direction + plant.phase + side * 2.5 + free * 2.8)
+            * free ** 2 * height * profile.amplitude * (0.011 + Math.abs(side) * 0.012) * flip : 0;
         positions[i] = plant.rest[i]! + offset * height * (profile?.amplitude ?? 1) + blade;
+        positions[i + 1] = plant.rest[i + 1]! + blade * side * 0.18;
       }
       buffer.update();
     }
-    this.plantEncounters.clear();
-    for (const contact of recent) this.plantEncounters.add(contact);
+    this.newPlantEncounters = this.plantEncounters;
+    this.plantEncounters = recent;
   }
 
   /** Detrás de los peces: residuos sobre el fondo y burbujas del filtro. */
-  private drawMid(state: SimState, derived: DerivedValues, geo: Geo, shade: (c: number) => number, seconds: number): void {
+  private drawMid(state: SimState, geo: Geo, shade: (c: number) => number, exposure: number, seconds: number): void {
     const g = this.mid;
     g.clear();
     const { left, width, waterTop, sandTop } = geo;
@@ -697,27 +734,29 @@ export class TankView {
     const outlet = this.paintedGlass ? filterMount(geo) : undefined;
     const source = outlet ? { x: (outlet.x - left) / scale, y: (outlet.outlet - waterTop - 2) / scale } : undefined;
     this.bubbles.update(Math.max(0, seconds - this.lastSeconds), this.flow.width, this.flow.height,
-      this.flow.strength * (this.paintedGlass ? 0.66 : 1), this.flow, source);
+      this.flow.strength, this.flow, source, this.bubblePop);
     for (const bubble of this.bubbles.particles) {
       const x = left + bubble.x * scale, y = waterTop + 2 + bubble.y * scale;
-      const r = Math.max(0.42, bubble.radius * scale);
-      const alpha = derived.lightOn ? 0.58 : 0.28;
-      g.ellipse(x, y, r, r * 0.9).stroke({ color: 0xcdece0, width: Math.min(0.63, r * 0.58), alpha });
+      const r = Math.max(0.40, bubble.radius * scale * 1.22);
+      const alpha = 0.28 + exposure * 0.3;
+      g.ellipse(x, y, r, r * 0.9).fill({ color: 0xa4d9d7, alpha: alpha * 0.16 })
+        .stroke({ color: 0xcdece0, width: Math.min(0.63, r * 0.58), alpha });
       if (r > 0.75) g.circle(x - r * 0.3, y - r * 0.38, r * 0.2).fill({ color: 0xf3fff2, alpha: alpha * 0.92 });
     }
   }
 
   /** Delante de los peces: tinte del agua, rayos de luz, partículas, brillos y algas. */
-  private drawFx(state: SimState, geo: Geo, shade: (c: number) => number, lit: boolean, seconds: number): void {
+  private drawFx(state: SimState, geo: Geo, shade: (c: number) => number, lit: boolean, exposure: number, seconds: number): void {
     const g = this.fx;
     g.clear();
+    this.suspendedBack.clear();
     const { left, right, width, waterTop, waterHeight, sandH } = geo;
     if (waterHeight <= 0) return;
     const tannins = state.water.tannins;
 
     // Tinte del agua sobre todo lo que está adentro.
     g.rect(left, waterTop, width, waterHeight).fill({
-      color: this.waterColor(lit, tannins, 0.5),
+      color: this.waterColor(lit, tannins, 0.5, exposure),
       alpha: 0.04 + 0.18 * tannins,
     });
 
@@ -753,8 +792,16 @@ export class TankView {
     const turbidity=Math.min(1,state.organics.detritusG*.3+state.algae.glass*.2);
     const foragers=state.animals.filter(a=>a.alive&&a.intent==='eat'&&a.speciesId.includes('cory')).flatMap(a=>{const b=this.fish.motion.bodies.get(a.id);return b?[{x:b.x,y:b.y,speed:Math.hypot(b.vx,b.vy)}]:[];});
     this.sediment.update(seconds-this.lastSeconds,ecosystem.water.cleanSpecks+turbidity*ecosystem.water.dirtySpecks,this.flow.width,this.flow.height,this.flow,foragers);
-    for(const p of this.sediment.particles)g.circle(left+p.x/this.flow.width*width,this.waterArea.y+p.y/this.flow.height*this.waterArea.height,.55);
-    if(this.sediment.particles.length)g.fill({color:0xeafff4,alpha:lit?.2:.1});
+    for (const p of this.sediment.particles) {
+      const fade = Math.min(1, p.age / 2.4, (p.life - p.age) / 3.4);
+      const near = p.depth > 0.52;
+      const layer = !near && this.illustrated ? this.suspendedBack : g;
+      layer.circle(left + p.x / this.flow.width * width, this.waterArea.y + p.y / this.flow.height * this.waterArea.height,
+        p.size * (0.68 + p.depth * 0.55)).fill({
+        color: near ? 0xeafff4 : 0xb4dbd0,
+        alpha: p.opacity * fade * (0.5 + exposure * 0.5) * (0.5 + p.depth * 0.5),
+      });
+    }
     if(lit && !this.paintedGlass)for(const strip of causticStrips(seconds,window.innerWidth<800?12:22)){
       g.ellipse(left+strip.x*width,geo.sandTop+2,width*.025,1.4).fill({color:0xdaf6ce,alpha:strip.intensity*.08});
     }

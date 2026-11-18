@@ -206,7 +206,7 @@
     "speciesLabel": "Especie",
     "weatherLabel": "Clima",
     "hourLabel": "Hora (solo vista)",
-    "hourReal": "real"
+    "hourReal": "del juego"
   },
   "compat": {
     "minTank": "{a} necesita una pecera de al menos {min} L y esta tiene {liters} L: va a vivir estresado.",

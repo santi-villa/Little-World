@@ -227,8 +227,12 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   scene.onReject = (tool, reason) => tray.reject(tool, reason);
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
-  scene.update(game.state, derive(game.state), performance.now() / 1000,
-    { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default', bettaStyle:game.player.bettaStyle??'code' });
+  let animationSeconds = performance.now() / 1000;
+  const drawScene = () => scene.update(game.state, derive(game.state), animationSeconds, {
+    weather: game.weather, outside: outdoor.view(), timeMinutes: game.visualTimeMinutes,
+    decorId: game.player.decorId ?? 'default', bettaStyle: game.player.bettaStyle ?? 'code',
+  });
+  drawScene();
   tools.setBusy(true);
   // Mientras se recupera el acuario, el cursor es el reloj de arena.
   document.body.classList.add('busy');
@@ -326,8 +330,10 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
     const frame = performance.now();
     const elapsed = (frame - lastFrame) / 1000;
     lastFrame = frame;
+    if (hiddenAt !== null || document.visibilityState === 'hidden') return;
+    animationSeconds += Math.min(0.1, Math.max(0, elapsed));
     game.observeFeedingContacts(scene.feedingContacts);game.observeGrains(scene.foodPositions,scene.grainContacts);
-    if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
+    if (recoveringFrom === null) game.update(elapsed);
     tools.update();
     fishFocus.update(game.state.animals.find(a=>a.id===scene.followingId));
     hud.update(game.state, game.weather, derive(game.state).hour);
@@ -358,7 +364,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
       window.setTimeout(() => void save(), SAVE_AFTER_ACTION_MS);
     }
     const now = performance.now();
-    scene.update(game.state, derive(game.state), now / 1000, { weather: game.weather, outside: outdoor.view(), decorId: game.player.decorId ?? 'default', bettaStyle:game.player.bettaStyle??'code' });
+    drawScene();
     panel?.update(now);
   });
 
@@ -368,6 +374,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   // recupera ese tiempo con el catch-up.
   const goBackground = (): void => {
     hiddenAt ??= Date.now();
+    app.stop();
     game.dirty = true;
     void save();
   };
@@ -376,6 +383,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
     const since = hiddenAt;
     hiddenAt = null;
     lastFrame = performance.now();
+    app.start();
     recoveringFrom = since;
     void catchUpSince(since).finally(() => {
       recoveringFrom = null;
@@ -389,6 +397,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   });
   window.addEventListener('pagehide', goBackground);
   window.addEventListener('pageshow', comeBack);
+  if (document.visibilityState === 'hidden') goBackground();
 
   // Instalada como app: intentar fijar la orientación horizontal.
   const orientation = screen.orientation as ScreenOrientation & {

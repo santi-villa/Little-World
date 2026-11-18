@@ -120,6 +120,11 @@ export class Game {
     };
   }
 
+  /** Incluye la fracción entre pasos para dibujar el ambiente de forma continua. */
+  get visualTimeMinutes(): number {
+    return this.state.timeMinutes + this.pendingMinutes;
+  }
+
   /** Avanza según el reloj real y la velocidad elegida. */
   update(realSeconds: number): void {
     if (this.speed <= 0 || !Number.isFinite(realSeconds) || realSeconds <= 0) return;

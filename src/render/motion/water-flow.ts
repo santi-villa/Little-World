@@ -14,6 +14,8 @@ export class WaterFlow implements WaterVelocity {
   strength = 0;
   shape: 'box' | 'round' = 'box';
   private habitat?: Habitat;
+  private pulse = 1;
+  private eddy = 0;
   configure(
     width: number,
     height: number,
@@ -30,6 +32,10 @@ export class WaterFlow implements WaterVelocity {
     );
     this.habitat = habitat;
     this.shape = round ? 'round' : 'box';
+  }
+  setTime(seconds: number): void {
+    this.pulse = 1 + 0.17 * Math.sin(seconds * 0.53);
+    this.eddy = Math.sin(seconds * 0.39);
   }
   constrain(x: number, y: number, margin: number): { x: number; y: number } {
     let px = Math.max(margin, Math.min(this.width - margin, x)),
@@ -72,11 +78,12 @@ export class WaterFlow implements WaterVelocity {
       attenuation *= 1 - config.flow.obstacleLoss * Math.exp(-d * d);
     }
     const speed = this.strength * config.flow.maxCmS * attenuation;
+    const along = Math.sin(Math.PI * u);
+    const across = Math.sin(Math.PI * v);
     return {
-      x: -speed * Math.sin(Math.PI * u) * Math.cos(Math.PI * v),
-      y:
-        (speed * Math.cos(Math.PI * u) * Math.sin(Math.PI * v) * this.height) /
-        this.width,
+      x: -speed * along * (this.pulse * Math.cos(Math.PI * v) + 0.14 * this.eddy * Math.cos(2 * Math.PI * v)),
+      y: speed * Math.cos(Math.PI * u) * across * this.height / this.width
+        * (this.pulse + 0.14 * this.eddy * Math.cos(Math.PI * v)),
     };
   }
 }

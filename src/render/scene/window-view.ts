@@ -9,6 +9,7 @@ import type { Graphics } from 'pixi.js';
 import type { Weather } from '../../sim';
 import type { OutsideView } from '../../world/weather';
 import { lerpColor, scatter } from '../pixel-utils';
+import type { AquariumEnvironment } from './aquarium-environment';
 
 /** Cuánto tapa el cielo cada clima (0 despejado .. 1 cerrado). */
 const OVERCAST: Record<Weather, number> = { clear: 0, cloudy: 0.6, rain: 0.85, storm: 1 };
@@ -38,6 +39,7 @@ export function drawSky(
   part: 'base' | 'front' = 'front',
   outside?: OutsideView,
   cloudDistance?: number,
+  environment?: Pick<AquariumEnvironment, 'twilight' | 'sunProgress'>,
 ): number {
   const { x, y, width: W, height: H } = window;
   const ov = outside ? Math.max(weather === 'storm' ? 0.9 : weather === 'rain' ? 0.7 : 0, outside.cloudCover / 100) : OVERCAST[weather];
@@ -59,7 +61,7 @@ export function drawSky(
   // y con el horizonte anaranjado al amanecer y al atardecer.
   const greyTop = lerpColor(0x0a0d18, weather === 'storm' ? 0x4a5262 : 0x6f7a8c, day);
   const greyLow = lerpColor(0x1a1f2c, weather === 'storm' ? 0x6a7280 : 0xa3adb8, day);
-  const twilight = outside?.twilight ?? Math.sin(day * Math.PI);
+  const twilight = environment?.twilight ?? outside?.twilight ?? Math.sin(day * Math.PI);
   let top = lerpColor(lerpColor(0x070b1c, 0x70a9c6, day), greyTop, ov);
   let low = lerpColor(lerpColor(0x18223f, 0xd0e3dc, day), greyLow, ov);
   top = lerpColor(top, 0x6a5a9a, twilight * 0.4 * (1 - ov));
@@ -90,16 +92,21 @@ export function drawSky(
     }
   }
 
-  // Sol o luna en arco: la luz sigue el amanecer/atardecer de Buenos Aires.
-  const progress = outside?.sunProgress ?? 0.5;
-  if (day > 0.05 && ov < 0.9) {
+  // Las horas solares de Buenos Aires se recorren con el reloj del juego.
+  const progress = environment?.sunProgress ?? outside?.sunProgress ?? 0.5;
+  const sunAlpha = Math.max(0, Math.min(1, (day - 0.035) / 0.32)) * (1 - ov);
+  const moonAlpha = Math.max(0, 1 - day / 0.28) * (1 - ov);
+  if (sunAlpha > 0.001) {
     const sx = x + W * (0.12 + progress * 0.76), sy = y + H * (0.65 - Math.sin(progress * Math.PI) * 0.5);
-    for(const [radius,alpha] of [[21,.035],[15,.06],[8,.85]])g.circle(sx,sy,radius!).fill({color:twilight>.5?0xffc78e:0xfff0bc,alpha:alpha!*(1-ov)});
-  } else if (day < 0.15 && ov < 0.7) {
+    const sun = lerpColor(0xfff0bc, 0xffc78e, twilight);
+    for (const [radius, alpha] of [[21, .035], [15, .06], [8, .85]])
+      g.circle(sx, sy, radius!).fill({ color: sun, alpha: alpha! * sunAlpha });
+  }
+  if (moonAlpha > 0.001) {
     const moonX=x+W*.7,moonY=y+H*.2;
-    g.circle(moonX,moonY,10).fill({color:0xc7d5e0,alpha:.04*(1-ov)});
-    g.circle(moonX,moonY,6).fill({color:0xe9e3bd,alpha:.85*(1-ov)});
-    g.circle(moonX+3,moonY-2,5.5).fill(skyAt(.2));
+    g.circle(moonX,moonY,10).fill({color:0xc7d5e0,alpha:.04*moonAlpha});
+    g.circle(moonX,moonY,6).fill({color:0xe9e3bd,alpha:.85*moonAlpha});
+    g.circle(moonX+3,moonY-2,5.5).fill({ color: skyAt(.2), alpha: Math.min(1, moonAlpha * 1.4) });
   }
 
   // Nubes curvas, con sombras suaves y desplazamiento continuo por viento real.

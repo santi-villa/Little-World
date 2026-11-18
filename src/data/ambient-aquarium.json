@@ -1,0 +1,19 @@
+{
+  "followBuenosAiresSun": true,
+  "sunriseHour": 6.5,
+  "sunsetHour": 19.5,
+  "dawn": { "beforeHours": 0.72, "afterHours": 1.05 },
+  "dusk": { "beforeHours": 1.25, "afterHours": 0.65 },
+  "transitionPerSecond": 2.6,
+  "weatherLight": { "clear": 1, "cloudy": 0.85, "rain": 0.7, "storm": 0.5 },
+  "room": { "night": 6847631, "day": 16773596, "twilight": 16760693 },
+  "water": {
+    "dark": 0.17,
+    "daylight": 0.62,
+    "lamp": 0.77,
+    "sunColor": 16774352,
+    "twilightColor": 16763559,
+    "lampColor": 13959145
+  },
+  "nightActivity": { "betta": 0.64, "bottom": 0.84, "school": 0.53, "other": 0.72 }
+}

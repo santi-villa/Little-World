@@ -22,17 +22,27 @@ Los peces buscan el alimento en profundidad y los obstáculos centrales solo los
 
 ### Agua, plantas y animales
 
-WaterFlow consulta un campo analítico en cm/s, ajustado por caudal efectivo, volumen, forma y obstáculos. Peces, plantas, comida, microburbujas y sedimento comparten ese campo. Sin filtro no hay recirculación generada. Las plantas mantienen raíz fija, perfiles propios y amortiguación, con impulsos locales al paso de peces.
+WaterFlow consulta un campo analítico en cm/s, ajustado por caudal efectivo, volumen, forma y obstáculos. Peces, plantas, comida, microburbujas y sedimento comparten el mismo campo, que pulsa suavemente. Sin filtro cesa la circulación. Las mallas de los PNG reciben la corriente en dos alturas, conservan las raíces bajo las máscaras de arena y sienten una estela breve según la altura y profundidad del pez.
 
-Las motas ahora conservan posiciones/velocidades durante la sesión, se asientan y reciben impulsos locales de corydoras que comen cerca. No reaparecen arriba en un bucle. El presupuesto deriva de la suciedad; no constituye un segundo balance químico. Sus coordenadas no se guardan: son una representación ambiental, a diferencia del alimento. Burbujas con presupuesto fijo, emisión por caudal y eliminación en superficie.
+Las motas tienen vidas y tamaños variados y aparecen en dos planos. El conjunto acotado reutiliza las partículas con fundidos escalonados. El sedimento puede asentarse y levantarse cerca de una corydora que se alimenta. Las burbujas salen por tandas desde la boquilla sumergida del filtro, suben con velocidades variables y generan una ondulación breve al llegar a la superficie. Estos efectos son visuales y no se guardan.
 
-Rayos y cáusticas del sustrato comparten pendientes de ondas superficiales y concentración de rayos aproximada. No son iluminación física, trazado de fotones ni CFD. Se conservan los colores del acuario y la luz apagada reduce efectos.
+El agua combina dos gradientes de PixiJS en función de la luz. La superficie y la proyección sobre el mueble usan la misma fase de onda. Las cáusticas usan trazos de luz animados, recortados por los perfiles de arena y por las siluetas alfa que usa el hábitat para rocas y maderas. Son aproximaciones visuales en 2.5D.
 
 El modelo procedural añade pelvis y aletas pareadas, radios largos en peces altos, barbillones/boca en peces de fondo, ondulación corporal en kuhli y apertura de opérculos del betta al desplegar. Se mantienen los 23 perfiles, crecimiento, enfermedad, muerte y giros con volumen. No se reemplazan los peces activos por imágenes.
 
 La ficha del betta permite acercar un espejo visible durante ocho segundos; se retira solo. El pez considera su posición, profundidad, cercanía y estado antes de investigar/desplegar aletas. Dormido, asustado o enfermo no se fuerza esa respuesta. No hay un reflejo permanente ni una segunda simulación de estrés añadida.
 
 Rueda y pinza, encuadre completo inicial, seguimiento individual, ficha y selector de animal, modo Contemplar y herramientas manuales se conservan.
+
+### Ambiente continuo
+
+El ambiente reutiliza el reloj configurable de la simulación (incluida la fracción entre pasos). Amanecer y atardecer usan las horas solares de Buenos Aires y el clima exterior disponible. [ambient-aquarium.json](../src/data/ambient-aquarium.json) reúne la opción de usar horarios solares o fijos, la duración de las transiciones, los colores, la intensidad del agua y el ritmo nocturno de cada grupo. La opción Hora del panel DEBUG permite comparar la iluminación sin alterar el fotoperíodo ni la hora del guardado.
+
+La ventana, el agua y las luces localizadas sobre la pared y el mueble se actualizan desde la misma muestra ambiental. El efecto de la lámpara del acuario sigue su programación de cuidado. El ritmo nocturno modula la exploración y las pausas conservando la prioridad de alimentación, respiración y sobresalto. Las animaciones se pausan al ocultar la pestaña y se retoman desde el último fotograma, con la recuperación de la simulación existente.
+
+Se reutilizaron las ilustraciones, mallas de plantas, equipos, máscaras de arena y luces de la habitación. Los nuevos efectos se dibujan con PixiJS y no requieren imágenes ni dependencias adicionales.
+
+La validación del ambiente y agua se ejecutó con las tres fases integradas. Pasaron 68 pruebas dirigidas de corrientes, partículas, plantas, reloj, meteorología, nado y alimentación. La compilación de producción incluyó el chequeo de tipos. En Chromium se verificaron los cambios de iluminación, el zoom, la pausa y reanudación al ocultar la pestaña, la apertura y cierre de tapa y la alimentación. Se reprodujo el recorrido con un viewport móvil emulado. Las capturas se tomaron con clima de Buenos Aires controlado para que las comparaciones sean reproducibles.
 
 ## Límites pendientes
 

@@ -4,6 +4,7 @@ import { lerpColor } from '../pixel-utils';
 import { softPool } from '../tank/illustrated-optics';
 import { surfaceSlope } from '../motion/water-light';
 import type { TankRect } from '../tank/tank-layout';
+import type { AquariumEnvironment } from './aquarium-environment';
 
 export const illustratedRoom = {
   window: { x: 183, y: 0, width: 350, height: 239 },
@@ -52,7 +53,6 @@ export class IllustratedRoomDecor {
   private readonly tableGlow = new Graphics();
   private readonly tableMask = new Graphics().poly([356, 416, 922, 416, 966, 447, 316, 447]).fill(0xffffff);
   private readonly moonlight = new Graphics();
-  private lit = -1;
   private warm = -1;
   private readonly lampGlow = new Graphics();
   private readonly sunlight = new Graphics();
@@ -104,7 +104,8 @@ export class IllustratedRoomDecor {
     this.container.addChild(this.lamp, this.notebook, this.sunlight, this.moonlight, this.lampGlow, this.wallMask, this.wallLight, this.tableMask, this.tableLight, this.edgeLight, this.table);
   }
 
-  update(tank: TankRect, seconds: number, dt: number, tint: number, light: number, tankLit: boolean, lampOn: boolean, breeze: number) {
+  update(tank: TankRect, seconds: number, dt: number, tint: number, environment: AquariumEnvironment, lampOn: boolean, breeze: number) {
+    const light = environment.natural;
     for (const p of this.plants) {
       p.pot.tint = p.mesh.tint = tint;
       const sway = Math.sin(seconds * 0.47 + p.spec.phase) * p.spec.amount * breeze;
@@ -117,15 +118,15 @@ export class IllustratedRoomDecor {
       p.buffer.update();
     }
     const fade = 1 - Math.exp(-dt * 2.6);
-    this.lit = this.lit < 0 ? Number(tankLit) : this.lit + (Number(tankLit) - this.lit) * fade;
     this.warm = this.warm < 0 ? Number(lampOn) : this.warm + (Number(lampOn) - this.warm) * fade;
     this.lamp.tint = lerpColor(tint, 0xffd6a8, this.warm * 0.54);
     this.notebook.tint = tint;
     this.lampGlow.alpha = this.warm * (0.12 + (1 - light) * 0.33);
-    this.sunlight.alpha = light * 0.29;
+    this.sunlight.alpha = light * (0.29 + environment.twilight * 0.075);
+    this.sunlight.tint = lerpColor(0xffffff, 0xffd3aa, environment.twilight);
     this.moonlight.alpha = (1 - light) * 0.16;
     const dusk = 1 - light;
-    const active = this.lit * (0.12 + dusk * 0.88);
+    const active = environment.lamp * (0.12 + dusk * 0.88);
     const cx = tank.x + tank.width / 2, base = tank.y + tank.height;
     // Match the drift of the waterline and keep the reflected motion local.
     // Only the transforms and opacity change each frame.

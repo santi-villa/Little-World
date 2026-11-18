@@ -178,8 +178,10 @@ export class BettaDynamics {
     }
     if (this.mode !== 'wander')
       this.goalAt = Math.max(this.goalAt, time + c.goalMinSeconds);
+    const ambient = this.mode === 'wander' || (this.mode === 'investigate' && this.inspecting)
+      ? a.ambientActivity ?? 1 : 1;
     this.cycle += dt;
-    const period = c.burstSeconds + c.glideSeconds + c.floatSeconds * (1.03 - a.activity * 0.55),
+    const period = c.burstSeconds + c.glideSeconds + c.floatSeconds * (1.03 - a.activity * 0.55) / ambient,
       at = this.cycle % period;
     this.stroke =
       at < c.burstSeconds
@@ -201,7 +203,7 @@ export class BettaDynamics {
       this.stroke = 'burst';
     if (navigation && this.mode === 'wander' && arrived && !this.parked) {
       this.parked = true;
-      this.parkUntil = time + 0.65 + random() * (1.2 + (1 - a.activity) * 0.85);
+      this.parkUntil = time + (0.65 + random() * (1.2 + (1 - a.activity) * 0.85)) / ambient;
       this.goalAt = this.parkUntil;
     }
     const parked = !!navigation && this.mode === 'wander' && time < this.parkUntil;
@@ -225,7 +227,7 @@ export class BettaDynamics {
       if (!arrived || Math.hypot(b.vx, b.vy) > 0.4) b.heading += turn;
       const speed = Math.hypot(b.vx, b.vy),
         cap =
-          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS * (1.02 + a.activity * 0.38)) * (a.condition ?? 1),
+          L * (this.mode === 'startle' ? c.burstLengthsS : c.cruiseLengthsS * (1.02 + a.activity * 0.38) * ambient) * (a.condition ?? 1),
         thrust =
           this.stroke === 'burst' && speed < cap
             ? (this.mode === 'startle' ? c.burstThrust : c.thrust * (0.82 + a.activity * 0.32))

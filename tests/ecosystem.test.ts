@@ -9,6 +9,8 @@ import {FoodParticles} from '../src/render/motion/food-particles';
 import {BubbleParticles} from '../src/render/motion/bubble-particles';
 import {PlantMotion} from '../src/render/motion/plant-motion';
 import {Camera} from '../src/render/camera';
+import {Sediment} from '../src/render/motion/sediment';
+import {SurfaceRipples} from '../src/render/motion/water-light';
 const empty={obstacles:[],leaves:[],refuges:[]};
 describe('ecosistema compartido',()=>{
  it('sin caudal no inventa corrientes y los obstáculos atenúan la circulación',()=>{
@@ -61,4 +63,51 @@ it('las burbujas nacen cerca de la boquilla sumergida y se cortan al quedar en s
     expect(bubble.y).toBeLessThan(7);
   }
   expect(new Set(bubbles.particles.map(p => p.radius)).size).toBeGreaterThan(1);
+});
+
+it('comparte corriente variable con las partículas y reutiliza las motas al reaparecer', () => {
+  const water = new WaterFlow();
+  water.configure(60, 30, 300, 60, empty);
+  const before = water.getWaterVelocity(30, 8);
+  water.setTime(2);
+  const later = water.getWaterVelocity(30, 8);
+  expect(Math.abs(later.x - before.x)).toBeGreaterThan(0.01);
+  water.setTime(2.01);
+  expect(Math.abs(water.getWaterVelocity(30, 8).x - later.x)).toBeLessThan(0.01);
+
+  const moving = new Sediment(12), still = new Sediment(12);
+  const noCurrent = new WaterFlow();
+  for (let i = 0; i < 180; i++) {
+    moving.update(1 / 60, 24, 60, 30, water, []);
+    still.update(1 / 60, 24, 60, 30, noCurrent, []);
+  }
+  expect(moving.particles).toHaveLength(12);
+  expect(new Set(moving.particles.map(p => p.depth)).size).toBe(12);
+  const mote = moving.particles[0]!;
+  expect(Math.abs(mote.x - still.particles[0]!.x)).toBeGreaterThan(0.05);
+  const id = mote.id;
+  for (let i = 0; i < 460; i++) moving.update(0.1, 24, 60, 30, water, []);
+  expect(moving.particles[0]).toBe(mote);
+  expect(mote.id).not.toBe(id);
+});
+
+it('deja pausas entre grupos de burbujas y una onda breve al llegar arriba', () => {
+  const water = new WaterFlow();
+  const bubbles = new BubbleParticles(8);
+  const surface = new SurfaceRipples(), quiet = new SurfaceRipples();
+  let lastId = 0, poppedAt = 0;
+  for (let i = 0; i < 300; i++) {
+    const now = (i + 1) / 60;
+    bubbles.update(1 / 60, 60, 4, 1, water, { x: 40, y: 0.8 }, p => {
+      poppedAt = now;
+      surface.disturb(p.x / 60, now, 0.6);
+    });
+    if (now < 2) lastId = Math.max(lastId, ...bubbles.particles.map(p => p.id));
+    else expect(bubbles.particles.every(p => p.id <= lastId)).toBe(true);
+  }
+  expect(lastId).toBeGreaterThan(2);
+  expect(poppedAt).toBeGreaterThan(0);
+  expect(surface.displacement(2 / 3, poppedAt)).toBeGreaterThan(quiet.displacement(2 / 3, poppedAt));
+  expect(surface.displacement(2 / 3, poppedAt + 3)).toBe(quiet.displacement(2 / 3, poppedAt + 3));
+  expect(surface.displacement(0, poppedAt)).toBeCloseTo(0);
 });

@@ -34,7 +34,7 @@ import { Container, Graphics, Sprite } from 'pixi.js';
 import { defaultConfig, type DerivedValues, type SimAction, type SimState, type Weather } from '../../sim';
 import { asset, tex } from '../assets';
 import { Camera, type CameraView } from '../camera';
-import { daylight, lerpColor } from '../pixel-utils';
+import { aquariumEnvironment, easeEnvironment, roomLightTint, type AquariumEnvironment } from './aquarium-environment';
 import { TankView } from '../tank/tank-view';
 import { careBarHeight, uiInsets, SceneUi, type CareId, type UiMode } from '../ui/scene-ui';
 import { texts } from '../ui/texts';
@@ -49,6 +49,7 @@ import { drawSky } from './window-view';
 export interface SceneView {
   weather: Weather;
   outside?: OutsideView;
+  timeMinutes?: number;
   decorId?: string;
   bettaStyle?: 'code'|'image'|'flat';
 }
@@ -56,8 +57,6 @@ export interface SceneView {
 type Point = { x: number; y: number };
 
 const ROOM_ID = 'dormitorio';
-/** Cuánta luz de día deja pasar cada clima. */
-const WEATHER_LIGHT: Record<Weather, number> = { clear: 1, cloudy: 0.85, rain: 0.7, storm: 0.5 };
 /** Cuánto hay que mover el dedo para que deje de ser un toque (píxeles de pantalla). */
 const DRAG_START = 10;
 /** Deslizar hacia abajo esto (en la vista de cerca) vuelve a la habitación. */
@@ -95,7 +94,7 @@ export class RoomScene {
   private lastBolt = 0;
   private tankFit?: { fill: number; key: string };
   private cloudDistance = 0;
-  private ambient?: number;
+  private environment?: AquariumEnvironment;
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
@@ -218,6 +217,10 @@ export class RoomScene {
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
     this.seconds = seconds;
+    const visualDt = Math.min(0.1, Math.max(0, dt));
+    const target = aquariumEnvironment(view.timeMinutes ?? state.timeMinutes, view.weather,
+      derived.lightOn, view.outside, scenePreview.hour);
+    const environment = this.environment = easeEnvironment(this.environment, target, visualDt);
     const decorId = view.decorId ?? 'default';
     if (decorId !== this.decorId) {
       this.decorId = decorId;
@@ -229,7 +232,7 @@ export class RoomScene {
     this.tank.setHand(this.mode==='tank' && hand ? {x:hand.x*state.tank.lengthCm,y:hand.y*(this.tank.waterBounds.height/Math.max(1,this.tank.waterBounds.width))*state.tank.lengthCm,speed:hand.speed,age:seconds-hand.at}:null);
     document.body.dataset.handTool=this.handTool;
     this.tank.fish.bettaStyle=view.bettaStyle??'code';
-    this.tank.update(state, derived, seconds);
+    this.tank.update(state, derived, seconds, environment);
     this.hybrid?.update(state,derived,dt);
     this.focusShade.clear();const dim=this.hybrid?.roomDim??0;if(dim>0)this.focusShade.rect(0,0,GAME_WIDTH,GAME_HEIGHT).fill({color:0x061c24,alpha:dim});
     const uiMode=this.mode==='tank'&&this.hybrid?.active&&!this.hybrid.ready?'room':this.mode;
@@ -247,7 +250,7 @@ export class RoomScene {
         this.handOverlay.rect(Math.round(cx-2),Math.round(r.y-3),4,1).fill({color:0xf0d59c,alpha:.8});
       }
     }
-    const light = this.drawRoom(state, derived, seconds, Math.min(0.1, Math.max(0, dt)), view);
+    const light = this.drawRoom(state, derived, seconds, visualDt, view, environment);
     this.cat.update(
       Math.max(light, derived.lightOn ? 0.6 : 0.3), seconds,
     );
@@ -600,14 +603,10 @@ export class RoomScene {
   }
 
   /** Dibuja la habitación y devuelve cuánta luz de día hay (0 noche .. 1 pleno día). */
-  private drawRoom(state: SimState, derived: DerivedValues, seconds: number, dt: number, view: SceneView): number {
+  private drawRoom(state: SimState, derived: DerivedValues, seconds: number, dt: number,
+    view: SceneView, environment: AquariumEnvironment): number {
     const tank = this.tankBounds;
-    // La hora puede venir del panel de debug (solo cambia lo que se ve).
-    const day = scenePreview.hour === null && view.outside ? view.outside.daylight : daylight(scenePreview.hour ?? derived.hour);
-    const target = day * WEATHER_LIGHT[view.weather];
-    const previous = this.ambient ?? target;
-    this.ambient = previous + (target - previous) * (1 - Math.exp(-dt * 2.6));
-    const light = this.illustrated ? this.ambient : target;
+    const { daylight: day, natural: light, twilight } = environment;
     const wind = Math.max(0.28, Math.min(2.2, (view.outside?.windKph ?? 10) / 14));
     this.cloudDistance += wind * dt;
     const night = 1 - light;
@@ -616,20 +615,20 @@ export class RoomScene {
     this.lampOn = lampOn;
 
     const skyKey = [Math.round(day * 256), view.weather, Math.round(view.outside?.cloudCover ?? 0),
-      Math.round((view.outside?.twilight ?? 0) * 255)].join();
+      Math.round(twilight * 255)].join();
     if (this.skyKey !== skyKey) {
       this.skyKey = skyKey;
-      drawSky(this.skyBase.clear(), this.window, day, view.weather, seconds, 'base', view.outside);
+      drawSky(this.skyBase.clear(), this.window, day, view.weather, seconds, 'base', view.outside, undefined, environment);
     }
     if (seconds >= this.nextSkyAt || seconds < this.nextSkyAt - 1 || view.weather === 'storm') {
       this.nextSkyAt = seconds + 1 / 30;
-      this.lastBolt = drawSky(this.sky.clear(), this.window, day, view.weather, seconds, 'front', view.outside, this.cloudDistance);
+      this.lastBolt = drawSky(this.sky.clear(), this.window, day, view.weather, seconds, 'front', view.outside, this.cloudDistance, environment);
     }
     const bolt = this.lastBolt;
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.
-    const tint = this.illustrated ? lerpColor(0x68768f, 0xfff1dc, light) : ambientTint(light);
+    const tint = this.illustrated ? roomLightTint(environment) : ambientTint(light);
     this.room.tint = tint;
     // Brisa: las plantas se hamacan apenas (más con la ventana abierta).
     const breeze = (state.room.windowOpen ? 1.8 : 0.9) * (view.weather === 'storm' ? 1.2 : 1);
@@ -639,7 +638,7 @@ export class RoomScene {
       item.sprite.rotation = (Math.min(2, breeze * item.amount) * swing * Math.PI) / 180;
     }
 
-    this.paintedDecor?.update(tank, seconds, dt, tint, light, derived.lightOn, lampOn, breeze);
+    this.paintedDecor?.update(tank, seconds, dt, tint, environment, lampOn, breeze);
     if (!this.illustrated) drawRoomAnim(this.anim.clear(), seconds);
 
     // Luces.
