@@ -53,6 +53,9 @@ import type { DerivedValues, SimState } from '../../sim';
 import { asset, tex } from '../assets';
 import { lerpColor, scatter } from '../pixel-utils';
 import { FishLayer } from './fish-layer';
+import { drawIllustratedEquipment } from './illustrated-equipment';
+import { FRONT_GLASS, illustratedFrame } from './illustrated-layout';
+import { fillWater, IllustratedOptics, softPool, traceBed } from './illustrated-optics';
 import { GLASS_ART, tankFrame, type TankRect } from './tank-layout';
 
 /** Una pieza de la decoración. */
@@ -68,6 +71,8 @@ export interface TankDecorItem {
   sink?: number;
   /** Agrandar o achicar (1 = su tamaño natural, con el píxel del resto). */
   scale?: number;
+  /** Ancho relativo al cristal para los objetos de alta resolución. */
+  width?: number;
   flip?: boolean;
   height?: number;
   layer?: string;
@@ -127,7 +132,14 @@ export class TankView {
   readonly flow=new WaterFlow();
   private sediment=new Sediment(typeof window!=='undefined'&&window.innerWidth<800?32:64);
   private bubbles=new BubbleParticles(typeof window!=="undefined"&&window.innerWidth<800?ecosystem.bubbles.mobileMax:ecosystem.bubbles.max);
-  readonly fish = new FishLayer();
+  readonly fish: FishLayer;
+  private readonly optics?: IllustratedOptics;
+  private readonly bedMask = new Graphics();
+  private readonly lipMask = new Graphics();
+  private readonly bedShade = new Graphics();
+  private readonly softShadow = softPool('#334437');
+  private frameCut = 1;
+  private get paintedGlass(): boolean { return this.illustrated && !this.round; }
   private readonly wet=new Container();
   private readonly roundMask=new Graphics();
   private round=false;private roundMaskKey="";
@@ -160,6 +172,7 @@ export class TankView {
   private decorKey = '';
   private glassKey = '';
   private waterKey = '';
+  private waterGradients: ReturnType<typeof fillWater> = [];
   private equipKey = '';
   private lastSeconds = 0;
   private mirrorUntil=0;
@@ -171,10 +184,20 @@ export class TankView {
     this.mirrorUntil=this.lastSeconds+8;
   }
 
-  constructor() {
+  constructor(private readonly illustrated = false, betta?: ConstructorParameters<typeof FishLayer>[0]) {
+    this.fish = new FishLayer(betta);
+    if (illustrated) this.optics = new IllustratedOptics();
     try{if(localStorage.getItem("lw-tank-glass")==="round")tankAppearance.shape="round";}catch{/* Storage can be unavailable. */}
-    this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.fish.artBack, this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
+    if (illustrated) {
+      this.inside.addChild(this.substrate, this.bedMask, this.contactShadows, this.hardscape,
+        this.rearPlants, this.plantLayer, this.frontPlants, this.foregroundSand, this.lipMask, this.bedShade,
+        this.fish.graphics, this.fish.artBack, this.fish.foreground, this.fish.artFront, this.mid, this.fish.foodGraphics,
+        this.optics!.light, this.fx, this.optics!.reflections);
+    } else {
+      this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.fish.artBack, this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
+    }
     this.inside.mask = this.waterMask;
+    this.equip.mask = this.waterMask;
     this.wet.addChild(this.water,this.glassBack,this.equip,this.inside,this.waterMask,this.roundMask);
     this.art.addChild(this.wet, this.glass, this.glassMask, this.lidSprite, this.ledOff);
     this.container.addChild(this.art);
@@ -215,18 +238,13 @@ export class TankView {
   update(state: SimState, derived: DerivedValues, seconds: number): void {
     const lit = derived.lightOn;
     this.round=tankAppearance.shape==='round'||(tankAppearance.shape==='model'&&state.tank.modelId==='bowl_8');
-    this.glass.texture=tex(this.round?'redonda-1':GLASS);this.glassBack.visible=!this.round;
+    this.glass.texture = tex(this.round ? 'redonda-1' : this.paintedGlass ? 'illustrated-frame' : GLASS);
+    this.glassBack.visible = !this.round && !this.paintedGlass;
+    this.optics?.updateVisibility(this.paintedGlass);
     const roundKey=this.round?String(this.glass.texture.uid):"";if(roundKey!==this.roundMaskKey){this.roundMaskKey=roundKey;this.roundMask.clear();if(this.round){const t=this.glass.texture,m=visual.roundMask;this.roundMask.ellipse(t.width*m.x,t.height*m.y,t.width*m.rx,t.height*m.ry).fill(0xffffff);}}this.wet.mask=this.round?this.roundMask:null;
     const geo = this.layout(state, derived);
     this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.sandTop-geo.waterTop-2)};
-    const glassTexture=this.glass.texture;
-    const cut=Math.max(1,this.inner.y-3);
-    const lidKey=`${glassTexture.uid}:${cut}`;
-    if(this.lidTextureKey!==lidKey){this.lidTextureKey=lidKey;this.lidSprite.texture=new Texture({source:glassTexture.source,frame:new Rectangle(0,0,glassTexture.width,cut)});}
-    this.glassMask.clear();
-    if(!this.round&&!state.tank.hasLid){this.glassMask.rect(0,cut,glassTexture.width,glassTexture.height-cut).fill(0xffffff);this.glass.mask=this.glassMask;}
-    else this.glass.mask=null;
-    this.lidSprite.visible=!this.round&&!state.tank.hasLid;this.lidSprite.position.set(0,-26);this.lidSprite.rotation=-0.035;
+    this.updateLid(state.tank.hasLid);
     const pxPerCm = this.inner.width / state.tank.lengthCm;
     const tannins = state.water.tannins;
 
@@ -235,7 +253,7 @@ export class TankView {
     this.buildDecor(geo);
     this.flow.configure(geo.width/pxPerCm,(geo.sandTop-geo.waterTop-2)/pxPerCm,derived.effectiveFlowLph,state.tank.waterLiters,this.habitat,this.round);this.fish.water=this.flow;
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
-    const tint = lerpColor(ambientTint(lit ? 1 : 0.18), lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
+    const tint = lerpColor(this.illustrated && lit ? 0xe6eedd : ambientTint(lit ? 1 : 0.18), lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
     this.substrate.tint = tint;
     this.foregroundSand.tint = tint;
     for (const child of this.hardscape.children) child.tint = tint;
@@ -260,6 +278,7 @@ export class TankView {
     this.drawMid(state, derived, geo, shade, seconds);
     this.drawFx(state, geo, shade, lit, seconds);
 
+    if (this.paintedGlass) this.optics?.update(geo, seconds, lit);
     const dt = this.lastSeconds === 0 ? 0 : seconds - this.lastSeconds;
     this.lastSeconds = seconds;
     const swimTop = geo.waterTop + 2;
@@ -278,22 +297,24 @@ export class TankView {
    * coordenadas de la imagen del vidrio (las del contenedor `art`).
    */
   private layout(state: SimState, derived: DerivedValues): Geo {
-    const meta = asset(this.round?'redonda-1':GLASS);
-    // Medidas de la textura que realmente se cargó; el hueco del manifest se lleva a ese tamaño.
+    const meta = asset(this.round ? 'redonda-1' : GLASS);
     const texture = this.glass.texture;
     const texW = texture.width > 1 ? texture.width : (meta?.width ?? GLASS_ART.width);
     const texH = texture.height > 1 ? texture.height : (meta?.height ?? GLASS_ART.height);
-    const source = this.round?{width:texW,height:texH,inner:{x:texW*visual.roundInner.x,y:texH*visual.roundInner.y,width:texW*visual.roundInner.width,height:texH*visual.roundInner.height}}:meta?.inner ? { width: meta.width, height: meta.height, inner: meta.inner } : GLASS_ART;
-    const rx = texW / source.width;
-    const ry = texH / source.height;
-    const inner = {
-      x: Math.round(source.inner.x * rx),
-      y: Math.round(source.inner.y * ry),
-      width: Math.round(source.inner.width * rx),
-      height: Math.round(source.inner.height * ry),
-    };
-    // El vidrio se escala parejo (nunca se estira) y el interior viaja con él.
-    const frame = tankFrame(state.tank.lengthCm, { width: texW, height: texH, inner });
+    const source = this.paintedGlass ? FRONT_GLASS : this.round
+      ? { width: texW, height: texH, inner: {
+          x: texW * visual.roundInner.x, y: texH * visual.roundInner.y,
+          width: texW * visual.roundInner.width, height: texH * visual.roundInner.height,
+        } }
+      : meta?.inner ? { width: texW, height: texH, inner: {
+          x: Math.round(meta.inner.x * texW / meta.width), y: Math.round(meta.inner.y * texH / meta.height),
+          width: Math.round(meta.inner.width * texW / meta.width), height: Math.round(meta.inner.height * texH / meta.height),
+        } } : GLASS_ART;
+    this.glass.width = source.width;
+    this.glass.height = source.height;
+    const inner = source.inner;
+    this.frameCut = this.paintedGlass ? FRONT_GLASS.lidCut : Math.max(1, inner.y - 3);
+    const frame = this.illustrated ? illustratedFrame(state.tank.lengthCm, source) : tankFrame(state.tank.lengthCm, source);
     const k = frame.scale;
     const glassKey = `${frame.outer.x},${frame.outer.y},${k}`;
     if (glassKey !== this.glassKey) {
@@ -305,7 +326,8 @@ export class TankView {
     this.outer = frame.outer;
 
     // La tira de luz de la tapa, apagada.
-    const led = meta?.led;
+    const rx = texW / (meta?.width ?? texW), ry = texH / (meta?.height ?? texH);
+    const led = this.paintedGlass ? undefined : meta?.led;
     this.ledOff.clear();
     if (led && !derived.lightOn) {
       this.ledOff.rect(Math.round(led.x * rx), Math.round(led.y * ry), Math.round(led.width * rx), Math.ceil(led.height * ry)).fill({ color: 0x20242e, alpha: 0.85 });
@@ -314,9 +336,9 @@ export class TankView {
     const { x: left, y: top, width, height } = inner;
     const bottom = top + height;
     // El agua llena el hueco; la evaporación la baja de a poco.
-    const fullTop = top + SURFACE_GAP;
+    const fullTop = top + (this.paintedGlass ? 8 : SURFACE_GAP);
     const waterHeight = Math.round((bottom - fullTop) * clamp(derived.waterLevel, 0, 1));
-    const sandH = clamp(Math.round(height * 0.13), 12, 28);
+    const sandH = clamp(Math.round(height * (this.illustrated ? 0.155 : 0.13)), 12, 34);
     return {
       left,
       right: left + width,
@@ -331,9 +353,30 @@ export class TankView {
     };
   }
 
+  private updateLid(closed: boolean): void {
+    const texture = this.glass.texture;
+    const cut = this.frameCut;
+    const sourceCut = Math.min(texture.height, Math.max(1, Math.round(cut * texture.height / this.glass.height)));
+    const key = `${texture.uid}:${sourceCut}:${closed}:${this.round}`;
+    if (this.lidTextureKey === key) return;
+    this.lidTextureKey = key;
+    this.glassMask.clear();
+    const open = !this.round && !closed;
+    this.glass.mask = open ? this.glassMask : null;
+    this.lidSprite.visible = open;
+    if (!open) return;
+    if (this.lidSprite.texture !== Texture.EMPTY) this.lidSprite.texture.destroy(false);
+    this.lidSprite.texture = new Texture({ source: texture.source, frame: new Rectangle(0, 0, texture.width, sourceCut) });
+    this.lidSprite.width = this.glass.width;
+    this.lidSprite.height = cut;
+    this.glassMask.rect(0, cut, this.glass.width, this.glass.height - cut).fill(0xffffff);
+    this.lidSprite.position.set(0, this.paintedGlass ? -18 : -26);
+    this.lidSprite.rotation = this.paintedGlass ? -0.022 : -0.035;
+  }
+
   /** Color del agua a una profundidad (0 superficie .. 1 fondo). */
   waterColor(lit: boolean, tannins: number, depth: number): number {
-    const clear = lit ? lerpColor(0x6caaa1, 0x294e50, depth) : lerpColor(0x14434e, 0x0a2731, depth);
+    const clear = lit ? lerpColor(this.paintedGlass ? 0x96bdb0 : 0x6caaa1, this.paintedGlass ? 0x2b5955 : 0x294e50, depth) : lerpColor(0x14434e, 0x0a2731, depth);
     const amber = lit ? lerpColor(0xc08a34, 0x6a4418, depth) : lerpColor(0x4a3413, 0x2a1c0c, depth);
     return lerpColor(clear, amber, tannins * 0.6);
   }
@@ -345,9 +388,17 @@ export class TankView {
     this.waterKey = key;
     const g = this.water;
     g.clear();
+    for (const gradient of this.waterGradients) gradient.destroy();
+    this.waterGradients = [];
     this.waterMask.clear();
     // Lo de adentro (arena, plantas, peces) se recorta al hueco del vidrio.
     this.waterMask.rect(geo.left, geo.top, geo.width, geo.height).fill(0xffffff);
+    if (this.paintedGlass) {
+      this.waterGradients = fillWater(g, geo, [
+        this.waterColor(lit, tannins, 0), this.waterColor(lit, tannins, 0.39), this.waterColor(lit, tannins, 1),
+      ], lit);
+      return;
+    }
     const { left: x, width: w, waterTop: top, waterHeight: h } = geo;
     // El aire entre la tapa y el agua: la sombra de la tapa (no se ve la habitación a través).
     g.rect(x, geo.top, w, Math.max(0, top - geo.top)).fill(lit ? 0x7d92a0 : 0x1c222c);
@@ -380,11 +431,15 @@ export class TankView {
   private drawEquipment(state: SimState, geo: Geo, lit: boolean): void {
     const hasFilter = state.filter.flowLph > 0;
     const hasHeater = state.heater.watts > 0;
-    const key = [geo.left, geo.top, geo.width, geo.height, lit, hasHeater, state.heater.on, state.heater.enabled, hasFilter, Math.round(state.water.temperatureC)].join();
+    const key = [geo.left, geo.top, geo.width, geo.height, this.paintedGlass, lit, hasHeater, state.heater.on, state.heater.enabled, hasFilter, Math.round(state.water.temperatureC)].join();
     if (key === this.equipKey) return;
     this.equipKey = key;
     const g = this.equip;
     g.clear();
+    if (this.paintedGlass) {
+      drawIllustratedEquipment(g, geo, state, lit);
+      return;
+    }
     const shade = (c: number): number => (lit ? c : lerpColor(c, NIGHT, 0.6));
     const { left, right, top, height } = geo;
 
@@ -436,7 +491,7 @@ export class TankView {
     this.decorKey = key;
 
     // Sustrato: se repite a lo ancho, con su píxel natural (no se estira).
-    const unit = artPx(this.decor.substrate);
+    const unit = this.illustrated ? tex(this.decor.substrate).width / geo.width : artPx(this.decor.substrate);
     this.substrate.texture = tex(this.decor.substrate);
     this.substrate.tileScale.set(1 / unit);
     this.substrate.position.set(geo.left, geo.bottom - geo.sandH);
@@ -449,6 +504,20 @@ export class TankView {
     this.foregroundSand.width = geo.width;
     this.foregroundSand.height = geo.bottom - geo.sandTop;
     this.foregroundSand.tilePosition.y = -(geo.sandTop - (geo.bottom - geo.sandH));
+    if (this.illustrated) {
+      const start = geo.bottom - geo.sandH - 3;
+      this.substrate.position.y = this.foregroundSand.position.y = start;
+      this.substrate.height = this.foregroundSand.height = geo.bottom - start;
+      this.foregroundSand.tilePosition.y = 0;
+      traceBed(this.bedMask, geo, geo.sandTop - 7, 5);
+      this.bedMask.fill(0xffffff);
+      traceBed(this.lipMask, geo, geo.sandTop - 0.5, 4);
+      this.lipMask.fill(0xffffff);
+      traceBed(this.bedShade, geo, geo.sandTop + 4, 3);
+      this.bedShade.fill({ color: 0x48351e, alpha: 0.09 });
+      this.substrate.mask = this.bedMask;
+      this.foregroundSand.mask = this.lipMask;
+    }
 
     for (const child of this.hardscape.removeChildren()) child.destroy();
     for (const child of this.plantLayer.removeChildren()) child.destroy();
@@ -457,20 +526,28 @@ export class TankView {
     this.contactShadows.clear();
     this.plants = [];this.plantImpulseAt.clear();this.habitat=emptyHabitat();
     for (const [index, item] of this.decor.items.entries()) {
-      const name = item.plant ? `${item.plant}-${item.stage ?? 1}` : (item.asset ?? '');
+      const name = item.asset ?? (item.plant ? `${item.plant}-${item.stage ?? 1}` : '');
       if (!asset(name)) continue;
       const texture = tex(name);
       const unit = artPx(name);
       // 1 píxel del dibujo = 1 píxel del vidrio. Las plantas, a lo sumo un tercio del agua.
-      let scale = (item.scale ?? 1) / unit;
-      if (item.plant) scale = Math.min(scale, (geo.bottom - geo.top) * (item.height ?? 0.45) / texture.height);
+      let scale = item.width ? item.width * geo.width / texture.width : (item.scale ?? 1) / unit;
+      if (item.plant) {
+        const heightScale = (geo.bottom - geo.top) * (item.height ?? 0.45) / texture.height;
+        scale = this.illustrated ? Math.min(heightScale, geo.width * 0.3 / texture.width) : Math.min(scale, heightScale);
+      }
       const w = texture.width * scale;
       const h = texture.height * scale;
       const cx = Math.round(clamp(geo.left + item.x * geo.width, geo.left + w / 2, geo.right - w / 2));
       const baseY = Math.round(geo.sandTop + (item.sink ?? 0) * h);
       const shadowW = Math.min(w * 0.7,geo.width*0.32);
-      for(let row=0;row<3;row++) this.contactShadows.rect(Math.round(cx-shadowW/2+row*2),geo.sandTop+row,Math.max(1,Math.round(shadowW-row*4)),1);
-      this.contactShadows.fill({color:ART.shadow,alpha:item.plant?0.1:0.22});
+      if (this.illustrated) {
+        this.contactShadows.ellipse(cx + w * 0.06, geo.sandTop, shadowW * 0.75, Math.max(3, h * 0.085))
+          .fill({ fill: this.softShadow, alpha: item.plant ? 0.29 : 0.46 });
+      } else {
+        for (let row = 0; row < 3; row++) this.contactShadows.rect(Math.round(cx - shadowW / 2 + row * 2), geo.sandTop + row, Math.max(1, Math.round(shadowW - row * 4)), 1);
+        this.contactShadows.fill({ color: ART.shadow, alpha: item.plant ? 0.1 : 0.22 });
+      }
       if(item.plant){
         const ny=(baseY-geo.waterTop-2)/Math.max(1,geo.sandTop-geo.waterTop-2),nh=h/Math.max(1,geo.sandTop-geo.waterTop-2);
         this.habitat.refuges.push({x:(cx-geo.left)/geo.width,y:Math.max(.12,Math.min(.88,ny-nh*.4))});
@@ -509,7 +586,7 @@ export class TankView {
       for (let i = 0; i < positions.length; i += 2) {
         const free = Math.pow(1 - (plant.rest[i + 1] as number) / height, 1.5);
         const sample=free*8,index=Math.min(7,Math.floor(sample)),offset=plant.motion.offsets[index]!*(1-(sample-index))+plant.motion.offsets[index+1]!*(sample-index);
-        positions[i] = (plant.rest[i] as number) + offset*height;
+        positions[i] = (plant.rest[i] as number) + offset * height * (this.illustrated ? 0.55 : 1);
 
       }
       attribute.buffer.update();
@@ -548,7 +625,7 @@ export class TankView {
     });
 
     // Rayos de luz que bajan desde la tapa, abriéndose y respirando.
-    if (lit && waterHeight > 12) {
+    if (!this.paintedGlass && lit && waterHeight > 12) {
       const rays = Math.max(3, Math.round(width / 52));
       const mid = left + width / 2;
       for (let i = 0; i < rays; i++) {
@@ -581,14 +658,14 @@ export class TankView {
     this.sediment.update(seconds-this.lastSeconds,ecosystem.water.cleanSpecks+turbidity*ecosystem.water.dirtySpecks,this.flow.width,this.flow.height,this.flow,foragers);
     for(const p of this.sediment.particles)g.circle(left+p.x/this.flow.width*width,this.waterArea.y+p.y/this.flow.height*this.waterArea.height,.55);
     if(this.sediment.particles.length)g.fill({color:0xeafff4,alpha:lit?.2:.1});
-    if(lit)for(const strip of causticStrips(seconds,window.innerWidth<800?12:22)){
+    if(lit && !this.paintedGlass)for(const strip of causticStrips(seconds,window.innerWidth<800?12:22)){
       g.ellipse(left+strip.x*width,geo.sandTop+2,width*.025,1.4).fill({color:0xdaf6ce,alpha:strip.intensity*.08});
     }
 
     // Brillos que corren por la superficie.
     let run = 0;
     let glints = 0;
-    for (let x = left; x <= right; x++) {
+    for (let x = left; !this.paintedGlass && x <= right; x++) {
       const on = x < right && Math.sin(x * 0.15 + seconds * 1.4) + Math.sin(x * 0.055 - seconds * 0.9) > 1.15;
       if (on) {
         run++;

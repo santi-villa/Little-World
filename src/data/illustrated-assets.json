@@ -1,0 +1,142 @@
+{
+  "illustrated-bedroom": {
+    "file": "room/bedroom.png",
+    "width": 1376,
+    "height": 768,
+    "source": "room/bedroom.png",
+    "kind": "illustrated"
+  },
+  "illustrated-frame": {
+    "file": "aquarium/front-frame.png",
+    "width": 949,
+    "height": 550,
+    "source": "aquarium/front-frame.png",
+    "kind": "illustrated"
+  },
+  "sage-foliage": {
+    "file": "room/decor/layers/sage-foliage.png",
+    "width": 440,
+    "height": 374,
+    "source": "room/decor/layers/sage-foliage.png",
+    "kind": "illustrated"
+  },
+  "trailing-foliage": {
+    "file": "room/decor/layers/trailing-foliage.png",
+    "width": 440,
+    "height": 262,
+    "source": "room/decor/layers/trailing-foliage.png",
+    "kind": "illustrated"
+  },
+  "ivory-pot": {
+    "file": "room/decor/layers/ivory-pot.png",
+    "width": 427,
+    "height": 367,
+    "source": "room/decor/layers/ivory-pot.png",
+    "kind": "illustrated"
+  },
+  "clay-pot": {
+    "file": "room/decor/layers/clay-pot.png",
+    "width": 440,
+    "height": 315,
+    "source": "room/decor/layers/clay-pot.png",
+    "kind": "illustrated"
+  },
+  "brass-lamp": {
+    "file": "room/decor/layers/brass-lamp.png",
+    "width": 400,
+    "height": 637,
+    "source": "room/decor/layers/brass-lamp.png",
+    "kind": "illustrated"
+  },
+  "sleeping-tabby": {
+    "file": "room/decor/layers/sleeping-tabby.png",
+    "width": 540,
+    "height": 301,
+    "source": "room/decor/layers/sleeping-tabby.png",
+    "kind": "illustrated"
+  },
+  "fine-ripples": {
+    "file": "aquarium/substrate/fine-ripples.jpg",
+    "width": 800,
+    "height": 447,
+    "source": "aquarium/substrate/fine-ripples.jpg",
+    "kind": "illustrated"
+  },
+  "warm-sand": {
+    "file": "aquarium/substrate/warm-sand.jpg",
+    "width": 800,
+    "height": 447,
+    "source": "aquarium/substrate/warm-sand.jpg",
+    "kind": "illustrated"
+  },
+  "pale-sand": {
+    "file": "aquarium/substrate/pale-sand.jpg",
+    "width": 800,
+    "height": 447,
+    "source": "aquarium/substrate/pale-sand.jpg",
+    "kind": "illustrated"
+  },
+  "narrow-leaf": {
+    "file": "aquarium/plants/narrow-leaf.png",
+    "width": 550,
+    "height": 680,
+    "source": "aquarium/plants/narrow-leaf.png",
+    "kind": "illustrated"
+  },
+  "broad-leaf": {
+    "file": "aquarium/plants/broad-leaf.png",
+    "width": 550,
+    "height": 629,
+    "source": "aquarium/plants/broad-leaf.png",
+    "kind": "illustrated"
+  },
+  "green-stem": {
+    "file": "aquarium/plants/green-stem.png",
+    "width": 482,
+    "height": 688,
+    "source": "aquarium/plants/green-stem.png",
+    "kind": "illustrated"
+  },
+  "arching-leaf": {
+    "file": "aquarium/plants/arching-leaf.png",
+    "width": 505,
+    "height": 713,
+    "source": "aquarium/plants/arching-leaf.png",
+    "kind": "illustrated"
+  },
+  "low-branch": {
+    "file": "aquarium/driftwood/low-branch.png",
+    "width": 550,
+    "height": 264,
+    "source": "aquarium/driftwood/low-branch.png",
+    "kind": "illustrated"
+  },
+  "upright-root": {
+    "file": "aquarium/driftwood/upright-root.png",
+    "width": 550,
+    "height": 350,
+    "source": "aquarium/driftwood/upright-root.png",
+    "kind": "illustrated"
+  },
+  "mossy-river-stone": {
+    "file": "aquarium/rocks/mossy-river-stone.png",
+    "width": 550,
+    "height": 343,
+    "source": "aquarium/rocks/mossy-river-stone.png",
+    "kind": "illustrated"
+  },
+  "rounded-stone": {
+    "file": "aquarium/rocks/rounded-stone.png",
+    "width": 550,
+    "height": 371,
+    "source": "aquarium/rocks/rounded-stone.png",
+    "kind": "illustrated"
+  },
+  "layered-stone": {
+    "file": "aquarium/rocks/layered-stone.png",
+    "width": 550,
+    "height": 333,
+    "source": "aquarium/rocks/layered-stone.png",
+    "kind": "illustrated"
+  }
+}

@@ -403,7 +403,7 @@ body.contemplating .paper-notes {
   animation: paper-in 240ms var(--ease) both;
 }
 
-body[data-view='tank'] .tool-tray {
+body[data-view='tank']:not(.contemplating) .tool-tray {
   display: flex;
 }
 

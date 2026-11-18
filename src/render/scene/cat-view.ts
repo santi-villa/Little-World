@@ -5,6 +5,7 @@ import { asset, tex } from '../assets';
 import { lerpColor } from '../pixel-utils';
 import { drawPixelText } from '../ui/pixel-font';
 import { BED, CAT_SCALE } from './scene-layout';
+import { softPool } from '../tank/illustrated-optics';
 
 interface Clip {
   frames: Texture[];
@@ -62,15 +63,20 @@ export class CatView {
   private readonly graphics = new Graphics();
   private readonly clip = loadClip('dormir');
   private pettedAt = -100;
-  constructor() {
+  constructor(private readonly bed = BED, private readonly illustrated = false) {
+    if (illustrated) {
+      const shadow = new Graphics().ellipse(bed.x + 4, bed.y - 2, 75, 10)
+        .fill({ fill: softPool('#35271d'), alpha: 0.68 });
+      this.container.addChild(shadow);
+    }
     this.graphics.scale.set(2);
     this.container.addChild(this.sprite, this.graphics);
   }
   pet(seconds: number): void { this.pettedAt = seconds; }
-  get position(): { x: number; y: number } { return BED; }
+  get position(): { x: number; y: number } { return this.bed; }
   get rect(): { x: number; y: number; width: number; height: number } {
     const w = Math.max(70, this.sprite.width), h = Math.max(60, this.sprite.height);
-    return { x: BED.x - w / 2, y: BED.y - h, width: w, height: h + 8 };
+    return { x: this.bed.x - w / 2, y: this.bed.y - h, width: w, height: h + 8 };
   }
   hit(x: number, y: number): boolean {
     const r = this.rect;
@@ -78,14 +84,21 @@ export class CatView {
   }
   update(daylight: number, seconds: number): void {
     const clip = this.clip, sprite = this.sprite;
-    sprite.texture = clip.frames[Math.floor(seconds * clip.fps) % clip.frames.length] ?? Texture.EMPTY;
-    sprite.anchor.set(clip.anchor.x, clip.anchor.y);
-    sprite.scale.set(CAT_SCALE);
-    sprite.position.set(BED.x, BED.y);
+    if (this.illustrated) {
+      sprite.texture = tex('sleeping-tabby');
+      sprite.anchor.set(0.5, 1);
+      const scale = 131 / sprite.texture.width;
+      sprite.scale.set(scale, scale * (1 + Math.sin(seconds * 1.86) * 0.012));
+    } else {
+      sprite.texture = clip.frames[Math.floor(seconds * clip.fps) % clip.frames.length] ?? Texture.EMPTY;
+      sprite.anchor.set(clip.anchor.x, clip.anchor.y);
+      sprite.scale.set(CAT_SCALE);
+    }
+    sprite.position.set(this.bed.x, this.bed.y);
     sprite.tint = ambientTint(daylight);
     const g = this.graphics;
     g.clear();
-    const top = Math.round((BED.y - sprite.height) / 2), cx = Math.round(BED.x / 2);
+    const top = Math.round((this.bed.y - sprite.height) / 2), cx = Math.round(this.bed.x / 2);
     if (seconds - this.pettedAt < 4) drawHearts(g, cx, top - 2, seconds - this.pettedAt, daylight);
     else drawPixelText(g, 'z', cx + 24, top - 4 - Math.floor(seconds * 2) % 6,
       lerpColor(0x8a90a8, 0xf4e9c8, daylight), 1);

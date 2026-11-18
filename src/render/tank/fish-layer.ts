@@ -45,8 +45,8 @@ export class FishLayer {
   private bettaExperiment?:import('../dev/betta-experiment').BettaExperiment;
   private readonly illustratedBettas=new Map<number,IllustratedBetta>();
   private devPanel?:import('../motion/betta-debug').BettaDebug;
-  constructor(private readonly createPreviewBetta?: BettaFactory) {
-    if (import.meta.env.DEV && !createPreviewBetta) {
+  constructor(private readonly createIllustratedBetta?: BettaFactory) {
+    if (import.meta.env.DEV && !createIllustratedBetta) {
       void import('../motion/betta-debug').then(({ BettaDebug }) => { this.devPanel = new BettaDebug(); });
       void import('../dev/betta-experiment').then(({ BettaExperiment }) => { this.bettaExperiment = new BettaExperiment(); });
     }
@@ -253,7 +253,12 @@ export class FishLayer {
     };
     const main = tint(hex(sp.color));
     const accent = tint(hex(sp.accent));
-    const len = Math.max(sp.category==='fish'?visual.minimumFishPixels:3, (animal.visualSizeCm??animal.sizeCm) * this.pxPerCm * scale);
+    const visualLength = animal.visualSizeCm ?? animal.sizeCm;
+    // The painted juvenile still grows, but retains a readable silhouette
+    // at room scale. Motion and collisions continue to use its real length.
+    const length = this.createIllustratedBetta && sp.id === 'betta'
+      ? Math.max(visualLength, animal.sizeCm * 0.87) : visualLength;
+    const len = Math.max(sp.category === 'fish' ? visual.minimumFishPixels : 3, length * this.pxPerCm * scale);
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;
     const halfLen = Math.min(len / 2, area.width / 2);
@@ -276,10 +281,10 @@ export class FishLayer {
     if(sp.id==='betta'){
       const parent = body.plane < 1.2 ? this.artBack : this.artFront;
       const motion = this.motion.bettas.get(animal.id);
-      const showIllustrated = !!this.createPreviewBetta || (import.meta.env.DEV && !!this.bettaExperiment?.illustrated);
+      const showIllustrated = !!this.createIllustratedBetta || (import.meta.env.DEV && !!this.bettaExperiment?.illustrated);
       let trial = showIllustrated ? this.illustratedBettas.get(animal.id) : undefined;
       if (showIllustrated && !trial) {
-        trial = this.createPreviewBetta?.(animal.id, body.facing) ?? this.bettaExperiment?.create(animal.id, body.facing);
+        trial = this.createIllustratedBetta?.(animal.id, body.facing) ?? this.bettaExperiment?.create(animal.id, body.facing);
         if (trial) this.illustratedBettas.set(animal.id, trial);
       }
       if (trial) {

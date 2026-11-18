@@ -10,6 +10,7 @@ export function versionedArt():Plugin {
   load(id){
    if(id!=='\0versioned-art')return;
    const root=resolve('public/assets'),manifest=JSON.parse(readFileSync(resolve(root,'manifest.json'),'utf8'));
+   Object.assign(manifest.assets, JSON.parse(readFileSync(resolve('src/data/illustrated-assets.json'), 'utf8')));
    for(const entry of Object.values(manifest.assets) as {file:string;file2x?:string}[]){
     // Also version the 2x cursor images.
     for(const key of ['file','file2x'] as const){

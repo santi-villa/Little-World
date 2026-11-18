@@ -53,14 +53,14 @@ export interface AssetEntry {
 let entries: Record<string, AssetEntry> = {};
 const textures = new Map<string, Texture>();
 
-export async function loadAssets(): Promise<void> {
+export async function loadAssets(illustrated = false): Promise<void> {
   const base = import.meta.env.BASE_URL;
   entries = bundledEntries;
   await Promise.all(
-    Object.entries(entries).map(async ([name, entry]) => {
+    Object.entries(entries).filter(([, entry]) => illustrated || entry.kind !== 'illustrated').map(async ([name, entry]) => {
       const texture = await Assets.load<Texture>(base + entry.file);
       if(texture.width!==entry.width || texture.height!==entry.height)throw new Error('La imagen no coincide con esta versión: '+name);
-      texture.source.scaleMode = 'nearest';
+      texture.source.scaleMode = entry.kind === 'illustrated' ? 'linear' : 'nearest';
       textures.set(name, texture);
     }),
   );

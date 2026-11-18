@@ -64,6 +64,70 @@
           "action": "toggle-window"
         }
       ]
+    },
+    "illustrated-bedroom": {
+      "background": "illustrated-bedroom",
+      "camera": {
+        "x": 640,
+        "y": 360,
+        "zoom": 1
+      },
+      "zones": [
+        {
+          "id": "tank",
+          "rect": "tank",
+          "action": "tank-view",
+          "fill": 0.86
+        },
+        {
+          "id": "cat",
+          "rect": "cat",
+          "action": "pet-cat",
+          "zoom": 2.2
+        },
+        {
+          "id": "lamp",
+          "rect": [
+            30,
+            428,
+            74,
+            82
+          ],
+          "action": "toggle-lamp"
+        },
+        {
+          "id": "notebook",
+          "rect": [
+            86,
+            346,
+            42,
+            36
+          ],
+          "action": "panel",
+          "panel": "notebook"
+        },
+        {
+          "id": "library",
+          "rect": [
+            0,
+            135,
+            154,
+            481
+          ],
+          "action": "panel",
+          "panel": "library"
+        },
+        {
+          "id": "window",
+          "rect": [
+            164,
+            0,
+            410,
+            250
+          ],
+          "action": "toggle-window"
+        }
+      ]
     }
   }
 }

@@ -3,6 +3,9 @@ import { cannotUse, pinchGrams, strokeSamples, type HandTool } from '../hand-too
 import { confirmPaper, type CursorState } from '../ui/paper-ui';
 import { fill } from '../ui/texts';
 import { ambientTint } from '../art-direction';
+import { illustratedDecor } from '../tank/illustrated-layout';
+import { IllustratedRoomDecor, illustratedRoom } from './illustrated-room-decor';
+import type { RoomData } from './room-zones';
 import decorData from '../../data/tank-decor.json';
 import type { OutsideView } from '../../world/weather';
 /**
@@ -78,25 +81,29 @@ export class RoomScene {
   readonly container = new Container();
   private readonly world = new Container();
   private readonly camera = new Camera(this.world);
-  private readonly data = roomData(ROOM_ID);
+  private readonly data: RoomData;
   private readonly skyBase = new Graphics();
   private readonly sky = new Graphics();
   private readonly outsideMask = new Graphics();
   private readonly bird = new CodeBird();
   /** Plantas que se hamacan: rotación muy leve con el pivote arriba. */
   private readonly swaying: { sprite: Sprite; phase: number; amount: number }[] = [];
-  private readonly room = new Sprite(tex(this.data.background));
+  private readonly room: Sprite;
+  private readonly paintedDecor?: IllustratedRoomDecor;
+  private skyKey = '';
+  private nextSkyAt = 0;
+  private lastBolt = 0;
   private readonly anim = new Graphics();
   private readonly lights = new Graphics();
   private readonly flash = new Graphics();
   private readonly glow = new Graphics();
   private readonly handOverlay=new Graphics();
-  private readonly tank = new TankView();
+  private readonly tank: TankView;
   private hybrid?:import('../dev/hybrid-tank-dev').HybridTankDev;
   private readonly focusShade=new Graphics();
   private get tankBounds(){return this.hybrid?.bounds??this.tank.bounds;}
   private tankPoint(p:Point):Point{return this.hybrid?.toTankPoint(p)??p;}
-  private readonly cat = new CatView();
+  private readonly cat: CatView;
   private readonly ui = new SceneUi();
   /** Los vidrios de la ventana, en píxeles gordos. */
   private readonly window: { x: number; y: number; width: number; height: number };
@@ -131,16 +138,29 @@ export class RoomScene {
   private seconds = 0;
 
   /** @param act Hace una acción de la simulación (acariciar al gato, abrir la ventana, cuidados). */
-  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | 'status' | CareId, animalId?: number) => void) {
+  constructor(private readonly act: (action: SimAction) => void, private readonly tools: (page: 'fish' | 'diary' | 'guide' | 'weather' | 'decor' | 'status' | CareId, animalId?: number) => void,
+    private readonly illustrated = false,
+    betta?: ConstructorParameters<typeof TankView>[1],
+  ) {
+    this.data = roomData(illustrated ? 'illustrated-bedroom' : ROOM_ID);
+    this.room = new Sprite(tex(this.data.background));
+    this.tank = new TankView(illustrated, betta);
+    this.cat = new CatView(illustrated ? illustratedRoom.cat : undefined, illustrated);
+    if (illustrated) {
+      this.room.width = GAME_WIDTH;
+      this.room.height = GAME_HEIGHT;
+      this.paintedDecor = new IllustratedRoomDecor();
+    }
     const hole = asset(this.data.background)?.hole ?? { x: 413, y: 85, width: 496, height: 300 };
-    this.window = {
+    this.window = illustrated ? illustratedRoom.window : {
       x: Math.floor(hole.x / PX),
       y: Math.floor(hole.y / PX),
       width: Math.ceil(hole.width / PX) + 1,
       height: Math.ceil(hole.height / PX) + 1,
     };
-    this.skyBase.scale.set(PX);
-    this.sky.scale.set(PX);
+    const skyScale = illustrated ? 1 : PX;
+    this.skyBase.scale.set(skyScale);
+    this.sky.scale.set(skyScale);
 
     const decor = new Container();
     const hang = (name: string, x: number, y: number, scale: number, phase: number, amount: number, flip = false): void => {
@@ -152,7 +172,7 @@ export class RoomScene {
       decor.addChild(sprite);
       this.swaying.push({ sprite, phase, amount });
     };
-    for (const p of HANGING) hang(p.asset, p.x, p.y, p.scale, p.phase, 1);
+    if (!illustrated) for (const p of HANGING) hang(p.asset, p.x, p.y, p.scale, p.phase, 1);
     this.anim.scale.set(PX);
     this.lights.blendMode = 'add';
     this.flash.blendMode = 'add';
@@ -162,12 +182,12 @@ export class RoomScene {
     // un shader hacía rayas. Ver PENDIENTE.md: hacerlas con sprites separados.
 
     const outside=new Container();
-    this.outsideMask.rect(this.window.x*PX,this.window.y*PX,this.window.width*PX,this.window.height*PX).fill(0xffffff);
+    this.outsideMask.rect(this.window.x*skyScale,this.window.y*skyScale,this.window.width*skyScale,this.window.height*skyScale).fill(0xffffff);
     outside.addChild(this.skyBase,this.sky,this.bird.container,this.outsideMask);outside.mask=this.outsideMask;
     this.world.addChild(
       outside,
       this.room,
-      decor,
+      this.paintedDecor?.container ?? decor,
       this.anim,
       this.focusShade,
       this.tank.container,
@@ -180,7 +200,7 @@ export class RoomScene {
     this.container.addChild(this.world);
     this.roomView = { ...this.data.camera };
     this.camera.goTo(this.roomView, true);
-    if(import.meta.env.DEV)void import('../dev/hybrid-tank-dev').then(({HybridTankDev})=>{
+    if(import.meta.env.DEV && !illustrated)void import('../dev/hybrid-tank-dev').then(({HybridTankDev})=>{
       const index=this.world.getChildIndex(this.tank.container);this.hybrid=new HybridTankDev(this.tank);this.world.addChildAt(this.hybrid.container,index);this.hybrid.setFocus(this.mode==='tank');
     });
   }
@@ -193,7 +213,8 @@ export class RoomScene {
     const decorId = view.decorId ?? 'default';
     if (decorId !== this.decorId) {
       this.decorId = decorId;
-      this.tank.setDecor(decorId === 'garden' ? decorData.garden : decorId === 'stones' ? decorData.stones : decorData.default);
+      this.tank.setDecor(this.illustrated ? illustratedDecor[decorId] ?? illustratedDecor.default! :
+        decorId === 'garden' ? decorData.garden : decorId === 'stones' ? decorData.stones : decorData.default);
     }
 
     const hand=this.hand;
@@ -205,7 +226,7 @@ export class RoomScene {
     this.focusShade.clear();const dim=this.hybrid?.roomDim??0;if(dim>0)this.focusShade.rect(0,0,GAME_WIDTH,GAME_HEIGHT).fill({color:0x061c24,alpha:dim});
     const uiMode=this.mode==='tank'&&this.hybrid?.active&&!this.hybrid.ready?'room':this.mode;
     if(document.body.dataset.view!==uiMode)document.body.dataset.view=uiMode;
-    if(this.followingId!==null&&!this.hybrid?.moving){const p=this.tank.fishPoint(this.followingId),animal=state.animals.find(a=>a.id===this.followingId);if(!p||!animal?.alive)this.showTank();else this.focusOn({x:p.x,y:p.y,zoom:this.camera.target.zoom},false);}
+    if(this.followingId!==null&&!this.hybrid?.moving&&!this.camera.transitioning){const p=this.tank.fishPoint(this.followingId),animal=state.animals.find(a=>a.id===this.followingId);if(!p||!animal?.alive)this.showTank();else this.focusOn({x:p.x,y:p.y,zoom:this.camera.target.zoom},false);}
 
     this.handOverlay.clear();
     if(this.mode==='tank' && hand && seconds-hand.at<2){
@@ -365,7 +386,7 @@ export class RoomScene {
       return;
     }
 
-    if(this.mode==='room'){const id=this.tank.fishAt(w.x,w.y);if(id!==null){this.showFish(id);this.fishDetails();return;}}
+    if(this.mode==='room' && !this.illustrated){const id=this.tank.fishAt(w.x,w.y);if(id!==null){this.showFish(id);this.fishDetails();return;}}
 
     const live = { tank: this.tankBounds, cat: this.cat.rect };
     const zone = this.data.zones.find((z) => inRect(zoneRect(z, live), worldPoint.x, worldPoint.y));
@@ -388,7 +409,7 @@ export class RoomScene {
         if (zone.panel) this.tools(zone.panel === 'notebook' ? 'diary' : 'guide');
         break;
       case 'toggle-window': {
-        this.enterFocus('window', { x: 660, y: 250, zoom: 1.5 });
+        this.enterFocus('window', this.illustrated ? illustratedRoom.windowFocus : { x: 660, y: 250, zoom: 1.5 });
         this.tools('weather');
         break;
       }
@@ -491,7 +512,9 @@ export class RoomScene {
     this.hybrid?.setFocus(mode==='tank');
     this.mode = mode;
     this.focusSince = this.seconds;
-    if(projected)this.camera.goTo(view,false,this.hybrid!.duration);else this.focusOn(view, true);
+    if (projected) this.camera.goTo(view, false, this.hybrid!.duration);
+    else if (this.illustrated) this.camera.goTo(view, false, illustratedRoom.transition);
+    else this.focusOn(view, true);
   }
 
   private focusOn(view: CameraView, snap: boolean): void {
@@ -507,7 +530,7 @@ export class RoomScene {
     this.followingId=null;
     if (this.mode === 'room') return;
     this.mode = 'room';this.handTool='hand';this.pointerLeave();
-    const duration=this.hybrid?.active?this.hybrid.duration:undefined;this.hybrid?.setFocus(false);
+    const duration=this.hybrid?.active?this.hybrid.duration:this.illustrated?illustratedRoom.transition:undefined;this.hybrid?.setFocus(false);
     this.camera.goTo(this.roomView,false,duration);
   }
 
@@ -522,14 +545,15 @@ export class RoomScene {
    * alféizar, se queda unos segundos (a veces se da vuelta) y se va volando.
    */
   private updateBird(seconds: number, allowed: boolean, light: number): void {
-    this.bird.update(seconds,allowed,light,BIRD_PERCH.x,BIRD_PERCH.y-8);
+    const perch = this.illustrated ? illustratedRoom.bird : BIRD_PERCH;
+    this.bird.update(seconds, allowed, light, perch.x, perch.y - 8);
   }
 
   /** Brillo sutil sobre la zona recién tocada. */
   private drawGlow(seconds: number): void {
     const g = this.glow;
     g.clear();
-    if (!this.glowZone) return;
+    if (!this.glowZone || (this.illustrated && this.glowZone.zone.id === 'tank')) return;
     const age = seconds - this.glowZone.since;
     if (age > GLOW_SECONDS) {
       this.glowZone = null;
@@ -557,12 +581,17 @@ export class RoomScene {
     const lampOn = this.lamp ?? light < 0.5;
     this.lampOn = lampOn;
 
-    // Ventana.
-    this.skyBase.clear();
-    drawSky(this.skyBase, this.window, day, view.weather, seconds, 'base', view.outside);
-    // De noche aparece la imagen del cielo estrellado, de a poco según la hora.
-    this.sky.clear();
-    const bolt = drawSky(this.sky, this.window, day, view.weather, seconds, 'front', view.outside);
+    const skyKey = [Math.round(day * 256), view.weather, Math.round(view.outside?.cloudCover ?? 0),
+      Math.round((view.outside?.twilight ?? 0) * 255)].join();
+    if (this.skyKey !== skyKey) {
+      this.skyKey = skyKey;
+      drawSky(this.skyBase.clear(), this.window, day, view.weather, seconds, 'base', view.outside);
+    }
+    if (seconds >= this.nextSkyAt || seconds < this.nextSkyAt - 1 || view.weather === 'storm') {
+      this.nextSkyAt = seconds + 1 / 30;
+      this.lastBolt = drawSky(this.sky.clear(), this.window, day, view.weather, seconds, 'front', view.outside);
+    }
+    const bolt = this.lastBolt;
     this.updateBird(seconds, view.weather === 'clear' && day > 0.6, light);
 
     // Día y noche: las imágenes se tiñen.
@@ -576,14 +605,13 @@ export class RoomScene {
       item.sprite.rotation = (Math.min(2, breeze * item.amount) * swing * Math.PI) / 180;
     }
 
-    // Vapor de la taza.
-    this.anim.clear();
-    drawRoomAnim(this.anim, seconds);
+    this.paintedDecor?.update(tank, seconds, tint, light, derived.lightOn, lampOn, breeze);
+    if (!this.illustrated) drawRoomAnim(this.anim.clear(), seconds);
 
     // Luces.
     const sun = view.weather === 'clear' && day > 0.5 ? day : 0;
     const lightsKey = `${Math.round(night * 40)},${lampOn},${tank.x},${tank.y},${tank.width},${derived.lightOn},${Math.round(sun * 20)}`;
-    if (lightsKey !== this.lightsKey) {
+    if (!this.illustrated && lightsKey !== this.lightsKey) {
       this.lightsKey = lightsKey;
       this.lights.clear();
       drawLights(this.lights, tank, lampOn, night, derived.lightOn, sun);

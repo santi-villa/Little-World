@@ -69,7 +69,7 @@ async function loadGame(): Promise<LoadedGame> {
   }
 }
 
-async function boot(): Promise<void> {
+async function boot(illustrated: boolean): Promise<void> {
   const stage = document.getElementById('stage');
   if (!stage) throw new Error('Falta #stage');
   document.title = texts.title;
@@ -96,6 +96,7 @@ async function boot(): Promise<void> {
   // Cambiar la resolución del canvas según la pantalla corría y achicaba la
   // escena en algunos celulares, así que no se hace.
   attachViewport(app.canvas, stage);
+  if (illustrated) app.canvas.style.imageRendering = 'auto';
 
   const { game, savingWorks, note, lastTimestamp } = await loadGame();
   const welcome = new WelcomePanel(document.body);
@@ -183,7 +184,10 @@ async function boot(): Promise<void> {
     return `${prefix} · ${fill(texts.save.ago, { seconds })}`;
   };
 
-  await loadAssets();
+  const [bettaRenderer] = await Promise.all([
+    illustrated ? import('./render/scene/illustrated-fish').then(({ loadBettaRenderer }) => loadBettaRenderer()) : undefined,
+    loadAssets(illustrated),
+  ]);
   // UI de papel y madera: arte en variables CSS, cursores y nombres al tocar largo.
   initUiArt();
   enableTips();
@@ -198,7 +202,7 @@ async function boot(): Promise<void> {
     if(page==='fish' && animalId!==undefined){tools.openAnimal(animalId);return;}
     if (page === 'fish' || page === 'diary' || page === 'guide' || page === 'weather' || page === 'decor' || page === 'status') tools.open(page);
     else tools.care(page);
-  });
+  }, illustrated, bettaRenderer);
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
   tools.onObserveAnimal=id=>scene.showFish(id);
   tools.onMirror=id=>scene.showMirror(id);
@@ -365,7 +369,7 @@ const entry = query.has('room-preview')
   ? import('./render/dev/room-preview').then(({ openRoomPreview }) => openRoomPreview())
   : import.meta.env.DEV && query.has('betta-lab')
     ? import('./render/dev/betta-comparison').then(({ openBettaComparison }) => openBettaComparison({ standalone: true }))
-    : boot();
+    : boot(!query.has('classic-room'));
 entry.catch((error) => {
   console.error(error);
   const message = document.createElement('pre');
