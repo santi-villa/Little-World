@@ -54,10 +54,10 @@ import { asset, tex } from '../assets';
 import { lerpColor, scatter } from '../pixel-utils';
 import { FishLayer } from './fish-layer';
 import { drawIllustratedEquipment } from './illustrated-equipment';
-import { FRONT_GLASS, illustratedFrame } from './illustrated-layout';
+import { FRONT_GLASS, canopyMotion, illustratedFrame, type CanopyMotion } from './illustrated-layout';
 import { fillWater, IllustratedOptics, softPool } from './illustrated-optics';
 import { AquariumBed, bedSurface, planeDepth } from './aquarium-bed';
-import { LidMotion, lidProjection } from '../motion/lid-motion';
+import { IllustratedLid } from './illustrated-lid';
 import { filterMount } from './illustrated-equipment';
 import { GLASS_ART, tankFrame, type TankRect } from './tank-layout';
 
@@ -128,6 +128,7 @@ interface Plant {
   baseY: number;
   worldHeight: number;
   worldWidth: number;
+  canopy?: CanopyMotion;
   depth: number;
 }
 
@@ -143,9 +144,7 @@ export class TankView {
   private readonly bed?: AquariumBed;
   private readonly backObjects = new Container();
   private readonly frontObjects = new Container();
-  private readonly lidMotion = new LidMotion();
-  private readonly hinge = new Graphics();
-  private hingeBuilt = false;
+  private readonly paintedLid?: IllustratedLid;
   private decorVersion = 0;
   private readonly softShadow = softPool('#334437');
   private frameCut = 1;
@@ -197,14 +196,14 @@ export class TankView {
 
   constructor(private readonly illustrated = false, betta?: ConstructorParameters<typeof FishLayer>[0]) {
     this.fish = new FishLayer(betta);
-    if (illustrated) { this.optics = new IllustratedOptics(); this.bed = new AquariumBed(); }
+    if (illustrated) { this.optics = new IllustratedOptics(); this.bed = new AquariumBed(); this.paintedLid = new IllustratedLid(); }
     try{if(localStorage.getItem("lw-tank-glass")==="round")tankAppearance.shape="round";}catch{/* Storage can be unavailable. */}
     if (illustrated) {
       const bed = this.bed!;
       this.inside.addChild(this.substrate, bed.backMask, bed.terrain, ...Object.values(bed.above), this.contactShadows,
-        this.backObjects, this.rearPlants, this.fish.graphics, this.fish.artBack,
-        this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront,
-        this.foregroundSand, bed.frontMask, bed.details, this.frontShadows, this.frontObjects, this.frontPlants,
+        this.backObjects, this.rearPlants, bed.rootSeams.back, this.fish.graphics, this.fish.artBack,
+        this.hardscape, this.plantLayer, bed.rootSeams.middle, this.fish.foreground, this.fish.artFront,
+        this.foregroundSand, bed.frontMask, bed.details, this.frontShadows, this.frontObjects, this.frontPlants, bed.rootSeams.front,
         this.mid, this.fish.foodGraphics, this.optics!.light, this.fx, this.optics!.reflections);
     } else {
       this.inside.addChild(this.substrate, this.contactShadows, this.rearPlants, this.fish.graphics, this.fish.artBack, this.hardscape, this.plantLayer, this.fish.foreground, this.fish.artFront, this.frontPlants, this.foregroundSand, this.mid, this.fish.foodGraphics, this.fx);
@@ -212,7 +211,8 @@ export class TankView {
     this.inside.mask = this.waterMask;
     this.equip.mask = this.waterMask;
     this.wet.addChild(this.water,this.glassBack,this.equip,this.inside,this.waterMask,this.roundMask);
-    this.art.addChild(this.wet, this.glass, this.glassMask, this.hinge, this.lidSprite, this.ledOff);
+    this.art.addChild(this.wet, this.glass, this.glassMask, this.lidSprite, this.ledOff);
+    if (this.paintedLid) this.art.addChild(this.paintedLid.container);
     this.container.addChild(this.art);
   }
 
@@ -374,50 +374,24 @@ export class TankView {
       this.lidTextureKey = key;
       this.glassMask.clear();
       this.glass.mask = separate ? this.glassMask : null;
-      this.lidSprite.visible = separate;
+      this.lidSprite.visible = separate && !painted;
       if (separate) {
-        if (this.lidSprite.texture !== Texture.EMPTY) this.lidSprite.texture.destroy(false);
-        this.lidSprite.texture = new Texture({ source: texture.source, frame: new Rectangle(0, 0, texture.width, sourceCut) });
-        this.lidSprite.width = this.glass.width;
-        this.lidSprite.height = cut;
-        this.glassMask.rect(0, cut, this.glass.width, this.glass.height - cut).fill(0xffffff);
-      }
-    }
-    if (painted) {
-      const progress = this.lidMotion.update(!closed, dt);
-      const projected = lidProjection(progress, cut);
-      // The rear edge stays at the top of the tank. The front edge rises
-      // through horizontal, revealing the darker underside of the lid.
-      this.lidSprite.position.set(0, 0);
-      this.lidSprite.rotation = 0;
-      this.lidSprite.scale.y = (Math.abs(projected) < 0.12 ? 0.12 : projected) / sourceCut;
-      this.lidSprite.tint = lerpColor(0xffffff, 0xbaaf9e, progress);
-      if (!this.hinge.visible && progress > 0) this.hinge.visible = true;
-      if (progress > 0 && !this.hingeBuilt) {
-        this.hingeBuilt = true;
-        const width = this.glass.width;
-        // The brackets bridge the rear hinge and the front edge of the open
-        // tank. Their fixed mounts remain visible throughout the rotation.
-        this.hinge.poly([15, 2, width - 15, 2, width - 5, cut + 0.3, 5, cut + 0.3])
-          .fill({ color: 0x9bb7ab, alpha: 0.16 });
-        this.hinge.poly([13, 2, 17, 2, 10, cut + 3, 4, cut + 3]).fill(0x5d5b4d);
-        this.hinge.poly([width - 17, 2, width - 13, 2, width - 4, cut + 3, width - 10, cut + 3]).fill(0x5d5b4d);
-        this.hinge.moveTo(8, cut).lineTo(width - 8, cut).stroke({ color: 0xbdd3c5, width: 1.4, alpha: 0.68 });
-        this.hinge.roundRect(13, 0, width - 26, 3.6, 1.4).fill(0x4a4238);
-        for (const u of [0.15, 0.85]) {
-          this.hinge.roundRect(this.glass.width * u - 8, -1.5, 16, 5.2, 1.5).fill(0x5e5445)
-            .stroke({ color: 0xb7a88e, width: 0.6, alpha: 0.68 });
+        // The painted frame keeps its real front rail while the top rotates.
+        const rail = painted ? cut - 3.8 : cut;
+        this.glassMask.rect(0, rail, this.glass.width, this.glass.height - rail).fill(0xffffff);
+        if (!painted) {
+          if (this.lidSprite.texture !== Texture.EMPTY) this.lidSprite.texture.destroy(false);
+          this.lidSprite.texture = new Texture({ source: texture.source, frame: new Rectangle(0, 0, texture.width, sourceCut) });
+          this.lidSprite.width = this.glass.width;
+          this.lidSprite.height = cut;
+          this.lidSprite.position.set(0, -26);
+          this.lidSprite.rotation = -0.035;
         }
       }
-      this.hinge.visible = progress > 0;
-    } else {
-      this.hinge.visible = false;
-      if (separate) {
-        this.lidSprite.height = cut;
-        this.lidSprite.tint = 0xffffff;
-        this.lidSprite.position.set(0, -26);
-        this.lidSprite.rotation = -0.035;
-      }
+    }
+    if (this.paintedLid) {
+      this.paintedLid.container.visible = painted;
+      if (painted) this.paintedLid.update(!closed, dt, this.glass.width, cut - 3.8);
     }
   }
 
@@ -592,14 +566,23 @@ export class TankView {
       const depth = planeDepth[layer];
       const u = (cx - geo.left) / geo.width;
       const ground = this.bed ? bedSurface(geo, u, layer) : geo.sandTop;
-      const bury = this.bed && item.plant ? Math.max(0.15, item.sink ?? 0) : item.sink ?? 0;
+      const canopy = this.bed && item.plant ? canopyMotion(name, index) : undefined;
+      const bury = canopy?.burial ?? item.sink ?? 0;
       const baseY = Math.min(geo.bottom - 1, Math.round(ground + bury * h));
       const swimY = geo.waterTop + 2;
       const heightInWater = this.waterArea.height;
       const shadowW = Math.min(w * 0.7,geo.width*0.32);
       if (this.illustrated) {
-        (layer === 'front' ? this.frontShadows : this.contactShadows).ellipse(cx + w * 0.06, ground, shadowW * 0.75, Math.max(3, h * 0.085))
-          .fill({ fill: this.softShadow, alpha: item.plant ? 0.29 : 0.46 });
+        const shadow = layer === 'front' ? this.frontShadows : this.contactShadows;
+        if (canopy) {
+          shadow.ellipse(cx + w * 0.075, ground + 1.2, w * 0.28, 3.25)
+            .fill({ fill: this.softShadow, alpha: 0.37 });
+        } else {
+          shadow.ellipse(cx + w * 0.13, ground + 2, shadowW * 0.76, Math.max(3, h * 0.085))
+            .fill({ fill: this.softShadow, alpha: 0.43 });
+          shadow.ellipse(cx, ground + 1, w * 0.32, Math.max(1.3, h * 0.043))
+            .fill({ fill: this.softShadow, alpha: 0.58 });
+        }
       } else {
         for (let row = 0; row < 3; row++) this.contactShadows.rect(Math.round(cx - shadowW / 2 + row * 2), geo.sandTop + row, Math.max(1, Math.round(shadowW - row * 4)), 1);
         this.contactShadows.fill({ color: ART.shadow, alpha: item.plant ? 0.1 : 0.22 });
@@ -618,12 +601,13 @@ export class TankView {
           const rootLine = this.bed.above[layer];
           mesh.mask = rootLine;
           rootLine.visible = true;
+          this.bed.seatRoots(geo, layer, u, w, index);
         }
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
         (item.layer === 'back' ? this.rearPlants : item.layer === 'front' ? this.frontPlants : this.plantLayer).addChild(mesh);
         const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
         this.plants.push({ motion: new PlantMotion(9, index * 1.7, item.plant), mesh,
-          rest: positions.slice(), phase: index * 1.7, cx, baseY, worldHeight: h, worldWidth: w, depth });
+          rest: positions.slice(), phase: index * 1.7, cx, baseY, worldHeight: h, worldWidth: w, canopy, depth });
       } else {
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5, 1);
@@ -659,6 +643,7 @@ export class TankView {
       const positions = buffer.data as Float32Array;
       const height = plant.mesh.texture.height;
       const width = plant.mesh.texture.width;
+      const profile = plant.canopy;
       const nearby = visitors.flatMap(f => {
         const height = (plant.baseY - f.y) / plant.worldHeight;
         const distance = Math.abs(f.x - plant.cx) / Math.max(14, plant.worldWidth * 0.77);
@@ -667,7 +652,7 @@ export class TankView {
         const contact = `${index}:${f.id}`;
         recent.add(contact);
         const flip = Math.sign(plant.mesh.scale.x);
-        const speed = f.vx * flip * (1 - depth / 0.4);
+        const speed = f.vx * flip * (1 - depth / 0.4) * (profile?.wake ?? 1);
         if (!this.plantEncounters.has(contact)) {
           plant.motion.receiveImpulse(height, speed * bettaConfig.plantImpulse * (1 - distance * 0.55));
         }
@@ -677,14 +662,19 @@ export class TankView {
         (plant.baseY - plant.worldHeight * 0.58 - this.waterArea.y) / pxPerCm).x;
       plant.motion.update(dt, seconds, flow, nearby, current * Math.sign(plant.mesh.scale.x));
       for (let i = 0; i < positions.length; i += 2) {
-        const free = Math.max(0, 1 - plant.rest[i + 1]! / height);
-        const sample = free ** 1.6 * 8;
+        const heightFromBase = 1 - plant.rest[i + 1]! / height;
+        // The whole exposed crown eases into the motion. The area below,
+        // including the small visible part of the roots, stays pinned.
+        const pinned = profile ? profile.burial + 0.045 : 0;
+        const free = Math.max(0, (heightFromBase - pinned) / (1 - pinned));
+        const sample = free ** 1.52 * 8;
         const row = Math.min(7, Math.floor(sample));
         const blend = sample - row;
         const offset = plant.motion.offsets[row]! * (1 - blend) + plant.motion.offsets[row + 1]! * blend;
-        const blade = this.illustrated
-          ? Math.sin(seconds * 0.74 + plant.phase + plant.rest[i]! / width * 2.5 + free * 2.8) * free ** 2 * height * 0.009 : 0;
-        positions[i] = plant.rest[i]! + offset * height * (this.illustrated ? 0.55 : 1) + blade;
+        const blade = profile
+          ? Math.sin(seconds * profile.frequency * profile.direction + plant.phase + plant.rest[i]! / width * 2.5 + free * 2.8)
+            * free ** 2 * height * profile.amplitude * 0.018 * Math.sign(plant.mesh.scale.x) : 0;
+        positions[i] = plant.rest[i]! + offset * height * (profile?.amplitude ?? 1) + blade;
       }
       buffer.update();
     }

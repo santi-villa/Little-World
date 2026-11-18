@@ -93,6 +93,7 @@ export class RoomScene {
   private skyKey = '';
   private nextSkyAt = 0;
   private lastBolt = 0;
+  private tankFit?: { fill: number; key: string };
   private cloudDistance = 0;
   private ambient?: number;
   private readonly anim = new Graphics();
@@ -120,7 +121,7 @@ export class RoomScene {
   get grainContacts(){return this.tank.fish.grainContacts;}
   get foodPositions(){return this.tank.fish.foodPositions;}
   get feedingContacts(){return this.tank.fish.feedingContacts;}
-  zoomAt(p:Point,factor:number):void{this.followingId=null;this.gesture=null;this.camera.zoomAt(p.x,p.y,factor);}
+  zoomAt(p:Point,factor:number):void{this.tankFit=undefined;this.followingId=null;this.gesture=null;this.camera.zoomAt(p.x,p.y,factor);}
   showFish(id:number):void {const p=this.tank.fishPoint(id);if(!p)return;this.followingId=id;this.handTool='hand';this.enterFocus('tank',{x:p.x,y:p.y,zoom:Math.max(3,Math.min(12,120/Math.max(1,p.length)))});}
   showMirror(id:number):void{this.showTank();this.tank.showMirror(id);}
   fishDetails():void {if(this.followingId!==null)this.tools('fish',this.followingId);}
@@ -252,6 +253,13 @@ export class RoomScene {
     );
     // De cerca, la cámara acompaña al gato si camina.
     if (this.mode === 'cat' && !this.gesture?.dragging) this.focusOn(this.catFocus(), false);
+    if (this.mode === 'tank' && this.tankFit && this.followingId === null) {
+      const key = this.tankFitKey();
+      if (key !== this.tankFit.key) {
+        this.tankFit.key = key;
+        this.camera.goTo(this.tankFocus(this.tankFit.fill), false, 0.42, false);
+      }
+    }
     this.camera.update(dt);
     this.drawGlow(seconds);
     this.ui.update(this.mode, state, seconds, seconds - this.focusSince);
@@ -405,7 +413,7 @@ export class RoomScene {
   private runZone(zone: RoomZone): void {
     switch (zone.action) {
       case 'tank-view':
-        this.enterFocus('tank', this.tankFocus(zone.fill ?? 0.85));
+        this.frameTank(zone.fill ?? 0.85);
         break;
       case 'pet-cat':
         this.zoomCat = zone.zoom ?? 2.2;
@@ -496,7 +504,18 @@ export class RoomScene {
   toggleLid():void {if(this.state){this.act({type:'setLid',hasLid:!this.state.tank.hasLid});}}
   showRoom(): void { this.exitFocus(); }
 
-  showTank(): void { this.followingId=null;this.enterFocus('tank', this.tankFocus(0.85)); }
+  showTank(): void { this.frameTank(0.85); }
+
+  private frameTank(fill: number): void {
+    this.followingId = null;
+    this.enterFocus('tank', this.tankFocus(fill));
+    if (this.illustrated) this.tankFit = { fill, key: this.tankFitKey() };
+  }
+
+  private tankFitKey(): string {
+    const { width, height } = this.tank.bounds;
+    return `${uiInsets.top}/${uiInsets.bottom}/${width}/${height}`;
+  }
 
   /** La pecera de cerca: ocupa `fill` de la pantalla, arriba de la barra de acciones. */
   private tankFocus(fill: number): CameraView {
@@ -515,6 +534,7 @@ export class RoomScene {
   }
 
   private enterFocus(mode: UiMode, view: CameraView): void {
+    this.tankFit = undefined;
     if (this.mode === 'room') this.roomView = { ...this.camera.target };
     const projected=this.hybrid?.active&&(mode==='tank'||this.mode==='tank');
     this.hybrid?.setFocus(mode==='tank');
@@ -535,6 +555,7 @@ export class RoomScene {
   }
 
   private exitFocus(): void {
+    this.tankFit = undefined;
     this.followingId=null;
     if (this.mode === 'room') return;
     this.mode = 'room';this.handTool='hand';this.pointerLeave();

@@ -551,3 +551,14 @@ body.debug-open[data-view='tank'] .aquarium-nav {
   body[data-view='tank'] .hud-paper { display: none; }
   .tool-tray { flex-wrap: wrap; }
 }
+
+.tool-tray .tray-food-type {
+  bottom: calc(100% + 4px);
+  padding-block: 2px;
+  font-size: clamp(12px, 2.1vw, 16px);
+  border-radius: 3px;
+}
+@media (max-height: 390px) {
+  .tool-tray .tray-tool { min-height: 38px; }
+  .tool-tray .wood-btn { min-height: 36px; }
+}

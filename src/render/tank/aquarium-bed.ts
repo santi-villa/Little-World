@@ -1,6 +1,6 @@
 import { FillGradient, Graphics } from 'pixi.js';
 import { scatter } from '../pixel-utils';
-import type { OpticalArea } from './illustrated-optics';
+import { softPool, type OpticalArea } from './illustrated-optics';
 
 export type DecorPlane = 'back' | 'middle' | 'front';
 
@@ -32,6 +32,8 @@ export class AquariumBed {
   readonly terrain = new Graphics();
   readonly above = { back: new Graphics(), middle: new Graphics(), front: new Graphics() };
   readonly details = new Graphics();
+  readonly rootSeams = { back: new Graphics(), middle: new Graphics(), front: new Graphics() };
+  private readonly rootShade = softPool('#584732');
   private readonly shelves = new Graphics();
   private readonly grains = new Graphics();
   private readonly stones = new Graphics();
@@ -57,6 +59,7 @@ export class AquariumBed {
       const mask = this.above[plane];
       contour(mask, area, plane, true).fill(0xffffff);
       mask.visible = false;
+      this.rootSeams[plane].clear();
     }
     contour(this.backMask, area, 'back').fill(0xffffff);
     contour(this.frontMask, area, 'front').fill(0xffffff);
@@ -91,8 +94,27 @@ export class AquariumBed {
     }
   }
 
+  /** Small occlusion and grains spill onto the buried edge of each stem. */
+  seatRoots(area: OpticalArea, plane: DecorPlane, u: number, width: number, seed: number) {
+    const g = this.rootSeams[plane];
+    const spread = Math.max(3, width * 0.19);
+    const y = bedSurface(area, u, plane);
+    const x = area.left + u * area.width;
+    g.ellipse(x + spread * 0.16, y + 0.8, spread, Math.min(2.2, spread * 0.22))
+      .fill({ fill: this.rootShade, alpha: 0.53 });
+    for (let i = 0; i < 13; i++) {
+      const dx = (scatter(i, 819 + seed) - 0.5) * spread * 1.95;
+      const edge = bedSurface(area, u + dx / area.width, plane);
+      const lift = scatter(i, 845 + seed);
+      const size = 0.24 + scatter(i, 877 + seed) * 0.39;
+      g.ellipse(x + dx, edge + 0.16 + lift * 2.1, size, size * 0.54)
+        .fill({ color: i % 3 === 0 ? 0x907a55 : 0xe3cd9e, alpha: 0.28 + (1 - lift) * 0.17 });
+    }
+  }
+
   tint(color: number) {
     this.terrain.tint = color;
     this.details.tint = color;
+    for (const contact of Object.values(this.rootSeams)) contact.tint = color;
   }
 }

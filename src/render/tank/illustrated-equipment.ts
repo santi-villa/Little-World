@@ -11,9 +11,14 @@ export function drawIllustratedEquipment(g: Graphics, area: OpticalArea, state: 
 
   const edge = lit ? 0xb7c5b8 : 0x748e94;
   const shade = lit ? 0x3c5451 : 0x294147;
-  const wire = (x: number, end: number) => g.moveTo(x + 1.4, top)
-    .quadraticCurveTo(x - 0.7, top + (end - top) * 0.7, x, end)
-    .stroke({ color: shade, width: 1.8, alpha: 0.8 });
+  const wire = (x: number, end: number) => {
+    // Each lead comes through a small fixed clip under the collar.
+    g.roundRect(x - 1.9, top + 0.1, 5.2, 3.1, 0.75)
+      .fill({ color: shade, alpha: 0.92 });
+    g.moveTo(x + 1.0, top + 2.3)
+      .bezierCurveTo(x - 0.65, top + 13, x - 0.3, end - 9, x, end)
+      .stroke({ color: shade, width: 1.65, alpha: 0.86 });
+  };
 
   const suction = (x: number, y: number) => {
     g.ellipse(x + 1.7, y, 4.8, 3.1).fill({ color: shade, alpha: 0.44 })
@@ -45,8 +50,8 @@ export function drawIllustratedEquipment(g: Graphics, area: OpticalArea, state: 
   if (state.filter.flowLph > 0) {
     const { x, outlet } = filterMount(area);
     const y = area.sandTop - height * 0.29;
-    suction(x + 3.5, top + height * 0.36);
-    suction(x + 3.5, y - 11);
+    suction(x + 1.2, top + height * 0.36);
+    suction(x + 1.2, y - 11);
     wire(x + 5.5, outlet - 8);
     g.roundRect(x - 1.8, top, 3.6, y - top, 1.7).fill({ color: shade, alpha: 0.76 });
     g.moveTo(x - 0.9, top).lineTo(x - 0.9, y).stroke({ color: edge, width: 0.64, alpha: 0.37 });

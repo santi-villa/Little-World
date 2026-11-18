@@ -322,8 +322,16 @@ async function boot(illustrated: boolean): Promise<void> {
     const viewportScale = canvas.clientHeight / GAME_HEIGHT;
     if (viewportScale > 0) {
       if (trayHeight > 0) {
-        uiInsets.bottom = Math.round((trayHeight + 12) / viewportScale);
-        document.body.style.setProperty('--tray-height', `${trayHeight}px`);
+        const lowerMargin = window.innerHeight - canvas.offsetTop - canvas.clientHeight;
+        // Reserve the edge of the tray and the pellet selector before the
+        // player chooses food, so reaching for it never moves the target.
+        uiInsets.bottom = illustrated
+          ? Math.max(12, Math.round((trayHeight + 28 - lowerMargin) / viewportScale))
+          : Math.round((trayHeight + 12) / viewportScale);
+        const heightPx = `${trayHeight}px`;
+        if (document.body.style.getPropertyValue('--tray-height') !== heightPx) {
+          document.body.style.setProperty('--tray-height', heightPx);
+        }
       }
       const chrome = window.innerWidth <= 760 ? 49 : 57;
       // The canvas is letterboxed. Only reserve the part that the UI overlaps.

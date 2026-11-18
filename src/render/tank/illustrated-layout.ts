@@ -24,6 +24,26 @@ export function illustratedFrame(length: number, source: { width: number; height
   };
 }
 
+export interface CanopyMotion {
+  amplitude: number;
+  frequency: number;
+  direction: -1 | 1;
+  wake: number;
+  burial: number;
+}
+
+const plantMotion: Record<string, CanopyMotion> = {
+  'green-stem': { amplitude: 0.47, frequency: 0.55, direction: -1, wake: 0.59, burial: 0.212 },
+  'narrow-leaf': { amplitude: 0.57, frequency: 0.84, direction: 1, wake: 0.86, burial: 0.185 },
+  'broad-leaf': { amplitude: 0.35, frequency: 0.63, direction: -1, wake: 0.69, burial: 0.195 },
+  'arching-leaf': { amplitude: 0.49, frequency: 0.72, direction: 1, wake: 0.77, burial: 0.2 },
+};
+
+export function canopyMotion(asset: string, slot: number): CanopyMotion {
+  const source = plantMotion[asset] ?? plantMotion['broad-leaf']!;
+  return { ...source, frequency: source.frequency * (1 + 0.06 * (slot % 3)) };
+}
+
 const plant = (asset: string, x: number, height: number, layer: DecorPlane, flip = false): TankDecorItem =>
   ({ asset, plant: asset === 'narrow-leaf' || asset === 'green-stem' ? 'vallisneria' : 'anubias',
     x, height, sink: 0.06, flip, layer });
@@ -34,9 +54,9 @@ export const illustratedDecor: Record<string, TankDecor> = {
   default: {
     substrate: 'fine-ripples',
     items: [
-      plant('green-stem', 0.24, 0.70, 'back', true),
-      plant('narrow-leaf', 0.13, 0.56, 'middle'),
-      plant('broad-leaf', 0.82, 0.45, 'middle', true),
+      plant('green-stem', 0.266, 0.70, 'back', true),
+      plant('narrow-leaf', 0.132, 0.55, 'middle'),
+      plant('broad-leaf', 0.852, 0.46, 'middle', true),
       object('low-branch', 0.36, 0.36),
       object('mossy-river-stone', 0.74, 0.17),
       object('rounded-stone', 0.69, 0.055, 'front'),

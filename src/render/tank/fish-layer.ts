@@ -239,7 +239,7 @@ export class FishLayer {
     const sp = animal.species;
     // Plano: 0 lejos (chico y azulado) .. 2 cerca.
     const far = (2 - body.plane) / 2;
-    const scale = 1 - visual.depthScale * far;
+    const scale = 1 - (this.createIllustratedBetta && sp.id === 'betta' ? 0.28 : visual.depthScale) * far;
     const tint = (color: number): number => {
       let c = color;
       if (!animal.alive) c = DEAD_COLOR;
@@ -257,7 +257,7 @@ export class FishLayer {
     // The painted juvenile still grows, but retains a readable silhouette
     // at room scale. Motion and collisions continue to use its real length.
     const length = this.createIllustratedBetta && sp.id === 'betta'
-      ? Math.max(visualLength * 1.07, animal.sizeCm * 1.08) : visualLength;
+      ? Math.max(visualLength * 1.12, animal.sizeCm * 1.13) : visualLength;
     const len = Math.max(sp.category === 'fish' ? visual.minimumFishPixels : 3, length * this.pxPerCm * scale);
     // Nadie asoma fuera del agua: el dibujo entero queda entre los vidrios y bajo la superficie.
     const area = this.area;

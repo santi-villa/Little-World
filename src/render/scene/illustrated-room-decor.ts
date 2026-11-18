@@ -2,6 +2,7 @@ import { Container, FillGradient, Graphics, MeshPlane, Sprite } from 'pixi.js';
 import { tex } from '../assets';
 import { lerpColor } from '../pixel-utils';
 import { softPool } from '../tank/illustrated-optics';
+import { surfaceSlope } from '../motion/water-light';
 import type { TankRect } from '../tank/tank-layout';
 
 export const illustratedRoom = {
@@ -42,7 +43,12 @@ export class IllustratedRoomDecor {
   readonly container = new Container();
   private readonly plants = plantSpecs.map(createPlant);
   private readonly table = new Graphics();
+  private readonly wallLight = new Container();
+  private readonly wallMask = new Graphics().poly([
+    575, 0, 1036, 0, 1036, 403, 979, 416, 218, 416, 218, 283, 575, 283,
+  ]).fill(0xffffff);
   private readonly tankGlow = new Graphics();
+  private readonly tableLight = new Container();
   private readonly tableGlow = new Graphics();
   private readonly tableMask = new Graphics().poly([356, 416, 922, 416, 966, 447, 316, 447]).fill(0xffffff);
   private readonly moonlight = new Graphics();
@@ -54,6 +60,10 @@ export class IllustratedRoomDecor {
   private readonly notebook = new Sprite(tex('objeto-cuaderno'));
   private readonly occlusion = softPool('#39271c');
   private readonly aqua = softPool('#b5dab9');
+  private readonly edgeLight = new Graphics();
+  private readonly spillRibbons = Array.from({ length: 4 }, () =>
+    new Graphics().ellipse(0, 0, 1, 1).fill(this.aqua));
+  private readonly wallBloom = new Graphics().ellipse(0, 0, 1, 1).fill(this.aqua);
   private footprint = '';
 
   constructor() {
@@ -80,9 +90,18 @@ export class IllustratedRoomDecor {
       colorStops: [{ offset: 0, color: '#ffe5ab00' }, { offset: 0.56, color: '#ffe5ab1e' }, { offset: 1, color: '#ffe5ab00' }],
     }));
     this.moonlight.ellipse(353, 222, 262, 216).fill(softPool('#8ea9db'));
-    this.tableGlow.mask = this.tableMask;
+    this.wallLight.addChild(this.tankGlow, this.wallBloom);
+    this.wallLight.mask = this.wallMask;
+    this.tableLight.addChild(this.tableGlow, ...this.spillRibbons);
+    this.tableLight.mask = this.tableMask;
+    this.edgeLight.moveTo(539, 270).bezierCurveTo(552, 269, 568, 267, 575, 262)
+      .stroke({ color: 0xb4d2bb, width: 1.8, alpha: 0.27 });
+    this.edgeLight.moveTo(781, 447).bezierCurveTo(828, 447, 898, 445.7, 919, 444.4)
+      .stroke({ color: 0xc5e1c2, width: 1.15, alpha: 0.41 });
+    this.wallLight.blendMode = 'add';
+    this.tableLight.blendMode = 'add';
     this.container.addChildAt(props, 0);
-    this.container.addChild(this.lamp, this.notebook, this.sunlight, this.moonlight, this.lampGlow, this.tankGlow, this.table, this.tableMask, this.tableGlow);
+    this.container.addChild(this.lamp, this.notebook, this.sunlight, this.moonlight, this.lampGlow, this.wallMask, this.wallLight, this.tableMask, this.tableLight, this.edgeLight, this.table);
   }
 
   update(tank: TankRect, seconds: number, dt: number, tint: number, light: number, tankLit: boolean, lampOn: boolean, breeze: number) {
@@ -105,12 +124,28 @@ export class IllustratedRoomDecor {
     this.lampGlow.alpha = this.warm * (0.12 + (1 - light) * 0.33);
     this.sunlight.alpha = light * 0.29;
     this.moonlight.alpha = (1 - light) * 0.16;
-    this.tankGlow.alpha = this.lit * (0.085 + (1 - light) * 0.31);
-    this.tableGlow.alpha = this.lit * (0.08 + (1 - light) * 0.37);
+    const dusk = 1 - light;
+    const active = this.lit * (0.12 + dusk * 0.88);
+    const cx = tank.x + tank.width / 2, base = tank.y + tank.height;
+    // Match the drift of the waterline and keep the reflected motion local.
+    // Only the transforms and opacity change each frame.
+    const sway = surfaceSlope(0.48, seconds);
+    this.tankGlow.alpha = active * 0.24;
+    this.tableGlow.alpha = active * 0.41;
+    this.wallBloom.alpha = active * (0.071 + sway * 0.21);
+    this.wallBloom.position.set(cx + tank.width * (0.39 + sway * 0.39), tank.y + tank.height * 0.31);
+    this.wallBloom.scale.set(tank.width * 0.39, tank.height * 0.65);
+    this.edgeLight.alpha = active * 0.46;
+    for (const [i, ribbon] of this.spillRibbons.entries()) {
+      const u = 0.21 + i * 0.19;
+      const drift = surfaceSlope(u, seconds);
+      ribbon.position.set(tank.x + tank.width * (u + drift * 0.24), base + 2.6 + i % 2 * 2);
+      ribbon.scale.set(tank.width * (0.14 + 0.023 * i), 6 + i);
+      ribbon.alpha = active * (0.12 + drift * 0.49);
+    }
     const key = [tank.x, tank.y, tank.width, tank.height].join();
     if (key === this.footprint) return;
     this.footprint = key;
-    const cx = tank.x + tank.width / 2, base = tank.y + tank.height;
     this.tankGlow.clear()
       .ellipse(cx, tank.y + tank.height * 0.41, tank.width * 0.71, tank.height * 0.88).fill(this.aqua);
     this.tableGlow.clear()

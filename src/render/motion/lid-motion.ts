@@ -1,9 +1,14 @@
 import { smoothView } from './view-transition';
 
-/** Orthographic projection of a rear-hinged lid climbing toward the viewer. */
-export function lidProjection(progress: number, thickness: number): number {
+/**
+ * The front edge travels around the rear hinge. Length is in tank-local
+ * units. Its forward reach shrinks as it rises, so the face recedes too.
+ */
+export function lidPose(progress: number, length: number) {
   const angle = smoothView(progress) * (Math.PI * 0.43);
-  return thickness * (Math.cos(angle) - 1.17 * Math.sin(angle));
+  const reach = Math.cos(angle);
+  const rise = Math.sin(angle);
+  return { reach, rise, screenOffset: length * (0.34 * reach - 0.76 * rise) };
 }
 
 export class LidMotion {
