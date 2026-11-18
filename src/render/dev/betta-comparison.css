@@ -1,0 +1,127 @@
+.betta-comparison {
+  box-sizing: border-box;
+  width: min(1180px, 97vw);
+  max-width: 97vw;
+  max-height: 96dvh;
+  padding: 22px;
+  border: 1px solid #73968b;
+  border-radius: 16px;
+  background: #112c2d;
+  color: #e2e6d7;
+  overflow: auto;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+  box-shadow: 0 24px 90px #0009;
+}
+.betta-comparison::backdrop {
+  background: #071c20dc;
+  backdrop-filter: blur(6px);
+}
+.betta-comparison header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.betta-comparison h1 {
+  font:
+    500 clamp(18px, 2.5vw, 28px)/1.2 Georgia,
+    serif;
+  margin: 0;
+}
+.betta-comparison h2 {
+  font: 500 clamp(12px, 1.6vw, 17px)/1.3 system-ui;
+  margin: 6px 0 10px;
+  color: #b6cdc1;
+}
+.betta-comparison p {
+  margin: 8px 0;
+  color: #aac3b8;
+}
+.betta-comparison button,
+.betta-comparison select {
+  border: 1px solid #6c9185;
+  border-radius: 6px;
+  background: #234b47;
+  color: #f0eddb;
+  padding: 7px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.betta-comparison button:focus-visible,
+.betta-comparison select:focus-visible,
+.betta-comparison input:focus-visible {
+  outline: 2px solid #e1c393;
+  outline-offset: 3px;
+}
+.betta-comparison-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 17px 0;
+}
+.betta-comparison-controls label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.betta-comparison-controls input[type="range"] {
+  width: 110px;
+  accent-color: #dfae91;
+}
+.betta-comparison-controls input[type="checkbox"] {
+  accent-color: #dfae91;
+}
+.betta-comparison-controls output {
+  min-width: 38px;
+}
+.betta-model-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  text-align: center;
+}
+.betta-comparison-canvas {
+  border: 1px solid #577b6e;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.betta-comparison-canvas canvas {
+  display: block;
+  image-rendering: auto !important;
+  touch-action: pan-y;
+}
+.betta-comparison > output {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #cfbda0;
+  font-variant-numeric: tabular-nums;
+}
+.betta-description {
+  min-height: 2em;
+}
+@media (max-width: 700px) {
+  .betta-comparison {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .betta-comparison-controls {
+    gap: 7px;
+    margin: 10px 0;
+  }
+  .betta-comparison-controls label {
+    gap: 4px;
+  }
+  .betta-comparison button,
+  .betta-comparison select {
+    padding: 5px 7px;
+  }
+  .betta-comparison header {
+    gap: 8px;
+  }
+  .betta-comparison > p {
+    font-size: 11px;
+  }
+}

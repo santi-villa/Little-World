@@ -1,0 +1,41 @@
+/* Experimental controls only exist in development. */
+.betta-experiment {
+  position: fixed;
+  right: 10px;
+  top: 90px;
+  z-index: 11;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 360px;
+  padding: 8px 10px;
+  border: 1px solid #6f9b93;
+  border-radius: 8px;
+  background: #183b37ed;
+  color: #e7e7d6;
+  font: 12px/1.4 system-ui;
+  box-shadow: 0 3px 18px #102d3266;
+}
+.betta-experiment small {
+  display: block;
+  flex-basis: 100%;
+  opacity: 0.75;
+}
+.betta-experiment select,
+.betta-experiment button {
+  font: inherit;
+  max-width: 100%;
+  background: #e4d9bc;
+  color: #263c37;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px;
+}
+body[data-view="tank"] .betta-experiment {
+  right: 10px;
+  top: 90px;
+  max-width: 240px;
+}
+body.contemplating .betta-experiment {
+  display: none;
+}

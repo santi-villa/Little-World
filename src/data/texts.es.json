@@ -638,5 +638,61 @@
     "food": "Alimento de la mano",
     "mirror": "Acercar espejo durante 8 segundos",
     "mirrorHelp": "El espejo se retira solo. Si el betta se acerca, puede desplegar sus aletas."
+  },
+  "bettaIllustrated": {
+    "label": "Laboratorio de betta · desarrollo",
+    "open": "Comparar bettas",
+    "close": "Volver al juego",
+    "title": "Un movimiento, dos formas de dibujarlo",
+    "intro": "Ambos modelos leen el mismo cuerpo físico. Esta pecera de prueba no modifica ni guarda tu partida.",
+    "current": "Betta actual · volumen con código",
+    "illustrated": "Betta ilustrado · mallas articuladas",
+    "style": "Betta en el acuario",
+    "loading": "Preparando el atlas ilustrado…",
+    "error": "No se pudo cargar el arte. El betta actual sigue disponible.",
+    "zoom": "Zoom de ambos modelos",
+    "fps": "Pasos de animación por segundo",
+    "pause": "Pausar",
+    "resume": "Continuar",
+    "replay": "Repetir escena",
+    "sequence": "Recorrer los movimientos",
+    "guides": "Mostrar articulaciones",
+    "scenario": "Movimiento de prueba",
+    "length": "Largo físico: 6 cm · misma escala en ambos",
+    "state": "Estado",
+    "speed": "Velocidad",
+    "effort": "Esfuerzo visual",
+    "small": "El detalle se aprecia al acercar. La vista 1× conserva el tamaño físico.",
+    "devNote": "Solo desarrollo. Cambiar el dibujo no reinicia al pez ni se guarda como preferencia.",
+    "scenarios": {
+      "swim": {
+        "label": "Natación normal",
+        "description": "Exploración con ráfagas, planeo y pausas de la física actual."
+      },
+      "accelerate": {
+        "label": "Aceleración",
+        "description": "Una partícula real cercana provoca el acercamiento; el esfuerzo crece sin saltos."
+      },
+      "brake": {
+        "label": "Frenado",
+        "description": "Se retira el estímulo y se pide reposo en la posición actual: la inercia se disipa con el arrastre existente."
+      },
+      "turn": {
+        "label": "Giro",
+        "description": "La comida queda detrás. El mismo cuerpo cambia de rumbo; cabeza, tronco y cola lo representan con retraso."
+      },
+      "rest": {
+        "label": "Descanso",
+        "description": "Intención de descanso en un refugio: pectorales lentas, aletas casi quietas."
+      },
+      "feed": {
+        "label": "Alimentación",
+        "description": "Alimento real de la simulación y consumo por contacto. El picoteo solo aparece cerca de un grano."
+      },
+      "startle": {
+        "label": "Sobresalto",
+        "description": "Un golpe de vidrio usa el susto y la ráfaga existentes; después vuelve al planeo."
+      }
+    }
   }
 }

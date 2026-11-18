@@ -40,8 +40,10 @@ function hex(color: string): number {
 }
 
 export class FishLayer {
+  private bettaExperiment?:import('../dev/betta-experiment').BettaExperiment;
+  private readonly illustratedBettas=new Map<number,import('../dev/illustrated-betta').IllustratedBetta>();
   private devPanel?:import('../motion/betta-debug').BettaDebug;
-  constructor(){if(import.meta.env.DEV)void import('../motion/betta-debug').then(({BettaDebug})=>{this.devPanel=new BettaDebug();});}
+  constructor(){if(import.meta.env.DEV)void import('../motion/betta-debug').then(({BettaDebug})=>{this.devPanel=new BettaDebug();});if(import.meta.env.DEV)void import('../dev/betta-experiment').then(({BettaExperiment})=>{this.bettaExperiment=new BettaExperiment();});}
 
   readonly graphics = new Graphics();
   readonly foreground = new Graphics();
@@ -172,6 +174,8 @@ export class FishLayer {
     if(this.lastStyle!==this.bettaStyle){for(const fish of this.codedBettas.values())fish.destroy();this.codedBettas.clear();this.lastStyle=this.bettaStyle;}
     const ids=new Set(animals.filter(a=>a.species.category==='fish').map(a=>a.id));
     for(const [id,fish]of this.codedBettas)if(!ids.has(id)){fish.destroy();this.codedBettas.delete(id);}
+    for(const [id,fish]of this.illustratedBettas)if(!animals.some(a=>a.id===id&&a.species.id==='betta')){fish.destroy();this.illustratedBettas.delete(id);}
+    for(const fish of this.illustratedBettas.values())fish.container.visible=false;
     for(const fish of this.codedBettas.values())fish.container.visible=false;
     this.dt = Math.min(0.1, Math.max(0, dtSeconds));
     for (const id of this.anim.keys()) if (!this.motion.bodies.has(id)) this.anim.delete(id);
@@ -268,6 +272,15 @@ export class FishLayer {
       const motion=this.motion.bettas.get(animal.id);
       fish.container.visible=true;
       fish.update(body,cx,cy,len,this.dt,sp.swim.speedCmS,animal.intent,animal.alive,lightOn,finDamage,motion,animal.condition);fish.container.tint=tint(0xffffff);
+      if(import.meta.env.DEV&&(this.bettaExperiment?.illustrated||this.illustratedBettas.has(animal.id))){
+        let trial=this.illustratedBettas.get(animal.id);
+        if(!trial){trial=this.bettaExperiment?.create(animal.id,body.facing);if(trial)this.illustratedBettas.set(animal.id,trial);}
+        if(trial){
+          const parent=body.plane<1.2?this.artBack:this.artFront;if(trial.container.parent!==parent)parent.addChild(trial.container);trial.container.visible=!!this.bettaExperiment?.illustrated;fish.container.visible=!trial.container.visible;
+          const grain=this.food.nearest(body.x,body.y,[0,1]),distance=grain?Math.hypot(body.x-grain.x,body.y-grain.y,((grain.z??body.plane/2)-body.plane/2)*this.water.width*.5):Infinity;
+          trial.update({body,motion:this.motion.bettas.get(animal.id),lengthCm:animal.visualSizeCm??animal.sizeCm,alive:animal.alive,condition:animal.condition??1,current:this.water.getWaterVelocity(body.x,body.y),food:animal.intent==='eat'&&grain?{x:grain.x,y:grain.y,distance}:undefined},cx,cy,len,this.dt,lightOn,finDamage);trial.container.tint=tint(0xffffff);
+        }
+      }
       if(import.meta.env.DEV)this.devPanel?.draw(this.foodGraphics,body,motion,cx,cy,this.pxPerCm);
       if(motion){const age=this.motion.seconds-motion.breathRingAt;if(age>=0&&age<cBetta.rippleSeconds)this.foodGraphics.ellipse(cx,area.y+1,(1+age/cBetta.rippleSeconds)*len*cBetta.heightFraction,1+age).stroke({color:0xd5e4df,alpha:1-age/cBetta.rippleSeconds,width:1});}
       return;

@@ -360,7 +360,10 @@ async function boot(): Promise<void> {
   });
 }
 
-boot().catch((error) => {
+const entry=import.meta.env.DEV&&new URL(location.href).searchParams.has('betta-lab')
+  ? import('./render/dev/betta-comparison').then(({openBettaComparison})=>openBettaComparison({standalone:true}))
+  : boot();
+entry.catch((error) => {
   console.error(error);
   const message = document.createElement('pre');
   message.style.cssText =

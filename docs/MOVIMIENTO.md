@@ -21,3 +21,7 @@ La opción explícita conserva las comprobaciones del motor anterior sin cambiar
 ## Render activo: regreso al pez procedural
 
 Por preferencia del usuario, el betta activo vuelve a CodeBetta: geometría con volumen y aletas articuladas, sin texturas PNG. La pose recibe fase de coletazo, pitch, balanceo, esfuerzo y flare de BettaDynamics. La cola conserva resorte de retardo; el planeo reduce la flexión y las pectorales siguen aleteando al flotar. Las otras especies mantienen el render previo. ArticulatedBetta y su variante PNG quedan como experimento fuera de la ruta activa del juego. Esta decisión sustituye la sección anterior sobre recortes del sprite como render principal.
+
+## Experimento 2D ilustrado (aislado en desarrollo)
+
+Se agrega IllustratedBetta como alternativa optativa, sin cambiar CodeBetta, BettaDynamics o FishMotion. Usa arte nuevo por componentes, skinning, mallas y resortes amortiguados. Se elige únicamente en desarrollo y no se guarda. `/Little-World/?betta-lab` ofrece comparación con un único cuerpo físico para los dos modelos, siete escenas, zoom y controles de FPS. Detalles del recurso, rig, límites e instrucciones en [BETTA-ILUSTRADO.md](BETTA-ILUSTRADO.md). La descripción histórica de ArticulatedBetta con tres recortes rígidos corresponde a otro experimento y no a este modelo.

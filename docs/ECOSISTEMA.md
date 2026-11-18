@@ -49,3 +49,7 @@ La implementación se completó antes de ejecutar pruebas. La ronda final pasó 
 El recorrido en Chromium comprobó inicio en habitación completa, peces procedurales, espejo temporal, selector de alimento de la mano, comida, guardado v4 y recarga conservando el registro completo, rueda y regreso al encuadre, selector visible en 667×375 y pinza táctil por CDP. No se observaron errores JavaScript. El primer intento del selector móvil necesitaba esperar el siguiente fotograma de UI; se corrigió esa espera en el recorrido y pasó sin cambiar la interfaz. Capturas y video en `/workspace/artifacts/ecosistema-completo`.
 
 La revisión final también ajustó la invalidación del hábitat al cambiar el nivel del agua para mantener los contornos relativos a la superficie. No se midió hardware móvil físico ni se observó todo el catálogo durante horas.
+
+## Comparación de betta ilustrado
+
+La rama experimental agrega un render optativo de desarrollo para el betta y un laboratorio aislado. No modifica la química, FoodGrain, BettaDynamics, FishMotion ni el render de otras especies. La animación lee corriente y partículas reales; no introduce otro consumo ni otro comportamiento. Recursos y limitaciones en [BETTA-ILUSTRADO.md](BETTA-ILUSTRADO.md).

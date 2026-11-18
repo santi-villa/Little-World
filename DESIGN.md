@@ -992,3 +992,9 @@ Un clic en un pez ahora abre inmediatamente su ficha y conserva enfoque suave; s
 El guardado v4 incorpora paquetes alimenticios con identidad, gramos, coordenadas y velocidad; es compatible con v1–v3. La química consume el paquete alcanzado y el render observa sus gramos. Offline conserva el acceso por especie/capa. Hasta 512 paquetes; al llegar al límite se combina identidad preservando masa. La mano elige cuatro tipos sin alimentar automáticamente.
 
 El alimento choca con siluetas alfa de rocas/maderas y sus espesores aproximados. Peces buscan profundidad y esquivan núcleos solo dentro de ese plano; no se simulan mallas 3D completas. El espejo temporal es un objeto visible y localizado: un betta cercano y activo puede desplegar aletas, y el espejo se retira solo. Las motas tienen trayectorias locales; rayos y cáusticas usan las mismas ondas analíticas. Documentación vigente y límites en docs/ECOSISTEMA.md; las descripciones históricas anteriores de pools sin coordenadas ya no describen el modo activo.
+
+### Experimento de betta 2D ilustrado
+
+En la rama `experiment/betta-ilustrado-articulado` se prepara una alternativa exclusivamente de desarrollo: IllustratedBetta usa un atlas pintado nuevo, partes articuladas, mallas y resortes visuales. El betta actual sigue por defecto y CodeBetta conserva su implementación. No cambia la identidad visual general, otras especies, parámetros físicos ni guardados.
+
+El laboratorio `/Little-World/?betta-lab` compara ambos renderizadores a partir del mismo cuerpo FishMotion/BettaDynamics y del alimento real en una sesión descartable que no toca la partida guardada. El selector del acuario normal tampoco persiste. La nueva textura usa filtrado lineal propio para evaluar un estilo ilustrado; el arte existente conserva su filtrado. Instrucciones, detalle de recursos, validación y límites: `docs/BETTA-ILUSTRADO.md`.

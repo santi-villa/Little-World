@@ -1,0 +1,36 @@
+{
+  "referenceLength": 120,
+  "bodyFraction": 0.6,
+  "atlas": { "width": 1536, "height": 1024 },
+  "frames": {
+    "body": { "x": 64, "y": 88, "width": 674, "height": 192 },
+    "tail": { "x": 944, "y": 4, "width": 390, "height": 358 },
+    "dorsal": { "x": 30, "y": 384, "width": 641, "height": 240 },
+    "anal": { "x": 826, "y": 376, "width": 626, "height": 275 },
+    "pectoral": { "x": 218, "y": 692, "width": 330, "height": 294 },
+    "operculum": { "x": 1008, "y": 686, "width": 252, "height": 314 }
+  },
+  "rig": { "head": 25, "body": 8, "rear": -5, "tail": -18, "blendWidth": 7 },
+  "pose": {
+    "stepSeconds": 0.008333333333333333,
+    "maxDelta": 0.25,
+    "effortEase": 4.5,
+    "frequencyEase": 5,
+    "baseHz": 0.14,
+    "strokeHz": 2.4,
+    "startleHz": 4.4,
+    "turnEase": 4.8,
+    "pitchEase": 4,
+    "jointEase": 8,
+    "jointLimit": 0.25,
+    "headLimit": 0.055,
+    "finNodes": 9,
+    "spring": 30,
+    "coupling": 12,
+    "damping": 9,
+    "finLimit": 7,
+    "finSpeedLimit": 28,
+    "breathHz": 0.72,
+    "nibbleSeconds": 0.85
+  }
+}
