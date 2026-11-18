@@ -1,3 +1,4 @@
+import settings from '../data/ecosystem.json';
 /**
  * Cámara de la escena: zoom y paneo con easing.
  *
@@ -50,11 +51,13 @@ export class Camera {
   readonly target: CameraView = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, zoom: 1 };
   /** Mientras el dedo arrastra, la cámara lo sigue más pegada. */
   dragging = false;
+  private anchor:{screenX:number;screenY:number;x:number;y:number}|null=null;
 
   constructor(private readonly world: Container) {}
 
   /** Va hacia una vista (con easing). `instant` salta sin transición. */
   goTo(view: CameraView, instant = false): void {
+    this.anchor=null;
     this.target.zoom = snapZoom(view.zoom);
     this.target.x = view.x;
     this.target.y = view.y;
@@ -62,8 +65,17 @@ export class Camera {
     if (instant) Object.assign(this.current, this.target);
   }
 
+  /** Cursor-anchored continuous zoom; panel scroll never reaches this method. */
+  zoomAt(screenX:number,screenY:number,factor:number):void{
+    if(!Number.isFinite(factor)||factor<=0)return;const world=this.toWorld(screenX,screenY);
+    this.target.zoom=Math.max(settings.camera.minimum,Math.min(settings.camera.maximum,this.target.zoom*factor));
+    this.target.x=world.x-(screenX-GAME_WIDTH/2)/this.target.zoom;this.target.y=world.y-(screenY-GAME_HEIGHT/2)/this.target.zoom;
+    this.clamp(this.target);this.anchor={screenX,screenY,...world};
+  }
+
   /** Corre el objetivo, en píxeles de la pantalla (deslizar el dedo). */
   panBy(screenDx: number, screenDy: number): void {
+    this.anchor=null;
     this.target.x -= screenDx / this.current.zoom;
     this.target.y -= screenDy / this.current.zoom;
     this.clamp(this.target);
@@ -90,6 +102,7 @@ export class Camera {
     c.y += (t.y - c.y) * k;
     if (Math.abs(t.x - c.x) < 0.05) c.x = t.x;
     if (Math.abs(t.y - c.y) < 0.05) c.y = t.y;
+    if(this.anchor){c.x=this.anchor.x-(this.anchor.screenX-GAME_WIDTH/2)/c.zoom;c.y=this.anchor.y-(this.anchor.screenY-GAME_HEIGHT/2)/c.zoom;if(c.zoom===t.zoom)this.anchor=null;}
     this.clamp(c);
 
     this.world.scale.set(c.zoom);

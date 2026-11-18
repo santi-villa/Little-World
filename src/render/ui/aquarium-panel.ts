@@ -65,6 +65,7 @@ export class AquariumPanel {
     document.body.append(nav, this.dialog);
     // Let the room be the first screen; the guide is available from the toolbar.
   }
+  onObserveAnimal:(id:number)=>void=()=>undefined;
   openAnimal(id:number):void {
     this.selectedAnimal=id;this.open('fish');
     this.body.querySelector(fill(careText.data_animal_id, { p0: id }))?.scrollIntoView({block:'nearest'});
@@ -243,6 +244,10 @@ export class AquariumPanel {
   }
   private fish(): void {
     this.title(careText.conoce_a_tus_peces);
+    const chooser=document.createElement('select');chooser.setAttribute('aria-label',texts.observation.choose);
+    for(const a of this.game.state.animals){const option=document.createElement('option');option.value=String(a.id);option.textContent=(a.name??findSpecies(a.speciesId)?.name??a.speciesId);chooser.append(option);}if(this.selectedAnimal!==null)chooser.value=String(this.selectedAnimal);
+    chooser.onchange=()=>{const id=Number(chooser.value);this.onObserveAnimal(id);this.openAnimal(id);};if(this.game.state.animals.length>1)this.body.append(chooser);
+
     if(this.game.state.animals.some(a=>!a.alive))this.body.append(button(texts.aquariumVisual.remove,()=>{this.game.act({type:'removeDead'});this.render();}));
     if (!this.game.state.animals.length) this.paragraph(careText.todavia_no_hay_animales_en_esta);
     for (const a of this.game.state.animals) {

@@ -1,0 +1,103 @@
+{
+  "flow": {
+    "maxCmS": 0.65,
+    "obstacleLoss": 0.8,
+    "fishCoupling": 0.16
+  },
+  "plants": {
+    "currentForce": 0.28,
+    "ambientForce": 0.002,
+    "coupling": 18,
+    "maxBend": 0.14,
+    "wakeForce": 0.035,
+    "impulseLimit": 0.12
+  },
+  "plantProfiles": {
+    "anubias": {
+      "stiffness": 18,
+      "damping": 9,
+      "exposure": 0.2
+    },
+    "vallisneria": {
+      "stiffness": 3.8,
+      "damping": 3.2,
+      "exposure": 1
+    },
+    "helecho-java": {
+      "stiffness": 7,
+      "damping": 5,
+      "exposure": 0.55
+    },
+    "musgo-java": {
+      "stiffness": 15,
+      "damping": 8,
+      "exposure": 0.12
+    },
+    "ludwigia-roja": {
+      "stiffness": 8,
+      "damping": 5.5,
+      "exposure": 0.5
+    },
+    "criptocoryne": {
+      "stiffness": 12,
+      "damping": 7,
+      "exposure": 0.3
+    }
+  },
+  "food": {
+    "maxParticles": 96,
+    "mobileParticles": 48,
+    "particlesPerGram": 1800,
+    "minGrams": 1e-06,
+    "radiusCm": 0.1,
+    "fallCmS": 2,
+    "sinkCmS": 0.11,
+    "drag": 3.5,
+    "reachBodyLengths": 0.55
+  },
+  "bubbles": {
+    "max": 90,
+    "mobileMax": 45,
+    "perSecond": 7,
+    "radiusCm": 0.035,
+    "riseCmS": 1.4,
+    "drag": 2
+  },
+  "water": {
+    "cleanSpecks": 12,
+    "dirtySpecks": 48,
+    "rayAlpha": 0.025,
+    "surfaceAlpha": 0.3
+  },
+  "camera": {
+    "minimum": 1,
+    "maximum": 12,
+    "wheelRate": 0.0014
+  },
+  "motionGroups": {
+    "slow": {
+      "cruise": 0.8,
+      "acceleration": 0.65,
+      "goalSeconds": 1.6,
+      "currentResistance": 0.7
+    },
+    "school": {
+      "cruise": 1,
+      "acceleration": 1,
+      "goalSeconds": 1.4,
+      "currentResistance": 1
+    },
+    "bottom": {
+      "cruise": 0.65,
+      "acceleration": 0.7,
+      "goalSeconds": 1.8,
+      "currentResistance": 0.3
+    },
+    "active": {
+      "cruise": 1,
+      "acceleration": 1,
+      "goalSeconds": 1,
+      "currentResistance": 1
+    }
+  }
+}

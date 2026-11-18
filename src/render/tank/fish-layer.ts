@@ -1,3 +1,6 @@
+import ecosystem from '../../data/ecosystem.json';
+import {WaterFlow} from '../motion/water-flow';
+import {FoodParticles} from '../motion/food-particles';
 import visual from '../../data/aquarium-visual.json';
 import {bettaParameters as cBetta} from '../motion/betta-dynamics';
 import {emptyHabitat,type Habitat} from '../motion/habitat';
@@ -18,7 +21,7 @@ import { ART } from '../art-direction';
 import { Graphics } from 'pixi.js';
 import { getSpecies, sizeFactor, defaultConfig, type SimState, type Species } from '../../sim';
 import { FishMotion, type FishBody, type MotionAnimal } from '../motion/fish-motion';
-import { lerpColor, scatter } from '../pixel-utils';
+import { lerpColor } from '../pixel-utils';
 import type { TankRect } from './tank-layout';
 import { FISH_SPRITES, SpritePainter } from './sprites';
 
@@ -46,11 +49,13 @@ export class FishLayer {
   private lastStyle='';
   readonly artBack=new Container();
   readonly artFront=new Container();
+  water:WaterFlow=new WaterFlow();
+  readonly food=new FoodParticles(typeof window!=="undefined"&&window.innerWidth<800?ecosystem.food.mobileParticles:ecosystem.food.maxParticles);
+  readonly feedingContacts:Record<number,number>={};
   habitat:Habitat=emptyHabitat();
   hand:HandInput|null=null;
   readonly foodGraphics = new Graphics();
   private ink = this.graphics;
-  private batches:{x:number;grams:number;at:number}[]=[];
   private selectedId: number | null = null;
   private selectedUntil = 0;
   private positions = new Map<number, {x:number;y:number;radius:number}>();
@@ -63,6 +68,7 @@ export class FishLayer {
   readonly motion = new FishMotion((Math.random() * 0xffffffff) >>> 0);
   private foodXCm = 0;
   private lastSurfaceG = 0;
+  private hunger=new Map<number,number>();
   private scare: { x: number; y: number; until: number } | null = null;
   private area: TankRect = { x: 0, y: 0, width: 1, height: 1 };
   private pxPerCm = 1;
@@ -112,10 +118,10 @@ export class FishLayer {
     if (state.food.surfaceG > this.lastSurfaceG + 1e-6 || this.foodXCm === 0) {
       this.foodXCm = bounds.width * (state.food.x ?? (0.25 + 0.5 * Math.random()));
     }
-    if(state.food.surfaceG<this.lastSurfaceG && this.lastSurfaceG>0){const keep=state.food.surfaceG/this.lastSurfaceG;for(const batch of this.batches)batch.grams*=keep;}
-    if(state.food.surfaceG>this.lastSurfaceG+1e-6)this.batches.push({x:this.foodXCm,grams:state.food.surfaceG-this.lastSurfaceG,at:seconds});
-    this.batches=this.batches.filter(b=>b.grams>1e-6).slice(-16);
-    this.lastSurfaceG = state.food.surfaceG;
+    this.lastSurfaceG=state.food.surfaceG;
+    let consumedLayers=0;for(const a of state.animals){if(a.hunger<(this.hunger.get(a.id)??a.hunger))consumedLayers|=this.feedingContacts[a.id]??0;this.hunger.set(a.id,a.hunger);}
+    this.food.update(dtSeconds,{surface:state.food.surfaceG,sinking:state.food.sinkingG,bottom:state.organics.foodG,x:this.foodXCm,consumedLayers},bounds.width,bounds.height,this.water);
+    for(const key of Object.keys(this.feedingContacts))delete this.feedingContacts[Number(key)];
 
     const species = new Map<number, Species>();
     const animals: MotionAnimal[] = state.animals.map((animal) => {
@@ -142,12 +148,14 @@ export class FishLayer {
       bounds,
       bettaPrototype: true,
       renderDepth:true,
+      water:this.water,
       animals,
       food: {
         surface: state.food.surfaceG > 1e-4,
         sinking: state.food.sinkingG > 1e-4,
         bottom: state.organics.foodG > 1e-3,
         x: this.foodXCm,
+        targets:this.food.particles.filter(p=>p.phase!=="falling").map(p=>({x:p.x,y:p.y,layer:p.layer})),
       },
       scare: this.scare,
       hand:this.hand,
@@ -194,29 +202,10 @@ export class FishLayer {
     }
   }
 
-  private drawFood(state: SimState, area: TankRect, pxPerCm: number, seconds: number): void {
-    const g = this.foodGraphics;
-    const x0 = area.x + this.foodXCm * pxPerCm;
-    const spread = Math.max(5, pxPerCm * 2);
-    let floating=0;
-    for(const [batchIndex,batch]of this.batches.entries()){
-      const count=Math.min(16,Math.ceil(batch.grams*visual.foodParticlesPerGram));floating+=count;
-      for(let i=0;i<count;i++){
-        const x=Math.round(area.x+batch.x*pxPerCm+(scatter(i+batchIndex*19,21)-.5)*2*spread);
-        if(x<area.x||x>area.x+area.width-2)continue;
-        const age=seconds-batch.at-i*.035;
-        const y=area.y-12+12*Math.min(1,Math.max(0,age)/.7)**2;
-        g.roundRect(x,y+Math.sin(seconds*1.7+i)*.5,visual.foodPixels,visual.foodPixels*.7,.6);
-      }
-    }
-    const sinking = Math.min(40, Math.ceil(state.food.sinkingG * visual.foodParticlesPerGram));
-    for (let i = 0; i < sinking; i++) {
-      const x = Math.round(x0 + (scatter(i, 22) - 0.5) * 2 * spread);
-      if (x < area.x || x > area.x + area.width - 2) continue;
-      const fall = (scatter(i, 23) + seconds * (0.05 + 0.04 * scatter(i, 24))) % 1;
-      g.roundRect(x, area.y + fall * (area.height - 2),visual.foodPixels*.8,visual.foodPixels*.6,.5);
-    }
-    if (floating + sinking > 0) g.fill({color:0xe9b96d,alpha:1}).stroke({color:0x624127,width:.4});
+  private drawFood(state: SimState, area: TankRect, pxPerCm: number, _seconds: number): void {
+    const g=this.foodGraphics;
+    for(const p of this.food.particles){const x=area.x+p.x*pxPerCm,y=area.y+p.y*pxPerCm,size=Math.max(1.2,p.size*pxPerCm);if(p.id%3===0){const co=Math.cos(p.angle),si=Math.sin(p.angle);g.poly([[-size,-size*.5],[size,-size*.5],[size,size*.5],[-size,size*.5]].flatMap(([dx,dy])=>[x+dx!*co-dy!*si,y+dx!*si+dy!*co])).fill({color:0xe7b66b,alpha:.95});}else g.ellipse(x,y,size,size*.65).fill({color:p.layer===2?0xb79059:0xe7b66b,alpha:.95});g.rect(x-size*.3,y-size*.3,.6,.6).fill(0xf7dca1);}
+    for(const a of state.animals){if(!a.alive)continue;const body=this.motion.bodies.get(a.id);if(!body)continue;const sp=getSpecies(a.speciesId),layers=defaultConfig.food.access[sp.zone].map((value,i)=>value>0?i:-1),p=this.food.nearest(body.x,body.y,layers);if(!p)continue;const reach=Math.max(.5,sp.adultSizeCm*(visual.juvenileFraction+(1-visual.juvenileFraction)*Math.min(1,Math.max(0,a.ageDays-defaultConfig.fish.newAnimalAgeDays)/visual.growthDays))*ecosystem.food.reachBodyLengths);if(Math.hypot(body.x-p.x,body.y-p.y)<reach)this.feedingContacts[a.id]=(this.feedingContacts[a.id]??0)|(1<<p.layer);}
   }
 
   private drawAnimal(

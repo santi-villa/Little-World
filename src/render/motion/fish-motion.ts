@@ -1,3 +1,5 @@
+import ecosystem from '../../data/ecosystem.json';
+import type {WaterVelocity} from './water-flow';
 import visual from '../../data/aquarium-visual.json';
 import {BettaDynamics} from './betta-dynamics';
 import {resolveHabitat,habitatTarget,type Habitat} from './habitat';
@@ -59,13 +61,15 @@ export interface MotionInput {
   /** Explicit opt-in for the visual betta prototype; legacy consumers retain their motion contract. */
   bettaPrototype?: boolean;
   renderDepth?:boolean;
+  water?:WaterVelocity;
+  trackingTargets?:ReadonlyMap<number,{x:number;y:number}>;
   habitat?:Habitat;
   hand?: HandInput | null;
   /** Agua: ancho y profundidad en cm. */
   bounds: Bounds;
   animals: readonly MotionAnimal[];
   /** Dónde hay comida ahora. */
-  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number };
+  food: { surface: boolean; sinking: boolean; bottom: boolean; x: number;targets?:readonly {x:number;y:number;layer:number}[] };
   /** Golpe reciente en el vidrio (posición en cm) o null. */
   scare: Vec | null;
   /** El gato está pegado al vidrio. */
@@ -237,7 +241,10 @@ export class FishMotion {
       const body = this.bodies.get(animal.id) as FishBody;
       const sp = animal.species;
       const limits = limitsFor(sp);
-      const condition=animal.condition??1;limits.maxSpeed*=condition;limits.maxAccel*=condition;
+      const group=sp.zone==='bottom'?'bottom':sp.traits.includes('slow')?'slow':groupStyle(sp)!=='none'?'school':'active';
+      const profile=ecosystem.motionGroups[group];
+      const condition=(animal.condition??1);if(input.water){limits.maxSpeed*=profile.cruise;limits.maxAccel*=profile.acceleration;}
+limits.maxSpeed*=condition;limits.maxAccel*=condition;
       const depth = bounds.height;
 
       if(input.renderDepth&&animal.alive){
@@ -249,10 +256,11 @@ export class FishMotion {
         const targetY = sp.category === 'fish' ? 0 : depth;
         const v = arrive(body, body.x, targetY, input.renderDepth?visual.floatSpeed:1.5, 4);
         integrate(body, v.x, v.y, { maxSpeed: 1.5, maxAccel: 2, maxTurn: 10 }, dt, bounds);
+        if(input.water?.constrain){const p=input.water.constrain(body.x,body.y,0);body.x=p.x;body.y=p.y;}
         continue;
       }
 
-      if(sp.id==='betta' && input.bettaPrototype){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,input,this.time,r);continue;}
+      if(sp.id==='betta' && input.bettaPrototype){let motion=this.bettas.get(animal.id);if(!motion){motion=new BettaDynamics();this.bettas.set(animal.id,motion);}motion.update(body,animal,dt,{...input,trackingTargets:this.bodies},this.time,r);continue;}
 
       const crawler = sp.category !== 'fish';
       const cruise = limits.maxSpeed * (0.35 + 0.3 * animal.activity) * (sp.id==='betta' ? .82+.18*Math.sin(this.time*.9+body.phase) : 1);
@@ -273,7 +281,9 @@ export class FishMotion {
           // Cada uno picotea en su lugarcito alrededor de la comida.
           const spread = Math.min(2, bounds.width * 0.05);
           const x = input.food.x + (Math.sin(body.phase) + 0.15 * Math.sin(this.time * 0.7 + body.phase)) * spread;
-          desired = arrive(body, x, y, limits.maxSpeed * 0.9, 1.5);
+          let foodTarget:{x:number;y:number}|undefined,distance=Infinity;
+          for(const target of input.food.targets??[]){if((access==='surface'&&target.layer===2)||(access==='bottom'&&target.layer===0))continue;const d=Math.hypot(body.x-target.x,body.y-target.y);if(d<distance){distance=d;foodTarget=target;}}
+          desired = arrive(body, foodTarget?.x??x, foodTarget?.y??y, limits.maxSpeed * 0.9, 1.5);
           break;
         }
         case 'rest': {
@@ -362,7 +372,7 @@ export class FishMotion {
             const arrived=length(body.goalX-body.x,body.goalY-body.y)<2;
             if(sp.id==='betta' && arrived && body.goalUntil>=0){body.pauseUntil=this.time+.5+1.2*r();body.goalUntil=-1;desired={x:0,y:0};break;}
             if (this.time >= body.goalUntil || arrived) {
-              this.pickGoal(body, animal, bounds);
+              this.pickGoal(body, animal, bounds);if(input.water)body.goalUntil=this.time+(body.goalUntil-this.time)*profile.goalSeconds;
             }
             const toGoal = arrive(body, body.goalX, body.goalY, cruise, 5);
             const drift = wander(body, cruise * 0.5, 1.5, dt, r);
@@ -429,6 +439,7 @@ export class FishMotion {
         desired.x+=(ahead.x-body.x-desired.x)*2;desired.y+=(ahead.y-body.y-desired.y)*2;
         const goal=resolveHabitat(body.goalX,body.goalY,input.habitat,bounds.width,depth,Math.min(1,animal.sizeCm*.15));body.goalX=goal.x;body.goalY=goal.y;
       }
+      if(input.water){const current=input.water.getWaterVelocity(body.x,body.y),coupling=ecosystem.flow.fishCoupling*profile.currentResistance;desired.x+=current.x*coupling;desired.y+=current.y*coupling;}
       const speedLimit = limits.maxSpeed * boost;
       const l = length(desired.x, desired.y);
       if (l > speedLimit) {
@@ -442,6 +453,7 @@ export class FishMotion {
         body.slowSeconds=Math.hypot(body.vx,body.vy)<.12?(body.slowSeconds??0)+dt:0;
         if(body.slowSeconds>5 && this.time>(body.pauseUntil??0)){this.pickGoal(body,animal,bounds);body.slowSeconds=0;}
       }
+      if(input.water?.constrain){const p=input.water.constrain(body.x,body.y,animal.sizeCm*.15);body.x=p.x;body.y=p.y;}
       // Cambio de plano suave.
       const dp = body.targetPlane - body.plane;
       const maxDp = PLANE_SPEED * dt * (animal.intent === 'flee' ? 3 : 1);

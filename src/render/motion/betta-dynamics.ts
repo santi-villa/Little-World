@@ -1,3 +1,4 @@
+import ecosystem from '../../data/ecosystem.json';
 import defaults from '../../data/motion-betta.json';
 import type { FishBody, MotionAnimal, MotionInput } from './fish-motion';
 import { angleDiff, containment } from './steering';
@@ -54,7 +55,7 @@ export class BettaDynamics {
       this.mode = 'startle';
       this.modeUntil = time + c.startleSeconds;
       this.cycle = 0;
-      const from = input.scare ??
+      const from = input.scare ?? input.trackingTargets?.get(a.targetId??-1)??
         input.hand ?? { x: bounds.width / 2, y: bounds.height / 2 };
       b.goalX = b.x + (b.x - from.x);
       b.goalY = b.y + (b.y - from.y);
@@ -66,7 +67,7 @@ export class BettaDynamics {
     this.previousFood = food;
     if (this.mode === 'startle' && time < this.modeUntil) {
       /* Finish the short escape before another intention. */
-    } else if (a.intent === 'rest') {
+    } else if (a.intent === 'rest'||a.intent==='hide') {
       this.mode = 'sleep';
       b.goalX = bounds.width * c.zoneTop;
       b.goalY = bounds.height * c.sleepFraction;
@@ -82,9 +83,12 @@ export class BettaDynamics {
       this.modeUntil = Infinity;
     } else if (food && (a.intent === 'eat' || time < this.foodUntil)) {
       this.mode = 'food';
-      b.goalX = input.food.x;
-      b.goalY =
+      const targets=(input.food.targets??[]).filter(p=>p.layer!==2),closest=targets.reduce<{x:number;y:number}|undefined>((best,p)=>!best||Math.hypot(p.x-b.x,p.y-b.y)<Math.hypot(best.x-b.x,best.y-b.y)?p:best,undefined);
+      b.goalX = closest?.x??input.food.x;
+      b.goalY = closest?.y??
         bounds.height * (input.food.surface ? c.surfaceFraction : c.zoneBottom);
+    } else if ((a.intent==='chase'||a.intent==='court')&&input.trackingTargets?.has(a.targetId??-1)){const target=input.trackingTargets.get(a.targetId!)!;this.mode='investigate';b.goalX=target.x+(a.intent==='court'?Math.cos(time+b.phase)*L:0);b.goalY=target.y+(a.intent==='court'?Math.sin(time+b.phase)*L:0);this.modeUntil=time+1;
+    } else if (input.hand&&input.hand.age<1&&input.hand.speed<15&&(a.feedingTrust??0)>.4&&a.fright<.1&&Math.sin(time*.07+b.phase)>.92){this.mode='investigate';b.goalX=input.hand.x;b.goalY=input.hand.y;this.modeUntil=time+1;
     } else if (time < this.flareUntil) {
       this.mode = 'flare';
     } else if (this.mode === 'breathe') {
@@ -199,6 +203,7 @@ export class BettaDynamics {
           fy += (dy / d) * (1 - d) * c.obstacleForce * L;
         }
       }
+      if(input.water){const current=input.water.getWaterVelocity(b.x,b.y);fx+=current.x*ecosystem.flow.fishCoupling;fy+=current.y*ecosystem.flow.fishCoupling;}
       this.force = { x: fx, y: fy };
       b.vx += ((fx - c.drag * speed * b.vx) / c.mass) * h;
       b.vy += ((fy - c.drag * speed * b.vy) / c.mass) * h;
@@ -224,6 +229,7 @@ export class BettaDynamics {
       );
       b.x = safe.x;
       b.y = safe.y;
+      if(input.water?.constrain){const p=input.water.constrain(b.x,b.y,L*c.collisionMargin);b.x=p.x;b.y=p.y;}
     }
     const pitch = Math.max(
       (-c.pitchMaxDeg * Math.PI) / 180,

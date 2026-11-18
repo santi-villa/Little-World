@@ -624,7 +624,8 @@
       "Hambre",
       "Confianza",
       "Aletas sanas"
-    ]
+    ],
+    "choose": "Observar otro pez"
   },
   "aquariumVisual": {
     "glass": "Forma del vidrio",

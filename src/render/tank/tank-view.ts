@@ -1,3 +1,6 @@
+import ecosystem from '../../data/ecosystem.json';
+import {WaterFlow} from '../motion/water-flow';
+import {BubbleParticles} from '../motion/bubble-particles';
 import visual from '../../data/aquarium-visual.json';
 import {tankAppearance} from './tank-layout';
 import {bettaParameters as bettaConfig} from '../motion/betta-dynamics';
@@ -118,10 +121,12 @@ export class TankView {
   readonly container = new Container();
   /** Vidrio e interior, en coordenadas de la imagen del vidrio. */
   private readonly art = new Container();
+  readonly flow=new WaterFlow();
+  private bubbles=new BubbleParticles(typeof window!=="undefined"&&window.innerWidth<800?ecosystem.bubbles.mobileMax:ecosystem.bubbles.max);
   readonly fish = new FishLayer();
   private readonly wet=new Container();
   private readonly roundMask=new Graphics();
-  private round=false;
+  private round=false;private roundMaskKey="";
   private readonly water = new Graphics();
   private readonly glassBack = new Sprite(tex(GLASS_BACK));
   private readonly equip = new Graphics();
@@ -196,7 +201,7 @@ export class TankView {
     const lit = derived.lightOn;
     this.round=tankAppearance.shape==='round'||(tankAppearance.shape==='model'&&state.tank.modelId==='bowl_8');
     this.glass.texture=tex(this.round?'redonda-1':GLASS);this.glassBack.visible=!this.round;
-    this.roundMask.clear();if(this.round){const t=this.glass.texture,m=visual.roundMask;this.roundMask.ellipse(t.width*m.x,t.height*m.y,t.width*m.rx,t.height*m.ry).fill(0xffffff);this.wet.mask=this.roundMask;}else this.wet.mask=null;
+    const roundKey=this.round?String(this.glass.texture.uid):"";if(roundKey!==this.roundMaskKey){this.roundMaskKey=roundKey;this.roundMask.clear();if(this.round){const t=this.glass.texture,m=visual.roundMask;this.roundMask.ellipse(t.width*m.x,t.height*m.y,t.width*m.rx,t.height*m.ry).fill(0xffffff);}}this.wet.mask=this.round?this.roundMask:null;
     const geo = this.layout(state, derived);
     this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.sandTop-geo.waterTop-2)};
     const glassTexture=this.glass.texture;
@@ -213,6 +218,7 @@ export class TankView {
     this.drawWater(geo, lit, tannins);
     this.drawEquipment(state, geo, lit);
     this.buildDecor(geo);
+    this.flow.configure(geo.width/pxPerCm,(geo.sandTop-geo.waterTop-2)/pxPerCm,derived.effectiveFlowLph,state.tank.waterLiters,this.habitat,this.round);this.fish.water=this.flow;
     // Las imágenes se tiñen: más oscuras con la luz apagada y ámbar con taninos.
     const tint = lerpColor(ambientTint(lit ? 1 : 0.18), lit ? 0xd9a860 : 0x4a3a2a, tannins * 0.45);
     this.substrate.tint = tint;
@@ -226,8 +232,8 @@ export class TankView {
     const visitors=[...this.fish.motion.bodies.values()].map(b=>({x:geo.left+b.x*pxPerCm,y:geo.waterTop+2+b.y*pxPerCm,vx:b.vx}));
     this.swayPlants(seconds,flow,Math.max(0,seconds-this.lastSeconds),visitors);
     // One brief wake per encounter, rather than forcing the whole plant every frame.
-    for(const animal of state.animals){if(animal.speciesId!=='betta'||!animal.alive)continue;const body=this.fish.motion.bodies.get(animal.id);if(!body)continue;
-      const x=geo.left+body.x*pxPerCm,y=geo.waterTop+2+body.y*pxPerCm,range=bettaConfig.plantRangeLengths*bettaConfig.bodyFraction*(this.fish.motion.bettas.get(animal.id)?.sizeCm??0)*pxPerCm;
+    for(const animal of state.animals){if(!animal.alive)continue;const body=this.fish.motion.bodies.get(animal.id);if(!body)continue;
+      const x=geo.left+body.x*pxPerCm,y=geo.waterTop+2+body.y*pxPerCm,range=bettaConfig.plantRangeLengths*bettaConfig.bodyFraction*(this.fish.motion.bettas.get(animal.id)?.sizeCm??2)*pxPerCm;
       const candidates=[...this.plants.map((p,index)=>({key:'mesh'+index,x:p.mesh.x+(p.mesh.scale.x<0?-1:1)*p.mesh.width/2,y:p.mesh.y+p.mesh.height,h:p.mesh.height,w:p.mesh.width,impulse:(u:number,v:number)=>p.motion.receiveImpulse(u,v)}))];
       for(const p of candidates){const u=(p.y-y)/Math.max(1,p.h),d=Math.abs(x-p.x),key=animal.id+':'+p.key;if(u<0||u>1||d>range+p.w/2){this.plantImpulseAt.delete(key);continue;}if(!this.plantImpulseAt.has(key)){p.impulse(u,body.vx*bettaConfig.plantImpulse);this.plantImpulseAt.set(key,seconds);}}
     }
@@ -459,7 +465,7 @@ export class TankView {
         mesh.position.set(Math.round(item.flip ? cx + w / 2 : cx - w / 2), baseY - Math.round(h));
         (item.layer === 'back' ? this.rearPlants : item.layer === 'front' ? this.frontPlants : this.plantLayer).addChild(mesh);
         const positions = mesh.geometry.getAttribute('aPosition').buffer.data as Float32Array;
-        this.plants.push({ motion:new PlantMotion(9,index*1.7),mesh, rest: positions.slice(), unit, phase: index * 1.7 });
+        this.plants.push({ motion:new PlantMotion(9,index*1.7,item.plant),mesh, rest: positions.slice(), unit, phase: index * 1.7 });
       } else {
         const sprite = new Sprite(texture);
         sprite.anchor.set(0.5, 1);
@@ -481,7 +487,7 @@ export class TankView {
       const attribute = plant.mesh.geometry.getAttribute('aPosition');
       const positions = attribute.buffer.data as Float32Array;
       const height = plant.rest[plant.rest.length - 1] || 1;
-      plant.motion.update(dt,seconds,flow,visitors.map(f=>({height:(plant.mesh.y+plant.mesh.height-f.y)/Math.max(1,plant.mesh.height),distance:Math.abs(f.x-(plant.mesh.x+(plant.mesh.scale.x<0?-1:1)*plant.mesh.width*.5))/Math.max(20,plant.mesh.width),speed:f.vx/4})));
+      plant.motion.update(dt,seconds,flow,visitors.map(f=>({height:(plant.mesh.y+plant.mesh.height-f.y)/Math.max(1,plant.mesh.height),distance:Math.abs(f.x-(plant.mesh.x+(plant.mesh.scale.x<0?-1:1)*plant.mesh.width*.5))/Math.max(20,plant.mesh.width),speed:f.vx/4})),this.flow.getWaterVelocity((plant.mesh.x-this.inner.x)/(this.inner.width/this.flow.width),(plant.mesh.y-this.waterArea.y)/(this.inner.width/this.flow.width)).x);
       for (let i = 0; i < positions.length; i += 2) {
         const free = Math.pow(1 - (plant.rest[i + 1] as number) / height, 1.5);
         const sample=free*8,index=Math.min(7,Math.floor(sample)),offset=plant.motion.offsets[index]!*(1-(sample-index))+plant.motion.offsets[index+1]!*(sample-index);
@@ -496,34 +502,19 @@ export class TankView {
   private drawMid(state: SimState, derived: DerivedValues, geo: Geo, shade: (c: number) => number, seconds: number): void {
     const g = this.mid;
     g.clear();
-    const { left, width, waterTop, waterHeight, sandTop, sandH } = geo;
+    const { left, width, waterTop, sandTop } = geo;
 
     const detritus = Math.min(80, Math.round(state.organics.detritusG * 8));
     for (let i = 0; i < detritus; i++) {
       g.rect(left + 1 + Math.floor(scatter(i, 3) * (width - 3)), sandTop - 1 + Math.floor(scatter(i, 4) * 4), 2, 1);
     }
     if (detritus > 0) g.fill(shade(0x4a3a26));
-    const food = Math.min(60, Math.ceil(state.organics.foodG * 20));
-    for (let i = 0; i < food; i++) {
-      g.rect(left + 6 + Math.floor(scatter(i, 5) * (width - 14)), sandTop - 1 + Math.floor(scatter(i, 6) * 3), 2, 2);
-    }
-    if (food > 0) g.fill(shade(0xd9703a));
+    for(const animal of state.animals){if(!animal.alive||animal.intent!=='eat'||!animal.speciesId.includes('cory'))continue;const body=this.fish.motion.bodies.get(animal.id);if(!body||body.y<this.flow.height*.75)continue;const scale=this.inner.width/this.flow.width;
+      for(let j=0;j<3;j++){const age=(seconds*.25+j/3)%1,current=this.flow.getWaterVelocity(body.x,body.y);g.rect(left+body.x*scale+(j-1)*2+current.x*age*scale,sandTop-age*5,1,1).fill({color:0xb5b69a,alpha:(1-age)*.2});}}
+    this.bubbles.update(Math.max(0,seconds-this.lastSeconds),this.flow.width,this.flow.height,this.flow.strength,this.flow);
+    const scale=this.inner.width/this.flow.width;
+    for(const bubble of this.bubbles.particles){const x=left+bubble.x*scale,y=waterTop+2+bubble.y*scale,r=Math.max(.4,bubble.radius*scale);g.circle(x,y,r).stroke({color:0xe3f8f6,width:.7,alpha:derived.lightOn?.6:.25});}
 
-    // Burbujas que suben junto a la toma del filtro, serpenteando.
-    if (state.filter.flowLph > 0 && derived.effectiveFlowLph > 1 && waterHeight > sandH + 6) {
-      const strength = Math.min(1, derived.effectiveFlowLph / state.filter.flowLph);
-      const colX = geo.right - 26;
-      const from = sandTop - Math.round(geo.height * 0.3) + 12;
-      const travel = from - waterTop - 2;
-      const bubbles = Math.round(8 + strength * 14);
-      for (let i = 0; i < bubbles; i++) {
-        const phase = (seconds * (0.22 + scatter(i, 9) * 0.3) + scatter(i, 10)) % 1;
-        const bx = colX + Math.round(Math.sin(phase * 11 + i) * 3 + (scatter(i, 12) - 0.5) * 8);
-        const size=visual.bubbleRadius*(.6+scatter(i,13))*(1+phase*.3),by=from-travel*phase;
-        g.circle(bx,by,size).stroke({color:0xd9fbff,alpha:.8,width:.8});g.circle(bx-size*.25,by-size*.3,.6).fill({color:0xffffff,alpha:.9});
-      }
-      g.fill({ color: 0xffffff, alpha: derived.lightOn ? 0.75 : 0.4 });
-    }
   }
 
   /** Delante de los peces: tinte del agua, rayos de luz, partículas, brillos y algas. */
@@ -547,7 +538,7 @@ export class TankView {
       for (let i = 0; i < rays; i++) {
         const baseX = left + ((i + 0.5) * width) / rays + Math.sin(seconds * 0.15 + i * 2) * 10;
         const wd = 8 + 10 * scatter(i, 81);
-        const alpha = 0.06 + 0.04 * Math.sin(seconds * 0.6 + i * 1.9);
+        const alpha = ecosystem.water.rayAlpha + 0.01 * Math.sin(seconds * 0.6 + i * 1.9);
         const slant = 0.4 * ((baseX - mid) / width) + 0.05;
         const len = (waterHeight - sandH * 0.5) * (0.6 + 0.35 * scatter(i, 82));
         const half = Math.round(len * 0.55);
@@ -570,12 +561,14 @@ export class TankView {
 
     // Partículas en suspensión, a la deriva.
     const column = Math.max(1, waterHeight - sandH - 3);
-    const specks = Math.min(70, Math.round((width * column) / 900));
+    const turbidity=Math.min(1,state.organics.detritusG*.3+state.algae.glass*.2);
+    const specks = Math.round(ecosystem.water.cleanSpecks+turbidity*ecosystem.water.dirtySpecks);
     for (let i = 0; i < specks; i++) {
       const drift = (i % 3 === 0 ? -1 : 1) * (0.5 + scatter(i, 83));
       const py = (((scatter(i, 84) * column + seconds * drift) % column) + column) % column;
       const px = left + 2 + scatter(i, 85) * (width - 5) + Math.sin(seconds * 0.25 + i) * 6;
-      g.rect(clamp(px, left, right - 1), waterTop + 2 + py, 1, 1);
+      const driftFlow=this.flow.getWaterVelocity((px-left)/(this.inner.width/this.flow.width),py/(this.inner.width/this.flow.width));
+      g.rect(clamp(px+driftFlow.x*4,left,right-1),waterTop+2+py+driftFlow.y,1,1);
     }
     if (specks > 0) g.fill({ color: 0xeafff4, alpha: lit ? 0.2 : 0.1 });
 
@@ -594,7 +587,7 @@ export class TankView {
       }
       run = 0;
     }
-    if (glints > 0) g.fill({ color: 0xffffff, alpha: lit ? 0.7 : 0.25 });
+    if (glints > 0) g.fill({ color: 0xffffff, alpha: lit ? ecosystem.water.surfaceAlpha : 0.12 });
 
     // Capa de algas en el vidrio.
     const algaeSpecks = Math.round(width * 1.6);

@@ -1,5 +1,24 @@
 {
- "growthDays":14,"juvenileFraction":0.35,"minimumFishPixels":6,"depthScale":0.32,"depthTint":0.05,"depthIntervalSeconds":8,"depthTravelSpeed":0.22,
- "sickActivity":0.35,"healthFloor":0.2,"floatSpeed":0.65,"foodPixels":3,"foodParticlesPerGram":1000,"bubbleRadius":2,
- "roundInner":{"x":0.1,"y":0.18,"width":0.8,"height":0.7},"roundMask":{"x":0.5,"y":0.53,"rx":0.43,"ry":0.42}
+  "growthDays": 14,
+  "juvenileFraction": 0.35,
+  "minimumFishPixels": 6,
+  "depthScale": 0.32,
+  "depthTint": 0.05,
+  "depthIntervalSeconds": 8,
+  "depthTravelSpeed": 0.22,
+  "sickActivity": 0.35,
+  "healthFloor": 0.2,
+  "floatSpeed": 0.65,
+  "roundInner": {
+    "x": 0.1,
+    "y": 0.18,
+    "width": 0.8,
+    "height": 0.7
+  },
+  "roundMask": {
+    "x": 0.5,
+    "y": 0.53,
+    "rx": 0.43,
+    "ry": 0.42
+  }
 }

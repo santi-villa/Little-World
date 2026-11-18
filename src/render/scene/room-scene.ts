@@ -103,7 +103,9 @@ export class RoomScene {
   private state:SimState|null=null;
   private lastTap=-100;
   private mode: UiMode = 'room';
-  followingId:number|null=null;private fishTapAt=-100;
+  followingId:number|null=null;
+  get feedingContacts(){return this.tank.fish.feedingContacts;}
+  zoomAt(p:Point,factor:number):void{this.followingId=null;this.gesture=null;this.camera.zoomAt(p.x,p.y,factor);}
   showFish(id:number):void {const p=this.tank.fishPoint(id);if(!p)return;this.followingId=id;this.handTool='hand';this.enterFocus('tank',{x:p.x,y:p.y,zoom:Math.max(3,Math.min(12,120/Math.max(1,p.length)))});}
   fishDetails():void {if(this.followingId!==null)this.tools('fish',this.followingId);}
   /** Vista de la habitación a la que se vuelve al salir de una vista de cerca. */
@@ -328,7 +330,7 @@ export class RoomScene {
           if(this.seconds-this.lastTap<1)return;
           this.lastTap=this.seconds;this.act({type:'tapGlass'});this.tank.scareAt(w.x,w.y);this.ui.say(texts.ui.knock);
         } else if(this.handTool==='observe'||this.handTool==='hand'){
-          const id=this.tank.fishAt(w.x,w.y);if(id!==null){if(this.followingId===id && this.seconds-this.fishTapAt<.45)this.fishDetails();else this.showFish(id);this.fishTapAt=this.seconds;}
+          const id=this.tank.fishAt(w.x,w.y);if(id!==null){this.showFish(id);this.fishDetails();}
         } else if(this.handTool==='kit'){
           this.tools('status');
         } else if(this.handTool==='bucket'){
@@ -344,6 +346,8 @@ export class RoomScene {
       if (this.cat.hit(w.x, w.y)) this.petCat();
       return;
     }
+
+    if(this.mode==='room'){const id=this.tank.fishAt(w.x,w.y);if(id!==null){this.showFish(id);this.fishDetails();return;}}
 
     const live = { tank: this.tank.bounds, cat: this.cat.rect };
     const zone = this.data.zones.find((z) => inRect(zoneRect(z, live), w.x, w.y));

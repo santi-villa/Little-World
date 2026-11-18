@@ -1,3 +1,4 @@
+import ecosystem from './data/ecosystem.json';
 import {FishFocus} from './render/ui/fish-focus';
 import { beforeAppUpdate, startAppUpdates } from './app-update';
 import { AquariumPanel } from './render/ui/aquarium-panel';
@@ -197,6 +198,7 @@ async function boot(): Promise<void> {
     else tools.care(page);
   });
   const fishFocus=new FishFocus(()=>scene.fishDetails(),()=>scene.showTank());
+  tools.onObserveAnimal=id=>scene.showFish(id);
   scene.onReject = (tool, reason) => tray.reject(tool, reason);
   app.stage.addChild(scene.container);
   // Render the room while historical data is loading, instead of showing a blank screen.
@@ -232,7 +234,7 @@ async function boot(): Promise<void> {
   // --- Tocar la escena: la escena decide (zonas, cámara, caricias, botones) ---
   const canvas = app.canvas;
   canvas.style.touchAction = 'none';
-  const toScene = (event: PointerEvent): { x: number; y: number } => {
+  const toScene = (event: {clientX:number;clientY:number}): { x: number; y: number } => {
     const rect = canvas.getBoundingClientRect();
     return {
       x: ((event.clientX - rect.left) / rect.width) * GAME_WIDTH,
@@ -248,7 +250,12 @@ async function boot(): Promise<void> {
     const tool = scene.activeTool;
     follow(tool === 'hand' ? null : scene.cursorAt(toScene(event)), event.clientX, event.clientY);
   };
+  const touches=new Map<number,{x:number;y:number}>();let pinching=false,pinchDistance=0;
+  const pinch=()=>{const points=[...touches.values()];if(points.length<2)return;const a=points[0]!,b=points[1]!,distance=Math.hypot(a.x-b.x,a.y-b.y),rect=canvas.getBoundingClientRect();if(pinchDistance>0)scene.zoomAt({x:((a.x+b.x)/2-rect.left)/rect.width*GAME_WIDTH,y:((a.y+b.y)/2-rect.top)/rect.height*GAME_HEIGHT},distance/pinchDistance);pinchDistance=distance;};
+  canvas.addEventListener('wheel',event=>{if(document.querySelector('dialog[open]'))return;event.preventDefault();const units=event.deltaMode===1?16:event.deltaMode===2?GAME_HEIGHT:1;scene.zoomAt(toScene(event),Math.exp(-Math.max(-300,Math.min(300,event.deltaY*units))*ecosystem.camera.wheelRate));},{passive:false});
   canvas.addEventListener('pointerdown', (event) => {
+    if(event.pointerType==='touch'){touches.set(event.pointerId,{x:event.clientX,y:event.clientY});if(touches.size>=2){pinching=true;cancelLong?.();scene.cancelPress();pinch();canvas.setPointerCapture?.(event.pointerId);return;}}
+
     canvas.setPointerCapture?.(event.pointerId);
     const p = toScene(event);
     scene.pointerDown(p);
@@ -259,6 +266,7 @@ async function boot(): Promise<void> {
     cancelLong = longPress(() => scene.describe(p), () => scene.cancelPress());
   });
   canvas.addEventListener('pointermove', (event) => {
+    if(touches.has(event.pointerId))touches.set(event.pointerId,{x:event.clientX,y:event.clientY});if(pinching){pinch();return;}
     const p = toScene(event);
     scene.pointerMove(p);
     setCursor(scene.cursorAt(p));
@@ -269,6 +277,7 @@ async function boot(): Promise<void> {
     }
   });
   const release = (event: PointerEvent, cancelled = false): void => {
+    touches.delete(event.pointerId);if(pinching){if(touches.size===0){pinching=false;pinchDistance=0;}scene.pointerUp(toScene(event),true);return;}
     cancelLong?.();
     cancelLong = null;
     pressStart = null;
@@ -282,12 +291,13 @@ async function boot(): Promise<void> {
   canvas.addEventListener('pointerleave', () => scene.pointerLeave());
   canvas.addEventListener('pointercancel', (event) => release(event, true));
 
-  window.addEventListener('keydown',e=>{if(e.key==='Escape')tools.revealControls();});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape')tools.revealControls();if(e.key==='0'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement)?.tagName))scene.showTank();});
   let lastFrame = performance.now();
   app.ticker.add(() => {
     const frame = performance.now();
     const elapsed = (frame - lastFrame) / 1000;
     lastFrame = frame;
+    game.observeFeedingContacts(scene.feedingContacts);
     if (hiddenAt === null && recoveringFrom === null) game.update(elapsed);
     tools.update();
     fishFocus.update(game.state.animals.find(a=>a.id===scene.followingId));

@@ -18,6 +18,8 @@ export interface OutdoorSeries {
 }
 
 export interface SimEnvironment {
+  /** Optional live observation: bitmask of food layers reached per animal. Offline uses species access. */
+  feedingContacts?:Readonly<Record<number,number>>;
   outdoor?: OutdoorSeries;
   weather?: Weather;
   /** El juego está abierto y a la vista (los peces aprenden a pedir comida). */

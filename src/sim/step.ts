@@ -49,7 +49,7 @@ function singleStep(
   // Seres vivos: el gato, y los animales de la pecera (comen, excretan, deciden).
   stepCat(state, dtMinutes, rng, config, env, events);
   if (state.animals.length > 0) {
-    stepFood(state, dtMinutes, ctx, config);
+    stepFood(state, dtMinutes, ctx, config,env.feedingContacts);
     stepAnimals(state, dtMinutes, ctx, config, events);
     if (ctx.stale) ctx = buildContext(state, config);
     const hoursCrossed =
@@ -61,7 +61,7 @@ function singleStep(
     }
     decideIntents(state, ctx, rng, config, env);
   } else {
-    stepFood(state, dtMinutes, ctx, config);
+    stepFood(state, dtMinutes, ctx, config,env.feedingContacts);
   }
 
   // Química y biología.

@@ -304,3 +304,11 @@ Implementados: plantas originales en mallas ondulantes; todos los peces procedur
 El vidrio redondo ahora aparece en bowl_8 y puede elegirse como apariencia en Cuaderno → Decorar, sin reiniciar la partida. Los peces muertos flotan y permanecen hasta retirarlos con el botón de Peces. La depredación conserva su comportamiento previo (una presa comida no deja un pez flotando).
 
 Pendiente: revisión visual de recorte de la redonda y mallas de cada planta, especialmente en móviles físicos. La profundidad es 2.5D visual, no volumen físico con colisiones tridimensionales. No se ejecutan tests ni se toman capturas por la instrucción vigente. Ajustes visuales en aquarium-visual.json y fish-appearance.json.
+
+## Ecosistema compartido: alcance implementado y límites
+
+Implementados: corriente analítica común; perfiles de resortes por planta y reposo reducido; partículas alimenticias persistentes por sesión y reconciliadas con pools químicos; alimentación en vivo por contacto/capa, manteniendo química y catch-up; microburbujas por caudal; rueda/pinza; ficha con un clic y selector de otro animal; perfiles por grupos; respuesta a corriente y ajustes de exploración; picoteo/branquias; estela discreta de corydoras; agua limpia con menos partículas y rayos más suaves. docs/ECOSISTEMA.md describe integraciones y opciones.
+
+Pendientes expresos: guardar posiciones de cada representante visual entre sesiones; consumo químico individual por grano (actualmente pools con contactos); colisión granular con cada rama/roca; fluido 3D/CFD; iluminación física/cáusticas; anatomías propias completas y espejo de flare; mediciones de rendimiento en celulares físicos. No presentar estos puntos como completos. La implementación se terminó antes de ejecutar tests, según instrucción del usuario; los resultados se agregan tras la validación final.
+
+Validación final del ecosistema: suite completa 248/248; pruebas focalizadas finales 9/9; typecheck y build/PWA correctos. Recorrido Chromium de escritorio y móvil horizontal: rueda, pinza, ficha en un clic, selector de individuo, scroll del modal y comida sin interferencia con selección; sin errores de consola observados. Revisión de capturas diurnas/nocturnas y video local. Falta medición en teléfono físico y observación prolongada de todas las especies.

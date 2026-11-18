@@ -980,3 +980,9 @@ Las composiciones dejan más espacio de nado: madera/rocas más pequeñas, menos
 Un clic en un pez con la mano/lupa sigue su centro con cámara suavizada y zoom acotado; no abre el cuaderno. La barra de seguimiento muestra nombre y cinco iconos con anillos: salud, estrés, hambre, confianza y aletas sanas. Etiquetas accesibles y tooltip expresan porcentajes; hambre/estrés altos son desfavorables. Más información o doble clic abre la ficha. Ver acuario sale del seguimiento; elegir herramienta también vuelve al encuadre general.
 
 Contemplar conserva el encuadre y el seguimiento, oculta HUD, herramientas, controles de depuración y reparación. Un toque en la escena, Escape o el botón accesible Mostrar controles lo restaura. No se agrega audio ambiental todavía: se conserva la interfaz de sonido existente y queda para incorporar la pista que el usuario elija.
+
+### Ecosistema compartido y selección directa (noviembre 2026)
+
+El agua tiene una corriente analítica compartida consultable en centímetros; afecta peces con resistencia por grupo, plantas con perfiles propios, comida persistente y microburbujas. Las cantidades siguen perteneciendo a la química. En vivo, una entrada opcional de contacto por capa limita la alimentación a peces que llegaron; offline y saltos de tiempo conservan la abstracción por especie para no depender del render. El guardado mantiene compatibilidad.
+
+Un clic en un pez ahora abre inmediatamente su ficha y conserva enfoque suave; sustituye el paso anterior de clic para seguir y segundo clic para información. Rueda del mouse y pinza ajustan zoom sin interferir con paneles. Las plantas permanecen casi quietas sin corriente y el movimiento responde principalmente a fuerzas e impulsos. Implementación, parámetros y límites: docs/ECOSISTEMA.md.

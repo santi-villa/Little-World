@@ -78,6 +78,8 @@ export class Game {
   lastCatchUp: CatchUpReport | null = null;
   private lastGlassNote=-Infinity;
   private pendingMinutes = 0;
+  private feedingContacts:Record<number,number>={};
+  observeFeedingContacts(contacts:Readonly<Record<number,number>>):void{for(const [id,mask]of Object.entries(contacts))this.feedingContacts[Number(id)]=(this.feedingContacts[Number(id)]??0)|mask;}
 
   constructor(state: SimState, settings: GameSettings = DEFAULT_SETTINGS, public player: PlayerState = createPlayer()) {
     this.state = { ...state, cat: createCat(state.timeMinutes) };
@@ -120,12 +122,14 @@ export class Game {
     if (this.pendingMinutes < LIVE_STEP_MINUTES) return;
     const minutes = this.pendingMinutes;
     this.pendingMinutes = 0;
-    this.advance(minutes);
+    this.advance(minutes,true);
   }
 
   /** Avanza la simulación `minutes` minutos de una. */
-  advance(minutes: number): void {
-    const result = step(this.state, minutes, defaultConfig, this.environment());
+  advance(minutes: number,live=false): void {
+    const env=this.environment();if(live)env.feedingContacts=this.feedingContacts;
+    const result = step(this.state, minutes, defaultConfig, env);
+    this.feedingContacts={};
     this.state = result.state;
     this.record(result.events);
     this.dirty = true;

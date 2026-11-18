@@ -81,6 +81,7 @@ export class CodeBetta {
     this.container.position.set(x, y+(motion?.bob??0)*length/Math.max(cBetta.epsilon,motion?.sizeCm??1));
     this.container.scale.set(length / 104, (length / 104) * (alive ? 1 : -1));
     this.container.tint = alive ? (lit ? 0xffffff : 0x7694ad) : 0xa0a0a0;
+    const nibble=alive&&intent==='eat'?Math.max(0,Math.sin(this.animationSeconds*7))*.7:0;
     const faces: Face[] = [],
       t = p.phase,
       fin = (1 - 0.5 * damage)*(motion?.mode==='flare'?cBetta.flareScale:1);
@@ -97,9 +98,9 @@ export class CodeBetta {
       ? 0x5866a1
       : Number.parseInt(sp!.accent.slice(1), 16);
     const dark = lerpColor(main, 0x152e36, 0.35),
-      light = lerpColor(main, 0xd6dfc5, 0.32);
+      light = lerpColor(main, 0xd6dfc5, 0.17);
     const point = (px: number, py: number, pz = 0): Point3 => ({
-      x: px,
+      x: px+(px>29?nibble:0),
       y: py * bodyHeight,
       z: pz,
     });
@@ -227,7 +228,7 @@ export class CodeBetta {
             point(16, -7, z),
             point(14, 1, z + side * 0.2),
             point(16, 6, z),
-            point(16.8, 1, z + side * 0.2),
+            point(16.8, 1, z + side * (0.2+Math.sin(this.animationSeconds*2)*.25)),
           ],
           0x193b50,
         );

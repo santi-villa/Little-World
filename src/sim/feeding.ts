@@ -50,6 +50,7 @@ export function stepFood(
   dtMinutes: number,
   ctx: TankContext,
   config: SimConfig,
+  contacts?:Readonly<Record<number,number>>,
 ): void {
   const food = state.food;
   const organics = state.organics;
@@ -62,6 +63,7 @@ export function stepFood(
   const f = config.fish;
   const animals = state.animals;
   const count = animals.length;
+  const accessAt=(i:number,layer:0|1|2):number=>contacts!==undefined&&((contacts[animals[i]!.id]??0)&(1<<layer))===0?0:layerAccess(ctx.species[i] as Species,animals[i]!,layer,config);
   if (want.length < count) {
     want = new Float64Array(count * 2);
     full = new Float64Array(count * 2);
@@ -99,7 +101,7 @@ export function stepFood(
           if ((want[i] as number) <= 0) continue;
           demand +=
             (want[i] as number) *
-            layerAccess(ctx.species[i] as Species, animals[i] as AnimalState, layer, config);
+            accessAt(i,layer);
         }
         if (demand <= 0) continue;
         const share = Math.min(1, available / demand);
@@ -108,7 +110,7 @@ export function stepFood(
           if ((want[i] as number) <= 0) continue;
           const a = animals[i] as AnimalState;
           const eaten =
-            (want[i] as number) * layerAccess(ctx.species[i] as Species, a, layer, config) * share;
+            (want[i] as number) * accessAt(i,layer) * share;
           if (eaten <= 0) continue;
           want[i] = (want[i] as number) - eaten;
           a.hunger = Math.max(0, a.hunger - eaten / (full[i] as number));
