@@ -222,7 +222,7 @@ async function boot(illustrated: boolean, fishPreview: boolean): Promise<void> {
   const tools = new AquariumPanel(game, outdoor, () => scene.showTank(), () => scene.showRoom(), (tool) => {
     const why = scene.selectTool(tool);
     if (why) tray.reject(tool, why);
-  }, () => scene.toggleLid());
+  }, () => scene.toggleLid(), (on) => scene.setImmersive(on));
   const hud = new HudPaper(() => tools.open('weather'), () => tools.open('status'));
   const scene = new RoomScene((action) => {
     game.act(action);

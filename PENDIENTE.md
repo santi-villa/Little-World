@@ -1,3 +1,16 @@
+# Pantalla completa del acuario
+
+Botón «Pantalla completa» (arriba, junto a Contemplar): el agua ocupa toda la
+pantalla sin vidrio, tapa, equipos ni controles, y pide pantalla completa al
+navegador (el iPhone no la permite: ahí solo se ocultan los controles). Se sale
+tocando la pantalla, con Escape, con «Mostrar controles» (abajo a la izquierda,
+tenue) o con el botón Habitación. La cámara cubre la pantalla con el agua, así
+que en pantallas 16:9 se recortan un poco los costados de la pecera. Revisado
+en escritorio con una captura; falta probarlo en un celular y con las otras
+peceras (la redonda se muestra como rectángulo).
+
+---
+
 # Interfaz de papel y madera (etapa 1 hecha)
 
 Hecho: sistema de UI con el arte de `marcos-ui.png` (papel, nota, madera,

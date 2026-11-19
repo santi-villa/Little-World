@@ -33,12 +33,12 @@ export class AquariumPanel {
   private readonly statusButton: HTMLButtonElement;
   private readonly weatherButton: HTMLButtonElement;
   private weatherKey = '';
-  revealControls():void {document.body.classList.remove('contemplating');const reveal=document.querySelector<HTMLButtonElement>('.reveal-controls');if(reveal)reveal.hidden=true;}
+  revealControls():void {if(document.body.classList.contains('immersive')){document.body.classList.remove('immersive');this.setImmersive?.(false);if(document.fullscreenElement)void document.exitFullscreen().catch(()=>undefined);}document.body.classList.remove('contemplating');const reveal=document.querySelector<HTMLButtonElement>('.reveal-controls');if(reveal)reveal.hidden=true;}
   private page: Page | null = null;
   private lastKey = '';
   private selectedAnimal: number | null = null;
   private opener: Element | null = null;
-  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void, private readonly chooseTool:(tool:HandTool)=>void, _toggleLid?:()=>void) {
+  constructor(private readonly game: Game, private readonly climate: BuenosAiresWeather, private readonly focusTank: () => void, showRoom: () => void, private readonly chooseTool:(tool:HandTool)=>void, _toggleLid?:()=>void, private readonly setImmersive?:(on:boolean)=>void) {
     const nav = this.navigation;
     nav.className = 'aquarium-nav'; nav.setAttribute('aria-label', careText.herramientas_del_acuario);
     this.statusButton = button(careText.agua, () => this.open('status'));
@@ -53,6 +53,15 @@ export class AquariumPanel {
     });
     const reveal=button(careText.mostrar_controles,()=>{document.body.classList.remove('contemplating');reveal.hidden=true;contemplate.focus();});
     reveal.className='reveal-controls';reveal.hidden=true;document.body.append(reveal);nav.append(contemplate);
+    // Pantalla completa: solo el agua, sin marcos ni controles, para mirar los peces con calma.
+    const immersive=button(careText.pantalla_completa,()=>{
+      document.body.classList.add('contemplating','immersive');reveal.hidden=false;
+      this.setImmersive?.(true);
+      // También el navegador a pantalla completa, si lo permite (el iPhone no).
+      void document.documentElement.requestFullscreen?.().catch(()=>undefined);
+    });
+    document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('immersive'))this.revealControls();});
+    nav.append(immersive);
     // Las herramientas y la tapa están en la bandeja de madera (tool-tray.ts).
     this.weatherButton = button(careText.buenos_aires, () => this.open('weather'));
     this.weatherButton.className = 'outside-chip';

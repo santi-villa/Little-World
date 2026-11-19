@@ -256,6 +256,15 @@ export class RoomScene {
     );
     // De cerca, la cámara acompaña al gato si camina.
     if (this.mode === 'cat' && !this.gesture?.dragging) this.focusOn(this.catFocus(), false);
+    if (this.immersive) {
+      // Si cambia la pecera (otro modelo, otra pantalla), la cámara se vuelve a ajustar.
+      const b = this.tank.viewBounds;
+      const key = `${Math.round(b.x)}/${Math.round(b.y)}/${Math.round(b.width)}/${Math.round(b.height)}`;
+      if (key !== this.immersiveKey) {
+        this.immersiveKey = key;
+        this.camera.goTo(this.immersiveView(), false, 0.6, false);
+      }
+    }
     if (this.mode === 'tank' && this.tankFit && this.followingId === null) {
       const key = this.tankFitKey();
       if (key !== this.tankFit.key) {
@@ -509,6 +518,33 @@ export class RoomScene {
 
   showTank(): void { this.frameTank(0.85); }
 
+  /** Pantalla completa: el agua ocupa toda la pantalla, sin marco, para mirar los peces. */
+  private immersive = false;
+  private immersiveKey = '';
+  get isImmersive(): boolean { return this.immersive; }
+
+  setImmersive(on: boolean): void {
+    if (on === this.immersive) return;
+    this.immersive = on;
+    this.tank.setImmersive(on);
+    this.immersiveKey = '';
+    this.handTool = 'hand';
+    if (on) {
+      this.followingId = null;
+      this.enterFocus('tank', this.immersiveView());
+      this.tankFit = undefined;
+    } else {
+      this.frameTank(0.85);
+    }
+  }
+
+  /** Cobre la pantalla entera con el agua (sin franjas), con un poquito de más para que no asome ningún borde. */
+  private immersiveView(): CameraView {
+    const b = this.tank.viewBounds;
+    const zoom = Math.max(GAME_WIDTH / b.width, GAME_HEIGHT / b.height) * 1.02;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2, zoom };
+  }
+
   private frameTank(fill: number): void {
     this.followingId = null;
     this.enterFocus('tank', this.tankFocus(fill));
@@ -558,6 +594,7 @@ export class RoomScene {
   }
 
   private exitFocus(): void {
+    if (this.immersive) { this.immersive = false; this.tank.setImmersive(false); }
     this.tankFit = undefined;
     this.followingId=null;
     if (this.mode === 'room') return;

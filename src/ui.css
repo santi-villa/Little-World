@@ -562,3 +562,23 @@ body.debug-open[data-view='tank'] .aquarium-nav {
   .tool-tray .tray-tool { min-height: 38px; }
   .tool-tray .wood-btn { min-height: 36px; }
 }
+
+/* ---------- Pantalla completa: solo el agua ---------- */
+
+body.immersive .reveal-controls {
+  opacity: 0.3;
+  transition: opacity 400ms ease;
+}
+
+body.immersive .reveal-controls:hover,
+body.immersive .reveal-controls:focus-visible {
+  opacity: 1;
+}
+
+body.immersive {
+  cursor: none;
+}
+
+body.immersive #stage canvas {
+  cursor: none;
+}

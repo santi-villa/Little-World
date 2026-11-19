@@ -234,6 +234,23 @@ export class TankView {
     return this.outer;
   }
 
+  /** Modo pantalla completa: sin vidrio, tapa ni equipos, solo el agua. */
+  private immersive = false;
+  setImmersive(on: boolean): void { this.immersive = on; }
+  /**
+   * El agua tal como se ve sin marcos (de vidrio a vidrio, de la superficie al
+   * fondo), en píxeles de la escena: lo que la cámara tiene que cubrir.
+   */
+  get viewBounds(): TankRect {
+    const k = this.art.scale.x;
+    const top = this.waterArea.y;
+    return {
+      x: this.art.x + this.inner.x * k,
+      y: this.art.y + top * k,
+      width: this.inner.width * k,
+      height: (this.inner.y + this.inner.height - top) * k,
+    };
+  }
   get waterBounds():TankRect { const k=this.art.scale.x;return {x:this.art.x+this.waterArea.x*k,y:this.art.y+this.waterArea.y*k,width:this.waterArea.width*k,height:this.waterArea.height*k}; }
   fishPoint(id:number){const p=this.fish.pointFor(id),k=this.art.scale.x;return p?{x:this.art.x+p.x*k,y:this.art.y+p.y*k,length:p.radius/.8*k}:null;}
   setHand(hand:HandInput|null):void {this.fish.hand=hand;}
@@ -268,6 +285,8 @@ export class TankView {
     this.glassBack.visible = !this.round && !this.paintedGlass;
     this.optics?.updateVisibility(this.paintedGlass);
     const roundKey=this.round?String(this.glass.texture.uid):"";if(roundKey!==this.roundMaskKey){this.roundMaskKey=roundKey;this.roundMask.clear();if(this.round){const t=this.glass.texture,m=visual.roundMask;this.roundMask.ellipse(t.width*m.x,t.height*m.y,t.width*m.rx,t.height*m.ry).fill(0xffffff);}}this.wet.mask=this.round?this.roundMask:null;
+    // Pantalla completa: la pecera redonda se ve como rectángulo (sin la máscara del cuenco).
+    if (this.immersive) this.wet.mask = null;
     const geo = this.layout(state, derived);
     this.waterArea={x:geo.left,y:geo.waterTop+2,width:geo.width,height:Math.max(1,geo.sandTop-geo.waterTop-2)};
     const dt = this.lastSeconds === 0 ? 0 : Math.max(0, seconds - this.lastSeconds);
@@ -275,6 +294,10 @@ export class TankView {
     const pxPerCm = this.inner.width / state.tank.lengthCm;
     const tannins = state.water.tannins;
 
+    // Sin bordes: el vidrio, la tapa, la luz y los equipos no se dibujan (renderable no pisa a `visible`).
+    const framed = !this.immersive;
+    for (const part of [this.glass, this.lidSprite, this.ledOff, this.glassBack, this.equip]) part.renderable = framed;
+    if (this.paintedLid) this.paintedLid.container.renderable = framed;
     this.drawWater(geo, lit, tannins);
     this.waterDay.visible = this.paintedGlass;
     this.waterDay.alpha = lighting.exposure;
